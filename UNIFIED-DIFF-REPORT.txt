@@ -1,0 +1,61 @@
+================================================================================
+RISQUE-UNIFIED — C: vs D: DIFF REPORT (2026-05-21)
+================================================================================
+
+Compared:
+  C:\github\RISQUE-UNIFIED\   (kitchen local mirror)
+  D:\github\RISQUE-UNIFIED\   (portable external drive — HANDOFF MASTER)
+
+Method: recursive file list + SHA256 for same relative paths.
+
+RESULT
+------
+  Identical (hash match):     134 files
+  Only on C (missing on D):     7 files  → COPIED to D
+  Only on D (missing on C):     0 files
+  Same path, different content: 0 files
+
+Files copied C → D (portable was behind on lab docs only):
+  UNIFIED-HANDOFF.txt
+  Collect-Risque-Environment.ps1
+  environment-snapshot-DESKTOP-FH9UOS6-2026-05-20_220630.txt
+  scripts\new\Launch-Local.bat
+  scripts\new\Launch-Menu.bat
+  scripts\new\Launch-Github-RISQUE.bat
+  scripts\new\Launch-Github-RISQUE-GEMINI.bat
+
+Game code (game.html, js\, phases\, scripts\RISQUE.ps1, etc.) was already
+in sync between C and D before this copy.
+
+HANDOFF RULE (user decision 2026-05-21)
+---------------------------------------
+  • Plug portable drive on each PC.
+  • Run:  <DRIVE>:\github\RISQUE-UNIFIED\RISQUE.bat
+  • Read: <DRIVE>:\github\RISQUE-UNIFIED\UNIFIED-HANDOFF.txt
+  • Save folder stays on each PC: C:\risque\save (not on the USB)
+
+Optional: after updating portable on kitchen, mirror to C:\github\RISQUE-UNIFIED\
+for local speed — but portable D:\github\RISQUE-UNIFIED\ is the source of truth.
+
+Re-diff after changes:
+  powershell -File <DRIVE>:\github\RISQUE-UNIFIED\Collect-Risque-Environment.ps1
+  (or re-run a folder compare tool)
+
+SKINNY CLEANUP (2026-05-21)
+---------------------------
+Removed from root (not used by RISQUE.bat / game):
+  _patch-toolbar.js, _reorder-dev-row.js, test.bat, test-celebration-isolation.html,
+  varify.html, Launch RISQUE Dual Display.cmd (broken — missing risque-dual-monitors.ps1),
+  risque-tv-ping.html, CHANGELOG.md, DEVLOG.md
+Removed from scripts:
+  RISQUE.bat (duplicate of root), skeleton-launch.*, all mock loaders/json/mjs/txt,
+  scripts\new\ (Launch-* pointed at other repos, not UNIFIED)
+Removed from js:
+  test-celebration-isolation.js (paired test page)
+Kept in scripts: RISQUE.ps1, risque-disk-server.ps1, risque-chromium-primary.ps1,
+  risque-browser-restart-job.ps1
+
+Applied on C:\github\RISQUE-UNIFIED. If D: still has old files, run Skinny-Portable.ps1
+on the portable drive when write access is allowed (USB write-protect off).
+
+================================================================================

@@ -1,0 +1,52 @@
+{
+  "0": [
+    {
+      "name": "GUIDO",
+      "color": "blue"
+    },
+    {
+      "name": "MICKEY",
+      "color": "red"
+    },
+    {
+      "name": "LAURA",
+      "color": "white"
+    },
+    {
+      "name": "NOOCH",
+      "color": "yellow"
+    }
+  ],
+  "1": [
+    {
+      "name": "GUIDO",
+      "color": "blue"
+    },
+    {
+      "name": "MICTOR",
+      "color": "red"
+    },
+    {
+      "name": "NOOCH",
+      "color": "yellow"
+    }
+  ],
+  "2": [
+    {
+      "name": "GUIDO",
+      "color": "blue"
+    },
+    {
+      "name": "MICKEY",
+      "color": "red"
+    },
+    {
+      "name": "KARL",
+      "color": "pink"
+    },
+    {
+      "name": "NOOCH",
+      "color": "yellow"
+    }
+  ]
+}

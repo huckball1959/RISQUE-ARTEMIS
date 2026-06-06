@@ -1,0 +1,477 @@
+================================================================================
+RISQUE UNIFIED LAB — AI HANDOFF
+================================================================================
+Last updated: 2026-05-21 (OLD BEDROOM round-6 test + browser prep)
+Purpose: Keep every AI session (and every PC) aligned on environment, goals,
+         and procedures. Read this file first when working on RISQUE.
+
+================================================================================
+1. PROJECT SNAPSHOT
+================================================================================
+
+PORTABLE MASTER (external drive — assign drive letter X: to the github root):
+  Game:   X:\github\RISQUE-APOLLO\
+  Saves:  X:\github\save\          (lowercase save — not SAVE)
+  THIS folder is the bedroom-tested build (minor Cursor edit on OLD BEDROOM).
+
+Launch (DEFAULT on lab PCs — use this, not raw RISQUE.bat):
+  X:\github\RISQUE-APOLLO\scripts\APOLLO-LAUNCHER.bat
+  OR repo root:  APOLLO-LAUNCH.bat  or  Launch-Lab.bat
+  APOLLO sets RISQUE_DOWNLOAD_PATH=X:\github\save, wipes TEMP Chrome profiles,
+  runs local file:// only (-SkipMenu -NoReplayDebug).
+
+Alternate (kitchen / hosted testing):
+  RISQUE.bat → menu 1 = Local, 2 = Hosted GitHub Pages (out of scope for lab).
+
+Older copies (RISQUE-UNIFIED on D: or C:) — use RISQUE-APOLLO on X: for handoff.
+
+Save folder (lab portable — REQUIRED on all machines when using X: github root):
+  X:\github\save
+  (Sibling of X:\github\RISQUE-APOLLO\. Created automatically by launcher.)
+  APOLLO-LAUNCHER.bat sets RISQUE_DOWNLOAD_PATH; RISQUE.ps1 + game read risque-launcher-paths.json.
+  Legacy fallback if repo is NOT under \github\: C:\risque\save
+  Override: env RISQUE_DOWNLOAD_PATH
+
+Git / GitHub (optional during lab):
+  May be disconnected from git while UNIFIED is a frozen snapshot.
+  Record commit hash or zip date in MACHINE-REPORT sections when known.
+
+================================================================================
+2. THREE TEST MACHINES
+================================================================================
+
+| ID           | Role              | Hardware (approx)     | OS        |
+|--------------|-------------------|------------------------|-----------|
+| KITCHEN      | Minimum spec GOLD | 8 GB RAM, i3, oldest   | Windows 10|
+| OLD BEDROOM  | Primary dev now   | 16 GB RAM, i7, ~10 yr  | Windows 10|
+| NEW BEDROOM  | Modern OS check   | 16 GB RAM, Win11, new  | Windows 11|
+
+Current problem (why UNIFIED exists):
+  - Same game build runs very well on KITCHEN.
+  - OLD BEDROOM locks up (round 1 early; after Chrome reset reached ~round 4).
+  - Suspected cause: environment / launch parity, NOT "bad game on i7."
+  - NEW BEDROOM: test after KITCHEN + OLD BEDROOM sheets match.
+
+Machines are game-dev only. User may disable AV for testing later; Defender
+is typical. Do not assume OS corruption until environment is documented.
+
+================================================================================
+3. MISSION PHASES (DO IN ORDER)
+================================================================================
+
+PHASE A — KITCHEN INVESTIGATION (FIRST)
+  Goal: Document ground truth on the machine that works.
+  Deliverable: Fill KITCHEN section in MACHINE-REPORTS below (or separate
+               KITCHEN-LAB-REPORT.txt in this folder).
+  No game code changes unless user explicitly requests after Phase C.
+
+PHASE B — OLD BEDROOM INVESTIGATION
+  Goal: Same checklist as KITCHEN; diff the results.
+  Deliverable: OLD BEDROOM section in MACHINE-REPORTS.
+
+PHASE C — COMPARE & HYPOTHESIZE
+  Goal: Side-by-side table; list top 3 environmental diffs (not code).
+  Deliverable: COMPARISON NOTES section at bottom of this file or
+               UNIFIED-COMPARISON.txt.
+
+PHASE D — NEW BEDROOM (after C)
+  Same checklist; note Win11-specific items.
+
+PHASE E — CODE CHANGES (only if user approves)
+  Rules for any future code:
+  - Bedroom/KITCHEN golden path must not regress.
+  - Prefer quota-gated / opt-in fixes (lsReplayLite, -NoReplayDebug).
+  - Document what changed in this handoff "CHANGELOG" section.
+
+================================================================================
+4. CRITICAL: BROWSER ≠ "CHROME SETTINGS YOU RESET"
+================================================================================
+
+RISQUE.bat does NOT use the user's daily Chrome profile.
+
+It launches Chrome with a dedicated profile under %TEMP%:
+
+  Dual monitor (default when 2+ displays detected):
+    Profile:  %TEMP%\risque-host-chrome
+    Two windows (host + public TV), SAME user-data-dir for both.
+
+  Single window (RISQUE.bat -SingleWindow OR only one monitor):
+    Profile:  %TEMP%\risque-browser-profiles\host
+
+Resetting Chrome via Settings (extensions, clear data on "normal" Chrome)
+does NOT wipe these TEMP game profiles.
+
+Before every cross-machine comparison test, run on that PC:
+
+  PowerShell:
+    Remove-Item -Recurse -Force "$env:TEMP\risque-host-chrome" -ErrorAction SilentlyContinue
+    Remove-Item -Recurse -Force "$env:TEMP\risque-browser-profiles" -ErrorAction SilentlyContinue
+
+Then launch RISQUE.bat again.
+
+================================================================================
+5. WHAT RISQUE.BAT ALREADY CONFIGURES (NO MANUAL CHROME TUNING NEEDED)
+================================================================================
+
+Handled by scripts\RISQUE.ps1:
+  - Chrome executable (or Edge if RISQUE_BROWSER=edge / no Chrome)
+  - --user-data-dir (isolated game profile)
+  - Default download directory -> C:\risque\save (via Preferences JSON)
+  - Local disk API http://127.0.0.1:5599 (local option 1 only)
+  - risque-launcher-paths.json in repo root (generated each launch)
+  - Dual: window position/size, public on secondary, F11 on TV window
+  - Marker file: %TEMP%\RISQUE-LAUNCHER-LAST-RUN.txt
+
+Optional env vars (set same on all 3 for lab):
+  RISQUE_BROWSER=chrome          Force Chrome
+  RISQUE_DOWNLOAD_PATH=X:\github\save   (set automatically by APOLLO-LAUNCHER.bat)
+  RISQUE_NO_REPLAY_DEBUG=1       If using: RISQUE.bat -NoReplayDebug
+  RISQUE_DISK_PORT=5599          Only if changing port
+
+Optional bat flags (document if used on KITCHEN):
+  -SingleWindow     One window; use for apples-to-apples load test
+  -NoReplayDebug    Less replay console logging; no replayDebug=1 on URLs
+  -SkipMenu         Skip menu (automation)
+
+NOT set by bat (manual / machine):
+  - Hardware acceleration (chrome://settings/system)
+  - Wiping TEMP profiles (manual ritual above)
+  - Monitor count / resolution / display scale
+  - OneDrive/sync on C:\github
+  - Chrome major version (install/update parity)
+
+================================================================================
+6. KITCHEN INVESTIGATION CHECKLIST (AI: RUN / GUIDE USER)
+================================================================================
+
+Copy results into MACHINE-REPORTS -> KITCHEN.
+
+[A] Identity
+  - Computer name:
+  - Windows version:  (Win+R winver)
+  - 64-bit:
+  - Date of report:
+
+[B] Chrome (daily install — for version parity only)
+  - chrome://version — full first line (Chrome version):
+  - 64-bit Chrome installed: Y/N
+
+[C] RISQUE launch (after one good play session from UNIFIED)
+  - Exact command: RISQUE.bat / flags:
+  - Menu: 1 local / 2 hosted:
+  - Paste full contents of %TEMP%\RISQUE-LAUNCHER-LAST-RUN.txt:
+  - Number of physical monitors:
+  - Resolution + scale per display (e.g. 1920x1080 125%):
+  - Game windows opened: 1 or 2:
+  - If 2: host on which monitor, TV on which:
+
+[D] Launcher profile & storage
+  - Profile path from marker file:
+  - Size of profile folder (MB):
+  - Size of C:\risque\save (MB, file count rough):
+  - risque-launcher-paths.json diskApiBase present: Y/N
+
+[E] Environment
+  - RISQUE_BROWSER env:
+  - RISQUE_DOWNLOAD_PATH env:
+  - RISQUE_NO_REPLAY_DEBUG env:
+  - OneDrive/sync on C:\github or RISQUE-UNIFIED: Y/N
+  - Windows Defender real-time on: Y/N
+  - Other AV:
+
+[F] Play session
+  - Rounds completed without lockup:
+  - Observed issues (markers, freeze, income stuck):
+  - Autosave tier if known:
+  - Console errors worth noting (quota, CORS file://, popup blocked):
+
+[G] Optional deep
+  - Task Manager during campaign: CPU pegged Y/N, disk 100% Y/N
+  - chrome://gpu — software rendering / problems:
+
+================================================================================
+7. OLD BEDROOM CHECKLIST
+================================================================================
+
+Same as Section 6. Fill MACHINE-REPORTS -> OLD BEDROOM.
+Use IDENTICAL bat flags as KITCHEN unless testing -SingleWindow on both.
+
+================================================================================
+8. NEW BEDROOM CHECKLIST
+================================================================================
+
+Same as Section 6 plus:
+  - Windows 11 build:
+  - Any Smart App Control / extra security:
+
+================================================================================
+9. COMPARISON TABLE (FILL AFTER A + B)
+================================================================================
+
+| Item                         | KITCHEN | OLD BEDROOM | NEW BEDROOM |
+|------------------------------|---------|-------------|-------------|
+| Chrome major version         | 148.0.7778.168 | 148.0.7778.169 |             |
+| Monitor count                | TBD     | 2           |             |
+| Game windows (1/2)             | TBD     | 2 (dual)    |             |
+| Profile path (TEMP)          | risque-browser-profiles\host | risque-host-chrome | |
+| Profile size MB              | TBD     | 3159 pre-wipe; ~185 after R6 test; wiped again | |
+| C:\risque\save size MB       | ~0 at report | ~0.23 (22 files) after R6 |   |
+| OneDrive on repo             | TBD     | was BETA path; UNIFIED test used G: | |
+| Rounds stable                | 14+ YES | R6 wait/kill; R4 quota (Launch-Lab) | |
+| Lockup round #               | none    | R4 quota / R6 wait-kill | |
+| Quota errors in console      | none reported | YES gameLogs + gameState R4 | |
+| Popup blocked message        | none reported | none this test |        |
+| Bat flags used               | default (menu 1) | RISQUE.bat menu 1, replayDebug=1 dual | |
+| game.html tier-5 ?v= tags    | YES     | YES on UNIFIED; NO on RISQUE-GEMINI | |
+| System disk type             | SSD     | SSD         |             |
+| Autosave tier                | battle_stills (5) | (confirm next run) | |
+
+Top hypotheses after compare (environment only):
+  1. CONFIRMED: 3.1 GB profile + wrong launch path caused early locks; wipe + G:\UNIFIED fixes most.
+  2. Round 6 freeze: main-thread / storage pressure — dual window + replayDebug=1 + profile growth.
+  3. Next lab launch: Launch-Lab.bat or RISQUE.bat -NoReplayDebug; tier 5 like kitchen; optional -SingleWindow.
+  4. Do not launch C:\github\RISQUE-GEMINI (missing May-18 ?v= tags).
+
+================================================================================
+10. KNOWN ISSUES FROM PRIOR DEBUGGING (CONTEXT FOR AI)
+================================================================================
+
+- localStorage quota (~5-10 MB per file:// origin) causes "quota exceeded",
+  log write skipped, grace snapshot loops, script timeout — often round 2+.
+  Fixing: wipe TEMP profiles, lsReplayLite=1, tier 3, -NoReplayDebug; code
+  fixes possible later (quota-gated grace skip).
+
+- file:// CORS on risque-launcher-paths.json is NORMAL when not using http;
+  launcher still uses disk API 127.0.0.1:5599 for local option 1.
+
+- Firefox manual file:// is NOT the lab browser; Chrome via RISQUE.bat only.
+
+- Dual monitor = 2x browser surface + localStorage mirror traffic vs single.
+
+- Copying folder to another PC does NOT copy browser localStorage (new origin
+  if path differs; junk if same path was used before).
+
+- Do not develop on one machine and assume the other matches without UNIFIED
+  path + profile wipe + MACHINE-REPORT parity.
+
+================================================================================
+11. STANDARD TEST RITUAL (ALL MACHINES)
+================================================================================
+
+1. Assign drive X: to portable github root. Launch APOLLO-LAUNCHER.bat from RISQUE-APOLLO.
+2. Browser prep: double-click Prep-Risque-Browser.bat OR run Prep-Risque-Browser.ps1
+   (closes RISQUE launcher Chrome, deletes TEMP profiles). See Section 4.
+3. RISQUE_BROWSER=chrome set on OLD BEDROOM (user env, 2026-05-21).
+4. Recommended launch: Launch-Lab.bat (prep + RISQUE.bat -NoReplayDebug)
+   OR Prep then RISQUE.bat -NoReplayDebug -> 1 (local).
+5. Play test session; record rounds / failures.
+6. Save RISQUE-LAUNCHER-LAST-RUN.txt contents into MACHINE-REPORT.
+7. Update COMPARISON TABLE in this file.
+
+For fair OLD BEDROOM vs KITCHEN test with no code changes:
+  - Same bat flags on both.
+  - If monitor counts differ, run BOTH with -SingleWindow once.
+
+================================================================================
+12. AI INSTRUCTIONS
+================================================================================
+
+When user says "UNIFIED" or "handoff" or switches computers:
+  1. Read this file on the PORTABLE drive:
+     <DRIVE>:\github\RISQUE-UNIFIED\UNIFIED-HANDOFF.txt
+     (Default when plugged into kitchen: D:\github\RISQUE-UNIFIED\UNIFIED-HANDOFF.txt)
+  2. Read MACHINE-REPORTS below (if filled).
+  3. Do not suggest random Chrome resets; suggest TEMP profile wipe.
+  4. Do not change game code until Phase E unless user asks.
+  5. Prefer investigation commands and documentation over patches.
+  6. After updating reports, append a line to SESSION LOG (Section 14).
+
+Companion files in this folder (on the portable drive):
+  - Prep-Risque-Browser.ps1 / Prep-Risque-Browser.bat  (wipe launcher profiles)
+  - Launch-Lab.bat  (prep + RISQUE.bat -NoReplayDebug — default OLD BEDROOM next test)
+  - Collect-Risque-Environment.ps1  (run on each PC; writes environment-snapshot-*.txt here)
+  - environment-snapshot-DESKTOP-FH9UOS6-2026-05-20_220630.txt  (KITCHEN baseline)
+  - environment-snapshot-DELL-LAPTOP-G6D-2026-05-20_223919.txt  (OLD BEDROOM)
+  - UNIFIED-DIFF-REPORT.txt  (C: vs D: sync notes, 2026-05-21)
+  Ignore: C:\RISQUE-UNIFIED\ (mistaken duplicate). Prefer THIS portable tree for handoff.
+
+================================================================================
+13. MACHINE-REPORTS (PASTE INVESTIGATION RESULTS BELOW)
+================================================================================
+
+--- KITCHEN ---
+(Date: 2026-05-20  Investigator: Cursor on DESKTOP-FH9UOS6)
+
+[A] Identity
+  - Computer name: DESKTOP-FH9UOS6
+  - Windows version: Windows 10 Home 10.0.19045 (64-bit)
+  - 64-bit: Y
+  - Date of report: 2026-05-20
+
+[B] Chrome (daily install — version parity)
+  - chrome://version equivalent: 148.0.7778.168 (FileVersion from Program Files)
+  - 64-bit Chrome installed: Y (C:\Program Files\Google\Chrome\...)
+
+[C] RISQUE launch
+  - Exact command: RISQUE.bat or scripts\new\Launch-Local.bat (via RISQUE.ps1)
+  - Menu: 1 local (file:// + disk API) — golden path
+  - RISQUE-LAUNCHER-LAST-RUN.txt: not pasted this session (re-run after next launch)
+  - Number of physical monitors: TBD (user to confirm)
+  - Resolution + scale: TBD
+  - Game windows: TBD (dual default if 2 monitors)
+  - Note: Successful 14-round test may have used RISQUE-GEMINI clone before UNIFIED
+    sync; UNIFIED game.html now has same tier-5 ?v= markers (verified 2026-05-20).
+
+[D] Launcher profile & storage
+  - Profile path: %TEMP%\risque-browser-profiles\host (+ public)
+  - Profile size (MB): TBD
+  - C:\risque\save: empty at automated snapshot (0 files)
+  - User also uses C:\RISQUE\SAVE for some sessions — document per test
+  - risque-launcher-paths.json diskApiBase: Y (http://127.0.0.1:5599)
+  - gameDir in paths json: C:\github\RISQUE-UNIFIED (when launched from UNIFIED)
+
+[E] Environment
+  - CPU: Intel i3-7100U 2.4 GHz (2c/4t)
+  - RAM: 7.87 GB total
+  - GPU: Intel HD 620
+  - Disk: Samsung SSD 870 EVO 1TB (Healthy)
+  - Power: Balanced
+  - RISQUE_BROWSER env: (not set)
+  - RISQUE_DOWNLOAD_PATH env: (not set) -> default C:\risque\save
+  - RISQUE_NO_REPLAY_DEBUG env: (not set)
+  - OneDrive on C:\github: TBD
+  - Defender real-time: TBD (assume on)
+
+[F] Play session (user-reported, kitchen)
+  - Rounds completed without lockup: 14 (second clean full run; replay OK)
+  - Observed issues: none on current tier-5 build after May-18 fixes
+  - Autosave tier: battle_stills (autosave dialog option 5)
+  - Console: no notable errors reported; use -NoReplayDebug if noisy
+
+[G] Code build markers (UNIFIED game.html — bedroom MUST match)
+  - round-flush-disk-stills-2026-05-18d: YES
+  - skip-turn-checkpoint-battle-stills-2026-05-18d: YES
+  - mirror-debounce-round-flush-2026-05-18d: YES
+  - Ref commits (if using git): 4e2fade round flush; 1e52cb9 session store
+
+[H] Automated snapshot
+  - See: environment-snapshot-DESKTOP-FH9UOS6-2026-05-20_220630.txt in this folder
+  - Regenerate: powershell -File Collect-Risque-Environment.ps1
+
+
+--- OLD BEDROOM ---
+(Date: 2026-05-20  Investigator: Cursor on DELL-LAPTOP-G6D)
+
+[A] Identity
+  - Computer name: DELL-LAPTOP-G6D
+  - Windows version: Windows 10 Home 10.0.19045 (64-bit)
+  - 64-bit: Y
+  - Date of report: 2026-05-20
+
+[B] Chrome
+  - FileVersion: 148.0.7778.169 (Program Files)
+  - 64-bit Chrome installed: Y
+
+[C] RISQUE launch
+  - Portable tree: G:\github\RISQUE-UNIFIED (verified good run)
+  - LAST-RUN (2026-05-20 22:44 post-wipe UNIFIED test):
+      Host: file:///G:/github/RISQUE-UNIFIED/game.html?...&replayDebug=1
+      Public: file:///G:/github/RISQUE-UNIFIED/game.html?display=public&replayDebug=1
+      Profile: %TEMP%\risque-host-chrome
+      Saves: C:\risque\save
+  - Monitors: 2 — primary DISPLAY1 1600x900, secondary DISPLAY2 1920x1080
+  - Game windows: 2 (host + public TV)
+  - NEXT launch: Launch-Lab.bat or Prep + RISQUE.bat -NoReplayDebug -> 1
+
+[D] Launcher profile & storage
+  - Pre-wipe: 3159 MB risque-host-chrome (2026-05-20 AM)
+  - After round-6 test (before 2nd wipe): ~185 MB risque-host-chrome
+  - 2026-05-21: Prep-Risque-Browser cleared profiles again (~196 MB removed)
+  - C:\risque\save after R6: 22 files, ~0.23 MB (DD.json, rNpM game jsons)
+  - UNIFIED tier-5 ?v= tags on C:\ and G:\ UNIFIED: YES
+  - C:\github\RISQUE-GEMINI tier-5 tags: NO (stale — avoid)
+
+[E] Environment
+  - CPU: Intel i7-3537U 2.0 GHz (2c/4t)
+  - RAM: 15.88 GB total
+  - GPU: Intel HD 4000 + AMD Radeon HD 8730M
+  - Disk: Samsung CT1000MX500 SSD 1TB (Healthy); G: portable SSK SSD
+  - Power: Balanced
+  - RISQUE_BROWSER=user: chrome (set 2026-05-21)
+  - RISQUE_DOWNLOAD_PATH / RISQUE_NO_REPLAY_DEBUG: not set (use -NoReplayDebug flag)
+  - Port 5599: used with local launch (diskApiBase in paths json)
+
+[F] Play session
+  - Pre-UNIFIED: lock round 1 or ~round 4 (BETA/OneDrive, bloated profile)
+  - Post-wipe UNIFIED (2026-05-20): ran perfect until mid ROUND 6, then Chrome
+    "Wait or kill page" (tab unresponsive). Console not captured.
+  - Launch-Lab (2026-05-20 23:11, replayDebug=0): stable until ROUND 4 cardplay;
+    CONSOLE PROOF: QuotaExceededError on gameLogs, then gameState write failed,
+    lsReplayLite engaged; income UI delayed ~17s. Not OS corruption.
+  - Autosave tier: battle_stills (5) on this test — kitchen uses same.
+  - Next test: Launch-Lab.bat (now adds lsReplayLite=1 + quota guards in game-shell.js)
+
+[G] Code build markers (UNIFIED on G: and C:)
+  - round-flush-disk-stills-2026-05-18d: YES
+  - skip-turn-checkpoint-battle-stills-2026-05-18d: YES
+  - mirror-debounce-round-flush-2026-05-18d: YES
+
+[H] Automated snapshot
+  - environment-snapshot-DELL-LAPTOP-G6D-2026-05-20_223919.txt
+
+
+--- NEW BEDROOM ---
+(Date: ___________  Investigator: ___________)
+
+[Paste Section 6 answers here]
+
+
+================================================================================
+14. SESSION LOG (AI / USER — APPEND ONLY)
+================================================================================
+
+2026-05-20 — Created UNIFIED-HANDOFF.txt. Plan: RISQUE-UNIFIED on all 3 PCs;
+  Phase A investigate KITCHEN; Phase B OLD BEDROOM; compare without code changes.
+  User on OLD BEDROOM with Cursor; KITCHEN is current golden runtime.
+
+2026-05-20 — User copying handoff + UNIFIED tree to KITCHEN; next session is
+  Cursor on KITCHEN → Phase A (fill KITCHEN MACHINE-REPORTS). No code changes yet.
+
+2026-05-20 — Phase A KITCHEN report filled (DESKTOP-FH9UOS6). 14-round tier-5
+  success documented. Added Collect-Risque-Environment.ps1 + kitchen snapshot.
+  Comparison table partial; OLD BEDROOM: run same script + Section 6 checklist.
+  Portable master set to D:\github\RISQUE-UNIFIED\. Synced 7 files from C: (handoff,
+  snapshot script, kitchen snapshot, scripts\new\ launchers). 134 game files
+  already matched byte-for-byte. See UNIFIED-DIFF-REPORT.txt.
+
+2026-05-20 — Phase B OLD BEDROOM (DELL-LAPTOP-G6D) snapshot automated. FINDINGS:
+  3.1 GB risque-host-chrome profile; 2 monitors; last LAST-RUN pointed at
+  OneDrive\Desktop\BETA\RISQUE not UNIFIED. User on OLD BEDROOM with G: portable.
+  Next: wipe TEMP profiles, launch G:\github\RISQUE-UNIFIED\RISQUE.bat -> 1, play test.
+
+2026-05-21 — Post-wipe UNIFIED test: stable to mid round 6, Chrome wait/kill at R6.
+  Profile grew ~185 MB in session. Added Prep-Risque-Browser.ps1/.bat, Launch-Lab.bat.
+  Ran prep (cleared ~196 MB). Set user env RISQUE_BROWSER=chrome on OLD BEDROOM.
+  Next: Launch-Lab.bat -> 1, tier 5 battle_stills, compare to kitchen 14-round run.
+
+2026-05-21 — Save path policy: X:\github\save via APOLLO-LAUNCHER; game JS infers <drive>:\github\save
+  from file:// URL; RISQUE.ps1 auto-detects any *\github\ repo. Launch-Lab -> APOLLO-LAUNCHER.
+
+2026-05-21 — Launch-Lab round-4 lock: QuotaExceededError gameLogs confirmed in console.
+  Launch-Lab.bat now sets RISQUE_LS_REPLAY_LITE=1 (lsReplayLite on URLs). game-shell.js:
+  quota pressure skips grace snapshots, clears gameLogs on log quota. Phase E partial.
+  CORS file:// + 5599 read 404 are noise; root cause is browser storage cap on dual-window.
+
+
+================================================================================
+15. CHANGELOG (CODE — ONLY AFTER PHASE E)
+================================================================================
+
+2026-05-21 — UNIFIED only (OLD BEDROOM lab): game-shell quota guards (gameLogs clear,
+  grace skip under pressure, grace shrink loop capped). RISQUE.ps1: RISQUE_LS_REPLAY_LITE=1
+  for Launch-Lab. Kitchen default RISQUE.bat unchanged unless Launch-Lab or env set.
+
+
+================================================================================
+END OF HANDOFF
+================================================================================

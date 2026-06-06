@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RISQUE — Help</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      line-height: 1.55;
+      color: #e2e8f0;
+      background: #0f172a;
+      padding: 0 0 48px;
+    }
+    .doc-nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 20px;
+      align-items: center;
+      padding: 14px 24px;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      font-size: 14px;
+    }
+    .doc-nav a {
+      color: #38bdf8;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .doc-nav a:hover { text-decoration: underline; }
+    main {
+      max-width: 40rem;
+      margin: 0 auto;
+      padding: 28px 20px 0;
+    }
+    h1 { font-size: 1.65rem; margin: 0 0 8px; }
+    .subtitle { color: #94a3b8; font-size: 15px; margin-bottom: 24px; }
+    h2 {
+      font-size: 1.1rem;
+      margin: 22px 0 10px;
+      color: #f1f5f9;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 6px;
+    }
+    p, li { margin: 0 0 10px; }
+    ul { padding-left: 1.25rem; margin: 0 0 14px; }
+    li { margin-bottom: 6px; }
+    .kbd {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #334155;
+      font-size: 13px;
+      font-family: Consolas, monospace;
+    }
+    .note {
+      background: #1e293b;
+      border-left: 4px solid #fbbf24;
+      padding: 12px 14px;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <nav class="doc-nav" aria-label="Document navigation">
+    <a href="../game.html?phase=login">Return to login</a>
+    <a href="manual.html">Game manual</a>
+    <a href="help.html" aria-current="page">Help</a>
+  </nav>
+  <main>
+    <h1>RISQUE help</h1>
+    <p class="subtitle">Quick reference for this app — read before you log in or share with new players.</p>
+
+    <h2>Login screen</h2>
+    <ul>
+      <li><strong>Player rows</strong> — Enter a name, then click a color swatch to assign that color. Each name and each color must be unique.</li>
+      <li><strong>Empty start</strong> — Name fields are blank when you open login. The map <strong>stats</strong> table also shows no roster until you log in. Use a <strong>Preset</strong> button if you want a saved lineup in one click.</li>
+      <li><strong>Save-folder hint (host)</strong> — If you start from the Windows launcher / local disk helper, you may see a small <strong>green</strong> badge on login confirming the save API is reachable; it goes away once the game begins.</li>
+      <li><strong>Game manual</strong> — Full rules overview (Risk-style).</li>
+      <li><strong>Help</strong> — This page.</li>
+      <li><strong>Log in</strong> — Starts a new game with the players you entered (after setup phases).</li>
+      <li><strong>Load game</strong> — Choose a saved <code>.json</code> game file to restore a previous session.</li>
+    </ul>
+
+    <h2>Where the game runs</h2>
+    <p>Most play happens in <strong>game.html</strong> (runtime shell): the map, phase panels, and buttons for attack, deploy, income, card play, etc. The exact screen depends on the current <strong>phase</strong> saved in your game state.</p>
+
+    <h2>Host map — corner controls</h2>
+    <p>On the <strong>host</strong> map (not the public TV tab), a toolbar sits on the map graphic:</p>
+    <ul>
+      <li><strong>Top row</strong> — <strong>NEW GAME</strong>, <strong>LOAD GAME</strong>, <strong>SAVE GAME</strong>, <strong>GRACE</strong>, <strong>PUBLIC</strong> (TV window), <strong>HIDE BUTTONS</strong>.</li>
+      <li><strong>HIDE BUTTONS</strong> — Collapses the top row to a single <strong>SHOW BUTTONS</strong> control in the same grid slot (same size as before). On the bottom row it hides <strong>REPLAY</strong> and <strong>SAVE + REPLAY</strong> only; <strong>MANUAL</strong>, <strong>HELP</strong>, the <strong>Autosave</strong> chip, <strong>EMERGENCY</strong>, and the <strong>round</strong> badge stay visible.</li>
+      <li><strong>Bottom row</strong> — <strong>MANUAL</strong> / <strong>HELP</strong> (these docs), <strong>REPLAY</strong> (Wayback), <strong>SAVE + REPLAY</strong> (same export as SAVE), the <strong>Autosave Config</strong> chip, <strong>EMERGENCY</strong> snapshot, and the large <strong>ROUND</strong> indicator.</li>
+    </ul>
+
+    <h2>Autosave &amp; replay policy</h2>
+    <p>Click <strong>Autosave Config</strong> on the host to set how often checkpoints hit your connected <strong>save folder</strong>. The default is <strong>2 · Safe with lean fun</strong>. Four options:</p>
+    <ol>
+      <li><strong>Safe &amp; fun (full replay)</strong> — Every player turn: game checkpoint plus granular replay segments on disk (<code>DD.json</code>, <code>rNpM.json</code>, etc.). Heaviest on disk; best if you want Wayback to rebuild from files alone.</li>
+      <li><strong>Safe with lean fun</strong> — Turn game checkpoints; granular replay files only when the host turns that path on (e.g. manual save, game win, opening Wayback). Fewer small replay files between exports.</li>
+      <li><strong>Safe, no replay disk</strong> — Game checkpoints only (e.g. <code>rNpMgame.json</code> style turns). No <code>DD.json</code> or per-turn <code>rNpM.json</code> replay tapes. In a finished session you can still use <strong>in-memory</strong> tape for postgame Wayback until you close the tab.</li>
+      <li><strong>No autosave</strong> — No automatic turn/round exports; you persist when you choose <strong>SAVE</strong>, <strong>SAVE + REPLAY</strong>, or <strong>EMERGENCY</strong>.</li>
+    </ol>
+    <p><strong>SAVE GAME</strong> and <strong>SAVE + REPLAY</strong> always write the <strong>current game JSON</strong> (replay stripped from the main file) <em>and</em> a <strong>full-session replay JSON</strong> from the deal through “now”, even in tier 4 — you do not need prior replay files on disk for that export.</p>
+    <p class="note">Policy is stored per browser (<code>localStorage</code>) and copied into new games from login. Use <strong>Choose save folder…</strong> in the same dialog if the browser asks you to grant a directory (HTTPS/localhost). The <strong>RISQUE.bat</strong> launcher can talk to a small local API so saves land under the usual Windows save path with fewer prompts.</p>
+
+    <h2>Map &amp; attack phase (typical)</h2>
+    <ul>
+      <li>Click one of <strong>your</strong> territories with at least <strong>2</strong> armies, then an <strong>adjacent enemy</strong> territory (or valid aerial link if enabled).</li>
+      <li>Use <strong>Roll</strong>, <strong>Blitz</strong>, or other attack buttons on the panel.</li>
+      <li>After capturing, you will be prompted to <strong>move armies</strong> into the conquered territory (at least the minimum required).</li>
+      <li><strong>Campaign instant</strong> — If an automated campaign run <strong>eliminates</strong> a player, the chain <strong>stops</strong> so you can handle elimination (cards, troops, follow-up phases) instead of continuing across the whole map in one go.</li>
+      <li><strong>Reinforcement phase</strong> moves you to placing armies between your territories before drawing cards / ending the turn, when the flow calls for it.</li>
+    </ul>
+
+    <h2>Saves &amp; browser data</h2>
+    <ul>
+      <li>The active game is kept in the browser’s <strong>localStorage</strong> under the key used by the app (e.g. when you continue from the runtime).</li>
+      <li><strong>Save game</strong> / <strong>Save + replay</strong> on the map suggests a basename like <code>RISQUE  2026-04-17  8:11AM</code> (two spaces after <strong>RISQUE</strong> and before the time). You normally get <strong>two</strong> files: the <strong>game</strong> JSON and a <strong>-replay.json</strong> sibling with the full session tape. The colon in the time becomes a hyphen on Windows (e.g. <code>8-11AM</code>). With <code>http://localhost</code>, HTTPS, or the launcher disk API, files can go straight into your chosen <strong>save folder</strong>; pure <code>file://</code> often lands in <strong>Downloads</strong>.</li>
+      <li><strong>Emergency</strong> — Forces an immediate game + replay snapshot (similar idea to SAVE) when you need a mid-round rescue.</li>
+      <li><strong>Load game</strong> on login replaces that stored state from your JSON file.</li>
+      <li>Clearing site data for this origin will erase in-progress games unless you have exported a JSON backup.</li>
+    </ul>
+
+    <h2>Privacy gate</h2>
+    <p>When the app shows a privacy step, it is so the next player does not see secret information (hands, draws, etc.). Pass the device or switch display as your group prefers.</p>
+
+    <h2>Wayback / instant replay</h2>
+    <p>The <strong>REPLAY</strong> button on the <strong>host</strong> map opens <strong>Wayback</strong> (the replay machine) in the control panel — no pop-up. It plays the session <strong>tape</strong>: <strong>deal</strong>, <strong>deploy</strong>, <strong>battles</strong>, <strong>eliminations</strong>, as map snapshots (not a full dice or card animation).</p>
+    <ul>
+      <li><strong>Start options</strong> — Full run from the <strong>territory deal</strong> (default), <strong>skip to the first battle</strong>, or (when the tape has round stamps) jump to the first frame <strong>at or after a chosen round</strong>.</li>
+      <li><strong>During playback</strong> — Look for <strong>SKIP TO END</strong> / <strong>CANCEL</strong>; <span class="kbd">Esc</span> cancels.</li>
+      <li><strong>Sources</strong> — Wayback prefers the <strong>in-memory</strong> tape from the current tab, then <strong>localStorage</strong> bootstrap, then files in your connected <strong>save folder</strong> (e.g. merged <code>DD.json</code> + <code>rNpM.json</code> when those exist).</li>
+      <li><strong>End of game</strong> — After a normal finish, the app can open replay automatically; you should still see the <strong>full</strong> session from the deal if the tab stayed open, even when autosave wrote <strong>no</strong> granular replay files.</li>
+      <li><strong>Public TV</strong> — A mirror tab can follow the same frames when host mirroring already works for live play.</li>
+    </ul>
+    <p class="note" style="border-left-color:#38bdf8;margin-top:12px;">
+      Replay is authored on the <strong>host</strong>. If playback looks short, the folder may only have a partial export (e.g. deal file only) <em>and</em> the in-memory tape may have been lost (reload/crash). Use <strong>SAVE + REPLAY</strong> before closing for a portable full tape. Older saves may lack round stamps on the tape, which limits “start from round” choices.
+    </p>
+
+    <h2>Public monitor — cardplay recap</h2>
+    <p>During committed cardplay on the <strong>public</strong> display, when a <strong>wildcard</strong> is used as a <strong>territory</strong> card, the monitor shows the chosen territory name prominently; a second line beneath indicates the effect at a glance (for example <strong>+2</strong>, <strong>−2</strong>, or <strong>ACQUIRED</strong>), similar to normal territory cards.</p>
+
+    <h2>If something looks wrong</h2>
+    <ul>
+      <li><strong>Combat dice or income once looked wrong</strong> — Save, refresh, and continue; if it persists, load a backup JSON. Odd totals can happen if the browser had a stale tab or interrupted save.</li>
+      <li>Refresh the page; if the save is corrupt, try <strong>Load game</strong> from a known-good JSON file.</li>
+      <li>Use the launcher / tools menu from <strong>index.html?menu=1</strong> if your project includes it (clear logs, test setups).</li>
+      <li>For a fresh start, use login again with new players (or load an earlier save).</li>
+    </ul>
+
+    <div class="note">
+      <strong>Tip:</strong> Open <strong>Manual</strong> and <strong>Help</strong> in a separate tab from login so you can read while keeping the login form open.
+    </div>
+
+    <p style="margin-top:28px;font-size:14px;color:#94a3b8;">Full rules: <a href="manual.html" style="color:#38bdf8;">Game manual</a></p>
+  </main>
+</body>
+</html>
