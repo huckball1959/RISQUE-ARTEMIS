@@ -553,6 +553,21 @@ function reinforceCompactSkip() {
   refreshReinforceCompactHud();
 }
 
+/** ARTEMIS: controls HTML can mount before init/bind — wire handlers and phase state. */
+window.risqueArtemisEnsureReinforceInteractive = function (gsOpt) {
+  var gs = gsOpt || window.gameState;
+  if (!gs || String(gs.phase || "") !== "reinforce") return;
+  abortReinforcePublishGate();
+  if (!window.__risqueReinforceInitialized) {
+    window.__risqueReinforceInitialized = false;
+    if (typeof window.initReinforcePhase === "function") {
+      window.initReinforcePhase();
+    }
+  }
+  bindReinforceCompactHud();
+  window.handleTerritoryClick = handleReinforceTerritoryClick;
+};
+
 function bindReinforceCompactHud() {
   const skip = document.getElementById('reinforce-btn-skip');
   const reset = document.getElementById('reinforce-btn-reset');
@@ -1516,6 +1531,9 @@ window.initReinforcePhase = initReinforcePhase;
 
     if (typeof window.initReinforcePhase === "function") {
       window.initReinforcePhase();
+    }
+    if (window.risqueArtemisMode && typeof window.risqueArtemisEnsureReinforceInteractive === "function") {
+      window.risqueArtemisEnsureReinforceInteractive(window.gameState);
     }
     captureReinforcePublicBoardSnapshot();
 

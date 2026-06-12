@@ -1,0 +1,34 @@
+ARTEMIS — HOST PC (SERVER folder)
+=================================
+
+CANONICAL DEV FOLDER (Guido edits code here)
+  C:\Users\huckb\OneDrive\Documents\GitHub\RISQUE-ARTEMIS
+
+  X:\github\RISQUE-ARTEMIS is backup only — do not run START from there.
+
+SHORTCUT ON GUIDO'S DESKTOP
+  Point to THIS folder's START-ARTEMIS.bat:
+  ...\RISQUE-ARTEMIS\scripts\SERVER\START-ARTEMIS.bat
+
+EVERY GAME NIGHT
+  1. Double-click START-ARTEMIS.bat
+  2. Leave "ARTEMIS Server - DO NOT CLOSE" window open
+  3. Confirm the banner shows the OneDrive game folder path
+  4. Copy scripts\LAPTOP 2 folder → Mictor desktop (JOIN.bat)
+  5. Copy scripts\LAPTOP 3 folder → Nooch desktop (JOIN.bat)
+  6. When done: STOP-ARTEMIS.bat
+
+START updates artemis-host-ip.txt in LAPTOP 2 / LAPTOP 3 automatically.
+
+WHEN YOU CHANGE LAUNCH URLS IN DEVELOPMENT
+  Edit ONE file: launchers\profiles.json
+  Bump cache version (e.g. m134 → m135) when changing ?v=
+  Restart server if already running — clients pick up on next JOIN click.
+
+FIRST TIME ON THIS PC ONLY
+  artemis-game-path.txt must be one line = full path to RISQUE-ARTEMIS.
+  Default is the OneDrive path above. Edit only if you moved the repo.
+  Node.js must be installed (nodejs.org).
+
+FULLSCREEN IN GAME
+  Ctrl+Shift+F = toggle on/off    Esc = exit fullscreen

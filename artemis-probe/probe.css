@@ -1,0 +1,311 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+  display: grid;
+  grid-template-columns: 1fr min(360px, 38vw);
+  grid-template-rows: auto 1fr;
+}
+
+.probe-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #1e293b;
+  border-bottom: 2px solid #334155;
+}
+
+.probe-bar-title {
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  font-size: 14px;
+  color: #38bdf8;
+}
+
+.probe-bar-status {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.probe-bar-status[data-kind="ok"] {
+  color: #4ade80;
+}
+
+.probe-bar-status[data-kind="wait"] {
+  color: #fbbf24;
+}
+
+.probe-bar-status[data-kind="err"] {
+  color: #f87171;
+}
+
+.probe-main {
+  padding: 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.probe-panel {
+  width: min(520px, 100%);
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 12px;
+  padding: 28px;
+}
+
+.probe-panel[hidden] {
+  display: none !important;
+}
+
+.probe-panel h1 {
+  margin: 0 0 12px;
+  font-size: 26px;
+}
+
+.probe-lead {
+  margin: 0 0 20px;
+  color: #94a3b8;
+  line-height: 1.45;
+}
+
+.probe-slots,
+.probe-roster {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+}
+
+.probe-slots li,
+.probe-roster li {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  font-size: 14px;
+}
+
+.probe-slots li.ready,
+.probe-roster li.ready {
+  border-color: #4ade80;
+  color: #bbf7d0;
+}
+
+.probe-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.probe-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 14px 22px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #fff;
+  background: #475569;
+}
+
+.probe-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.probe-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.probe-btn--primary {
+  width: 100%;
+  background: #0ea5e9;
+  margin-top: 8px;
+}
+
+.probe-btn--go {
+  width: 100%;
+  background: #16a34a;
+  margin-top: 16px;
+}
+
+.probe-btn--ready {
+  background: #6366f1;
+}
+
+.probe-btn--control {
+  width: 100%;
+  font-size: 22px;
+  padding: 22px;
+  background: #16a34a;
+  margin: 20px 0 12px;
+}
+
+.probe-btn--control:disabled {
+  background: #334155;
+  color: #64748b;
+}
+
+.probe-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.probe-input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 18px;
+  border-radius: 8px;
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.probe-error {
+  min-height: 1.2em;
+  color: #f87171;
+  font-size: 14px;
+  margin: 8px 0 0;
+}
+
+.probe-hint {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+}
+
+.probe-panel--turn {
+  text-align: center;
+}
+
+.probe-turn-banner {
+  font-size: clamp(22px, 4vw, 36px);
+  font-weight: 800;
+  line-height: 1.2;
+  min-height: 2.4em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.probe-turn-banner.picking {
+  color: #fbbf24;
+  animation: probe-pulse 0.35s ease-in-out infinite alternate;
+}
+
+.probe-turn-banner.active-mine {
+  color: #4ade80;
+}
+
+.probe-turn-banner.active-theirs {
+  color: #38bdf8;
+}
+
+@keyframes probe-pulse {
+  from {
+    opacity: 0.75;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+.probe-countdown {
+  font-size: 48px;
+  font-weight: 900;
+  color: #fbbf24;
+  margin: 8px 0;
+}
+
+.probe-spectator {
+  color: #94a3b8;
+  font-size: 15px;
+  margin: 0;
+}
+
+.probe-debug {
+  padding: 16px;
+  background: #020617;
+  border-left: 1px solid #334155;
+  overflow: auto;
+  max-height: calc(100vh - 52px);
+}
+
+.probe-debug h2 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #64748b;
+  margin: 16px 0 8px;
+}
+
+.probe-debug h2:first-child {
+  margin-top: 0;
+}
+
+.probe-truth {
+  margin: 0;
+  font-size: 13px;
+  font-family ui-monospace, "Cascadia Code", monospace;
+}
+
+.probe-truth dt {
+  color: #64748b;
+  margin-top: 6px;
+}
+
+.probe-truth dd {
+  margin: 2px 0 0;
+  color: #e2e8f0;
+  word-break: break-word;
+}
+
+.probe-log {
+  margin: 0;
+  padding: 0 0 0 18px;
+  font-size: 12px;
+  font-family ui-monospace, "Cascadia Code", monospace;
+  color: #94a3b8;
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.probe-log li {
+  margin-bottom: 6px;
+}
+
+.probe-log li.mine {
+  color: #4ade80;
+}
+
+@media (max-width: 800px) {
+  body {
+    grid-template-columns: 1fr;
+  }
+
+  .probe-debug {
+    border-left: none;
+    border-top: 1px solid #334155;
+    max-height: none;
+  }
+}

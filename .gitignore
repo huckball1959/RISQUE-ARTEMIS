@@ -1,1 +1,8 @@
 risque-launcher-paths.json
+artemis-server/node_modules/
+scripts/artemis-last-host.txt
+**/artemis-host-ip.txt
+scripts/SERVER/artemis-game-path.txt
+logs/artemis-session.jsonl
+logs/artemis-last-report.json
+.cursor/

@@ -11,6 +11,7 @@
       '<div id="hud-title-stack" class="hud-title-stack">' +
       '<div class="hud-title-stack__brand-row">' +
       '<div class="hud-title-stack__stats-slot" aria-hidden="true"></div>' +
+      '<div id="hud-banner-game-title" class="hud-banner-game-title-main hud-banner-phase-title">SETUP</div>' +
       '<div class="hud-title-stack__host-top-buttons">' +
       '<button type="button" id="risque-private-stats-toggle" class="risque-private-stats-toggle risque-host-topbar-btn" role="switch" aria-checked="false" aria-label="Toggle large stats in control panel" title="STATS — enlarge table in panel">STATS</button>' +
       '<button type="button" id="risque-host-cards-played-toggle" class="risque-host-cards-played-toggle risque-host-topbar-btn" role="switch" aria-checked="false" aria-label="Toggle cards played gallery in control panel" title="Cards played — territory cards cashed in this game">CARDS PLAYED</button>' +
@@ -18,7 +19,6 @@
       '<button type="button" id="risque-host-lucky-toggle" class="risque-host-lucky-toggle risque-host-topbar-btn" role="switch" aria-checked="false" aria-label="Toggle lucky dice and battle stats in control panel" title="Lucky — six rate and battle round win rates">LUCKY</button>' +
       '<button type="button" id="risque-host-cards-in-hand-toggle" class="risque-host-cards-in-hand-toggle risque-host-topbar-btn" role="switch" aria-checked="false" aria-label="Show current player cards in hand" title="Cards in hand — current player\'s territory cards">CARDS IN HAND</button>' +
       "</div>" +
-      '<div id="hud-banner-game-title" class="hud-banner-game-title-main">RISQUE</div>' +
       "</div>" +
       "</div>"
     );
@@ -174,7 +174,7 @@
   /**
    * @param {string|null|undefined} primary
    * @param {string|null|undefined} report - second line under primary (scrolls with voice box)
-   * @param {{ reportClass?: string }=} opts - e.g. { reportClass: "ucp-voice-report--warn" }
+   * @param {{ reportClass?: string, skipMirror?: boolean }=} opts
    */
   function setControlVoiceText(primary, report, opts) {
     opts = opts || {};
@@ -220,8 +220,21 @@
     } catch (ePersist) {
       /* ignore */
     }
-    if (typeof window.risqueMirrorPushGameState === "function") {
+    if (typeof window.risqueMirrorPushGameState === "function" && !opts.skipMirror) {
       window.risqueMirrorPushGameState();
+    }
+    if (
+      opts.artemisDeployOwner ||
+      (window.risqueArtemisMode &&
+        window.gameState &&
+        String(window.gameState.phase || "") === "deploy" &&
+        typeof window.risqueArtemisEnsureDeployOwnerVoiceChrome === "function" &&
+        ((typeof window.risqueArtemisLocalOwnsSetupDeploy === "function" &&
+          window.risqueArtemisLocalOwnsSetupDeploy(window.gameState)) ||
+          (typeof window.risqueArtemisIsMyTurn === "function" &&
+            window.risqueArtemisIsMyTurn(window.gameState))))
+    ) {
+      window.risqueArtemisEnsureDeployOwnerVoiceChrome(window.gameState);
     }
   }
 
@@ -231,6 +244,22 @@
   function ensure(uiOverlay) {
     if (!uiOverlay) return;
     var existingRoot = document.getElementById("runtime-hud-root");
+    if (
+      existingRoot &&
+      existingRoot.classList.contains("runtime-hud-root--setup") &&
+      window.risqueArtemisMode &&
+      window.gameState
+    ) {
+      var artemisPh = String(window.gameState.phase || "");
+      if (
+        artemisPh === "cardplay" ||
+        artemisPh === "con-cardplay" ||
+        artemisPh === "income" ||
+        artemisPh === "con-income"
+      ) {
+        return;
+      }
+    }
     if (
       existingRoot &&
       !existingRoot.classList.contains("runtime-hud-root--login") &&
@@ -247,6 +276,45 @@
    * Setup flow: same panel as in-game (stats + control voice + combat log) but attack chrome / slot strip hidden via CSS.
    * Phase-specific UI mounts in #risque-phase-content below the control voice.
    */
+  /** ARTEMIS setup-deploy spectator: HUD rebuild must not wipe waiting narration. */
+  function artemisPreserveDeploySpectatorVoice() {
+    return (
+      window.risqueArtemisMode &&
+      window.gameState &&
+      String(window.gameState.phase || "") === "deploy" &&
+      typeof window.risqueArtemisLocalOwnsSetupDeploy === "function" &&
+      !window.risqueArtemisLocalOwnsSetupDeploy(window.gameState)
+    );
+  }
+
+  function captureControlVoicePrimary() {
+    var vt = document.getElementById("control-voice-text");
+    if (!vt) return "";
+    var t = vt.textContent != null ? String(vt.textContent).trim() : "";
+    return t;
+  }
+
+  function restoreDeploySpectatorVoiceAfterHudRebuild(priorVoice) {
+    if (priorVoice && artemisPreserveDeploySpectatorVoice()) {
+      setControlVoiceText(priorVoice, "", { skipMirror: true });
+      return;
+    }
+    if (typeof window.risqueArtemisApplyDeployVoiceFromState === "function" && window.gameState) {
+      try {
+        window.risqueArtemisApplyDeployVoiceFromState(window.gameState);
+      } catch (eDepVoice) {
+        /* ignore */
+      }
+    }
+  }
+
+  function clearControlVoiceForHudRebuild() {
+    if (artemisPreserveDeploySpectatorVoice()) {
+      return;
+    }
+    setControlVoiceText("", "");
+  }
+
   function ensureSetupUnifiedHud(uiOverlay, bannerText, opts) {
     opts = opts || {};
     if (!uiOverlay) return;
@@ -255,10 +323,16 @@
     uiOverlay.classList.remove("risque-deploy1-ui");
 
     if (opts.force) {
+      var voiceBeforeForce = captureControlVoicePrimary();
       uiOverlay.innerHTML = buildFullHudRootHtml("runtime-hud-root--setup");
       applyStandaloneBannerText(bannerText);
       setAttackChromeInteractive(false);
-      setControlVoiceText("", "");
+      clearControlVoiceForHudRebuild();
+      var rhForce = document.getElementById("runtime-hud-root");
+      if (rhForce && window.risqueArtemisMode) {
+        rhForce.classList.add("runtime-hud-root--artemis-compact");
+      }
+      restoreDeploySpectatorVoiceAfterHudRebuild(voiceBeforeForce);
       return;
     }
 
@@ -267,22 +341,118 @@
     var isSetupFull = existing && existing.classList.contains("runtime-hud-root--setup");
 
     if (existing && !isLoginMinimal && !isSetupFull) {
+      if (window.risqueArtemisMode) {
+        var phArtemisRebuild = String((window.gameState && window.gameState.phase) || "");
+        if (phArtemisRebuild === "income" || phArtemisRebuild === "con-income") {
+          existing.classList.add("runtime-hud-root--setup");
+          existing.classList.remove("runtime-hud-root--cardplay-panel-only");
+          existing.classList.remove("runtime-hud-root--host-cardplay-recap");
+          existing.classList.remove("runtime-hud-root--public-cardplay-recap");
+          existing.classList.remove("runtime-hud-root--artemis-cardplay");
+          applyStandaloneBannerText(bannerText);
+          setAttackChromeInteractive(false);
+          return;
+        }
+        var voiceBeforeArtemis = captureControlVoicePrimary();
+        uiOverlay.innerHTML = buildFullHudRootHtml("runtime-hud-root--setup");
+        applyStandaloneBannerText(bannerText);
+        setAttackChromeInteractive(false);
+        clearControlVoiceForHudRebuild();
+        var rhArtemis = document.getElementById("runtime-hud-root");
+        if (rhArtemis) rhArtemis.classList.add("runtime-hud-root--artemis-compact");
+        restoreDeploySpectatorVoiceAfterHudRebuild(voiceBeforeArtemis);
+        return;
+      }
       applyStandaloneBannerText(bannerText);
       return;
     }
 
     if (isSetupFull) {
       applyStandaloneBannerText(bannerText);
+      if (window.risqueArtemisMode) {
+        existing.classList.add("runtime-hud-root--artemis-compact");
+        var phIncomeKeep = String((window.gameState && window.gameState.phase) || "");
+        var incomeUiMounted =
+          phIncomeKeep === "income" ||
+          phIncomeKeep === "con-income"
+            ? typeof window.risqueArtemisIncomeControlsPresent === "function" &&
+              window.risqueArtemisIncomeControlsPresent()
+            : false;
+        if (!document.getElementById("risque-private-stats-toggle") && !incomeUiMounted) {
+          var voiceBeforeRepair = captureControlVoicePrimary();
+          uiOverlay.innerHTML = buildFullHudRootHtml("runtime-hud-root--setup");
+          applyStandaloneBannerText(bannerText);
+          setAttackChromeInteractive(false);
+          clearControlVoiceForHudRebuild();
+          var rhRepair = document.getElementById("runtime-hud-root");
+          if (rhRepair) rhRepair.classList.add("runtime-hud-root--artemis-compact");
+          restoreDeploySpectatorVoiceAfterHudRebuild(voiceBeforeRepair);
+          return;
+        }
+      }
       var slot = document.getElementById("risque-phase-content");
-      if (slot) slot.innerHTML = "";
+      var artemisKeepDeploy =
+        window.risqueArtemisMode &&
+        typeof window.risqueArtemisIsMyTurn === "function" &&
+        window.risqueArtemisIsMyTurn(window.gameState) &&
+        (window.risqueDeploy1Active ||
+          document.getElementById("deploy1-confirm") ||
+          document.getElementById("risque-artemis-portable-deploy") ||
+          (function () {
+            var d = document.getElementById("risque-artemis-deploy-dock");
+            return d && !d.hidden && d.childElementCount > 0;
+          })());
+      var artemisKeepCardplayDock =
+        window.risqueArtemisMode &&
+        (function () {
+          var d = document.getElementById("risque-artemis-cardplay-dock");
+          return d && !d.hidden && d.querySelector("#cardplay-skip-income-btn");
+        })();
+      var artemisKeepCycleDock =
+        window.risqueArtemisCycleProbeActive &&
+        (function () {
+          var d = document.getElementById("risque-artemis-cycle-probe-dock");
+          return (
+            d &&
+            !d.hidden &&
+            (d.querySelector("#cycle-probe-active-panel") || d.querySelector("#cycle-probe-waiting-panel"))
+          );
+        })();
+      var artemisKeepIncome =
+        window.risqueArtemisMode &&
+        (function () {
+          var phKeep = String((window.gameState && window.gameState.phase) || "");
+          if (phKeep !== "income" && phKeep !== "con-income") return false;
+          if (
+            typeof window.risqueArtemisIncomeControlsPresent === "function" &&
+            window.risqueArtemisIncomeControlsPresent()
+          ) {
+            return true;
+          }
+          return !!document.querySelector("#risque-phase-content .income-hud-phase-stack");
+        })();
+      var artemisKeepPhaseSlot =
+        artemisKeepDeploy ||
+        artemisKeepCardplayDock ||
+        artemisKeepCycleDock ||
+        artemisKeepIncome ||
+        (typeof window.risqueArtemisShouldKeepPhaseSlotContent === "function" &&
+          window.risqueArtemisShouldKeepPhaseSlotContent());
+      if (slot && !artemisKeepPhaseSlot) {
+        slot.innerHTML = "";
+      }
       setAttackChromeInteractive(false);
       return;
     }
 
     uiOverlay.innerHTML = buildFullHudRootHtml("runtime-hud-root--setup");
     applyStandaloneBannerText(bannerText);
+    if (window.risqueArtemisMode) {
+      var rhNew = document.getElementById("runtime-hud-root");
+      if (rhNew) rhNew.classList.add("runtime-hud-root--artemis-compact");
+    }
     setAttackChromeInteractive(false);
-    setControlVoiceText("", "");
+    clearControlVoiceForHudRebuild();
   }
 
   function clearPhaseSlot() {
@@ -480,13 +650,99 @@
       .replace(/"/g, "&quot;");
   }
 
-  /** Setup / login: optional "TITLE · subtitle" splits across game title + player line. */
+  function artemisActivePlayerNameUpper(gs) {
+    if (!gs) return "";
+    var cpU = gs.currentPlayer ? String(gs.currentPlayer).trim().toUpperCase() : "";
+    var ctrl = Number(gs.artemisControlSlot) || 0;
+    if (ctrl >= 1 && ctrl <= 3 && Array.isArray(gs.players)) {
+      var slotName = "";
+      var roster = gs.artemisRoster;
+      if (roster && Array.isArray(roster)) {
+        var hit = roster.find(function (r) {
+          return Number(r.slot) === ctrl;
+        });
+        if (hit && hit.name) {
+          slotName = String(hit.name).trim().toUpperCase();
+        }
+      }
+      if (!slotName) {
+        var byOrder = gs.players.find(function (x) {
+          return x && Number(x.playerOrder) === ctrl;
+        });
+        if (byOrder && byOrder.name) {
+          slotName = String(byOrder.name).trim().toUpperCase();
+        }
+      }
+      if (!slotName && gs.players[ctrl - 1] && gs.players[ctrl - 1].name) {
+        slotName = String(gs.players[ctrl - 1].name).trim().toUpperCase();
+      }
+      if (slotName) {
+        if (cpU && slotName !== cpU) {
+          return cpU;
+        }
+        return slotName;
+      }
+    }
+    if (cpU) {
+      return cpU;
+    }
+    return "";
+  }
+
+  function artemisPhaseHudTitle(phase, gs) {
+    var p = String(phase || "");
+    if (p === "cardplay" || p === "con-cardplay") {
+      if (window.risqueArtemisMode && gs) {
+        var cpName = artemisActivePlayerNameUpper(gs);
+        if (cpName) return "CARD PLAY-" + cpName;
+      }
+      return "CARD PLAY";
+    }
+    if (p === "income" || p === "con-income") return "INCOME";
+    if (p === "deploy" || p === "deploy1" || p === "deploy2" || p === "con-deploy") {
+      if (window.risqueArtemisMode && gs && isArtemisSetupDeployPhase(gs)) {
+        var depName = artemisActivePlayerNameUpper(gs);
+        return depName ? "FIRST DEPLOYMENT-" + depName : "FIRST DEPLOYMENT";
+      }
+      return "DEPLOYMENT";
+    }
+    if (p === "attack") return "ATTACK";
+    if (p === "reinforce") return "REINFORCEMENT";
+    if (p === "receivecard" || p === "getcard") return "RECEIVE CARD";
+    if (p === "playerSelect") {
+      var sk = gs && String(gs.selectionPhase || gs.risquePublicUiSelectKind || "");
+      if (sk === "firstCard") return "FIRST CARD";
+      if (sk === "deployOrder") return "DEPLOY ORDER";
+      if (sk === "cardPlay") return "CARD PLAY ORDER";
+      return "PLAYER SELECT";
+    }
+    if (p === "deal") return "DEAL";
+    if (p === "welcome") return "WELCOME";
+    if (p === "login") return "SIGN IN";
+    if (p === "conquer") return "CONQUER";
+    if (p === "con-cardtransfer") return "CARD TRANSFER";
+    if (!p) return "SETUP";
+    return phaseToBannerSuffix(p).toUpperCase();
+  }
+
+  /** Setup / login: optional "TITLE · subtitle" splits across phase title + player line. */
   function applyStandaloneBannerText(bannerText) {
     if (bannerText == null || String(bannerText) === "") return;
     var b = document.getElementById("attack-player-name");
     var t = document.getElementById("hud-banner-game-title");
     var full = String(bannerText);
     var dot = full.indexOf("·");
+    if (window.risqueArtemisMode && t) {
+      if (dot !== -1) {
+        t.textContent = full.slice(0, dot).trim();
+        if (b) b.textContent = full.slice(dot + 1).trim();
+      } else {
+        t.textContent = full;
+        if (b) b.textContent = "";
+      }
+      t.classList.add("hud-banner-phase-title");
+      return;
+    }
     if (t && b && dot !== -1) {
       t.textContent = full.slice(0, dot).trim();
       b.textContent = full.slice(dot + 1).trim();
@@ -516,6 +772,16 @@
     if (blueish && lum < 0.58) return false;
     if (lum < 0.42) return true;
     return false;
+  }
+
+  function isArtemisSetupDeployPhase(gs) {
+    if (!window.risqueArtemisMode || !gs || String(gs.phase || "") !== "deploy") return false;
+    if (String(gs.risqueMirrorDeployRoute || "") === "setup") return true;
+    var banks = 0;
+    (gs.players || []).forEach(function (p) {
+      if ((Number(p.bankValue) || 0) > 0) banks += 1;
+    });
+    return banks > 1;
   }
 
   function phaseToBannerSuffix(phase) {
@@ -591,10 +857,18 @@
       el.classList.remove("hud-turn-banner--cardplay");
       el.classList.add("hud-turn-banner--player-phase");
       el.style.color = "";
+      if (titleEl && window.risqueArtemisMode) {
+        titleEl.textContent = "SIGN IN";
+        titleEl.classList.add("hud-banner-phase-title");
+      }
       el.innerHTML =
         '<span class="hud-banner-player-phase-line" style="color:#00ff00">' +
-        escapeHtmlBanner("SIGN IN") +
+        escapeHtmlBanner(window.risqueArtemisMode && titleEl ? "" : "SIGN IN") +
         "</span>";
+      if (window.risqueArtemisMode && titleEl) {
+        el.textContent = "";
+        el.innerHTML = "";
+      }
       return;
     }
     if (phase === "postgame") {
@@ -613,9 +887,33 @@
       el.classList.remove("hud-turn-banner--cardplay");
       el.classList.add("hud-turn-banner--player-phase");
       el.style.color = "";
+      if (titleEl && window.risqueArtemisMode) {
+        titleEl.textContent = "DEAL";
+        titleEl.classList.add("hud-banner-phase-title");
+        el.textContent = "";
+        el.innerHTML = "";
+        return;
+      }
       el.innerHTML =
         '<span class="hud-banner-player-phase-line" style="color:#00ff00">' +
         escapeHtmlBanner("DEAL") +
+        "</span>";
+      return;
+    }
+    if (phase === "welcome") {
+      el.classList.remove("hud-turn-banner--cardplay");
+      el.classList.add("hud-turn-banner--player-phase");
+      el.style.color = "";
+      if (titleEl && window.risqueArtemisMode) {
+        titleEl.textContent = "WELCOME";
+        titleEl.classList.add("hud-banner-phase-title");
+        el.textContent = "";
+        el.innerHTML = "";
+        return;
+      }
+      el.innerHTML =
+        '<span class="hud-banner-player-phase-line" style="color:#00ff00">' +
+        escapeHtmlBanner("WELCOME") +
         "</span>";
       return;
     }
@@ -633,17 +931,66 @@
       el.classList.remove("hud-turn-banner--cardplay");
       el.classList.add("hud-turn-banner--player-phase");
       el.style.color = "";
+      if (titleEl && window.risqueArtemisMode) {
+        titleEl.textContent = sub;
+        titleEl.classList.add("hud-banner-phase-title");
+        el.textContent = "";
+        el.innerHTML = "";
+        return;
+      }
       el.innerHTML =
         '<span class="hud-banner-player-phase-line" style="color:#00ff00">' +
         escapeHtmlBanner(sub) +
         "</span>";
       return;
     }
-    var p = gs.players
-      ? gs.players.find(function (x) {
-          return x.name === gs.currentPlayer;
-        })
-      : null;
+    var p = null;
+    if (
+      window.risqueArtemisMode &&
+      phase === "deploy" &&
+      gs.players
+    ) {
+      var activeName = artemisActivePlayerNameUpper(gs);
+      if (activeName) {
+        p = gs.players.find(function (x) {
+          return x && String(x.name || "").trim().toUpperCase() === activeName;
+        });
+      }
+      if (
+        !p &&
+        Number(gs.artemisControlSlot) >= 1 &&
+        Number(gs.artemisControlSlot) <= 3
+      ) {
+        var ctrlSlot = Number(gs.artemisControlSlot);
+        var roster = gs.artemisRoster;
+        if (roster && Array.isArray(roster)) {
+          var rosterHit = roster.find(function (r) {
+            return Number(r.slot) === ctrlSlot;
+          });
+          if (rosterHit && rosterHit.name) {
+            var rosterName = String(rosterHit.name).trim().toUpperCase();
+            p = gs.players.find(function (x) {
+              return x && String(x.name || "").trim().toUpperCase() === rosterName;
+            });
+          }
+        }
+        if (!p) {
+          p = gs.players.find(function (x) {
+            return x && Number(x.playerOrder) === ctrlSlot;
+          });
+        }
+        if (!p && gs.players[ctrlSlot - 1]) {
+          p = gs.players[ctrlSlot - 1];
+        }
+      }
+    }
+    if (!p) {
+      p = gs.players
+        ? gs.players.find(function (x) {
+            return x.name === gs.currentPlayer;
+          })
+        : null;
+    }
     if (!p) {
       el.textContent = "";
       el.innerHTML = "";
@@ -653,6 +1000,31 @@
     var suffix = phaseToBannerSuffix(phase);
     var nameU = String(p.name || "").toUpperCase();
     var suffixU = String(suffix || "").toUpperCase();
+
+    if (window.risqueArtemisMode && titleEl) {
+      titleEl.textContent = artemisPhaseHudTitle(phase, gs);
+      titleEl.classList.add("hud-banner-phase-title");
+      titleEl.style.color = color;
+      el.textContent = "";
+      el.innerHTML = "";
+      var skipArtemisVoiceSync =
+        phase === "attack" ||
+        phase === "reinforce" ||
+        phase === "receivecard" ||
+        phase === "getcard" ||
+        phase === "deploy" ||
+        phase === "con-deploy" ||
+        phase === "cardplay" ||
+        phase === "con-cardplay";
+      if (
+        !skipArtemisVoiceSync &&
+        typeof window.risqueArtemisSyncPhaseControlVoice === "function"
+      ) {
+        window.risqueArtemisSyncPhaseControlVoice(gs);
+      }
+      return;
+    }
+
     el.classList.remove("hud-turn-banner--cardplay");
     el.classList.add("hud-turn-banner--player-phase");
     el.style.color = "";

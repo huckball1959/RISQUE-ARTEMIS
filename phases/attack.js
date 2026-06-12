@@ -1377,8 +1377,16 @@ function risqueTroopTransferOnShortcutChosen(which) {
  */
 function syncHostAttackCardEarnedIndicator() {
   const gs = window.gameState;
+  var artemisSpectator =
+    window.risqueArtemisMode &&
+    typeof window.risqueArtemisIsMyTurn === 'function' &&
+    gs &&
+    !window.risqueArtemisIsMyTurn(gs);
   const hostAttack =
-    !window.risqueDisplayIsPublic && gs && String(gs.phase || '') === 'attack';
+    !window.risqueDisplayIsPublic &&
+    gs &&
+    String(gs.phase || '') === 'attack' &&
+    !artemisSpectator;
   const earned = !!(gs && (gs.cardEarnedViaAttack || gs.cardEarnedViaCardplay));
   const tip =
     earned
@@ -5960,10 +5968,44 @@ function goToReinforce() {
     delete window.gameState.risqueAerialLinkPending;
   }
   window.gameState.phase = 'reinforce';
+  if (window.risqueArtemisMode) {
+    if (typeof window.risqueArtemisStampControlSlot === 'function') {
+      window.risqueArtemisStampControlSlot(window.gameState);
+    }
+    if (typeof window.risqueArtemisClearMapPhaseHandoffFlags === 'function') {
+      window.risqueArtemisClearMapPhaseHandoffFlags(window.gameState);
+    }
+    if (typeof window.risqueArtemisCancelAttackMapRouting === 'function') {
+      window.risqueArtemisCancelAttackMapRouting();
+    }
+    if (typeof window.risqueArtemisBeginPhaseTransition === 'function') {
+      window.risqueArtemisBeginPhaseTransition('reinforce');
+    }
+  }
   saveGameState();
+  if (
+    window.risqueArtemisMode &&
+    window.risqueArtemisNetClient &&
+    !window.risqueArtemisHost
+  ) {
+    if (typeof window.risqueArtemisFlushClientStatePush === 'function') {
+      window.risqueArtemisFlushClientStatePush(window.gameState);
+    }
+    if (typeof window.risqueArtemisSyncPortableReinforce === 'function') {
+      window.risqueArtemisSyncPortableReinforce(window.gameState);
+    }
+    return;
+  }
+  var reinforceDelay = window.risqueArtemisMode ? 0 : 1000;
   setTimeout(() => {
     navigateGameHtmlPreferSoft('game.html?phase=reinforce');
-  }, 1000);
+    if (
+      window.risqueArtemisMode &&
+      typeof window.risqueArtemisSyncPortableReinforce === 'function'
+    ) {
+      window.risqueArtemisSyncPortableReinforce(window.gameState);
+    }
+  }, reinforceDelay);
 }
 
 function backFromAerialPreview() {
@@ -6072,6 +6114,10 @@ function startAerialAttack() {
   syncAttackPhaseActionLocks();
 }
 
+function samePlayerName(a, b) {
+  return String(a || '').trim().toUpperCase() === String(b || '').trim().toUpperCase();
+}
+
 function risqueAttackPhaseTerritoryClick(label, owner, troops) {
   if (window.gameState.attackPhase === 'pending_transfer') return;
   if (isAwaitingAerialConfirm) return;
@@ -6096,7 +6142,7 @@ function risqueAttackPhaseTerritoryClick(label, owner, troops) {
 
   // Defensive resync: after long rounds/phase churn, stale attacker/defender can linger.
   const currentPlayerName = window.gameState.currentPlayer;
-  if (attacker && (attacker.owner !== currentPlayerName || attacker.troops < 2)) {
+  if (attacker && (!samePlayerName(attacker.owner, currentPlayerName) || attacker.troops < 2)) {
     attacker = null;
     defender = null;
     updateBattlePanelReadout();
@@ -6105,7 +6151,7 @@ function risqueAttackPhaseTerritoryClick(label, owner, troops) {
   if (defender && attacker) {
     const adj = window.gameUtils.getAdjacencies(attacker.label);
     const isAerialSel = aerialBridge && aerialBridge.source === attacker.label && aerialBridge.target === defender.label;
-    if (defender.owner === currentPlayerName || (!isAerialSel && !adj.includes(defender.label))) {
+    if (samePlayerName(defender.owner, currentPlayerName) || (!isAerialSel && !adj.includes(defender.label))) {
       defender = null;
       updateBattlePanelReadout();
       setPublicAttackFromSelection(attacker.owner, attacker.label);
@@ -6113,7 +6159,7 @@ function risqueAttackPhaseTerritoryClick(label, owner, troops) {
   }
 
   if (isSelectingAerialSource) {
-    if (owner !== window.gameState.currentPlayer || troops < 2) return;
+    if (!samePlayerName(owner, window.gameState.currentPlayer) || troops < 2) return;
     attacker = { label, owner, troops };
     updateBattlePanelReadout();
     isSelectingAerialSource = false;
@@ -6132,7 +6178,7 @@ function risqueAttackPhaseTerritoryClick(label, owner, troops) {
   }
 
   if (isSelectingAerialTarget) {
-    if (owner === window.gameState.currentPlayer) return;
+    if (samePlayerName(owner, window.gameState.currentPlayer)) return;
     isSelectingAerialTarget = false;
     isAwaitingAerialConfirm = true;
     if (window.gameState.risqueAerialLinkLocked && window.gameState.aerialAttack) {
@@ -6175,7 +6221,7 @@ function risqueAttackPhaseTerritoryClick(label, owner, troops) {
   }
 
   if (!attacker) {
-    if (owner !== window.gameState.currentPlayer) {
+    if (!samePlayerName(owner, window.gameState.currentPlayer)) {
       showPrompt('Select one of your territories with 2+ troops to attack from.', [{ label: 'Cancel', onClick: cancelAttack }]);
       return;
     }
@@ -6293,6 +6339,19 @@ function resetAttackInMemoryStateAfterShellPhaseRemount(gs) {
     }
   }
 }
+
+window.risqueResetAttackPhaseMemoryForMount = resetAttackInMemoryStateAfterShellPhaseRemount;
+
+window.risqueAttackResyncTerritorySelectionVisuals = function () {
+  if (!attacker && !defender) return;
+  document.querySelectorAll(".territory-circle").forEach(function (c) {
+    var lab = c.dataset && c.dataset.label;
+    c.classList.toggle(
+      "selected",
+      !!(attacker && lab === attacker.label) || !!(defender && lab === defender.label)
+    );
+  });
+};
 
 /** Matches attack mount helper risquePhaseIsContinentalConquestChain — never coerce continental elimination chain steps to "attack". */
 function risquePhaseIsContinentalConquestChainForAttackMount(phase) {

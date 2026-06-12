@@ -7,6 +7,104 @@
 
   var STYLE_ID = "risque-player-select-styles";
 
+  /**
+   * DEV ONLY — rig roulette winner while keeping the name cycle animation.
+   * Set to laptop slot (1 = Guido/host, 2 = Mictor, 3 = Nooch) or null for true random.
+   * Override at runtime: window.risqueArtemisRigSelectSlot = 1 | null
+   * URL override: ?artemisPickSlot=1  or  ?rigPick=random  to disable rig.
+   */
+  var RISQUE_DEV_RIG_PLAYER_SELECT_SLOT = null;
+
+  function normSelectName(n) {
+    return String(n || "")
+      .trim()
+      .toUpperCase();
+  }
+
+  function resolveRiggedSelectSlot(selectKind) {
+    selectKind = String(selectKind || "");
+    /*
+     * ARTEMIS setup-deploy testing: force Guido (host / slot 1) as first deployer.
+     * Does not affect firstCard or cardPlay roulettes. Disable: ?rigDeploy=random on host URL.
+     */
+    if (window.risqueArtemisMode && selectKind === "deployOrder") {
+      try {
+        if (new URL(window.location.href).searchParams.get("rigDeploy") === "random") {
+          return 0;
+        }
+      } catch (eDepRand) {
+        /* ignore */
+      }
+      if (typeof window.risqueArtemisRigDeployOrderSlot === "number") {
+        var depSlot = Number(window.risqueArtemisRigDeployOrderSlot);
+        return depSlot >= 1 ? depSlot : 1;
+      }
+      return 1;
+    }
+    /*
+     * ARTEMIS cardplay-order testing: force Guido (host / slot 1) as first cardplayer.
+     * Disable: ?rigCardPlay=random on host URL. Later: window.risqueArtemisRigCardPlaySlot = 2 for Mictor.
+     */
+    if (window.risqueArtemisMode && selectKind === "cardPlay") {
+      try {
+        if (new URL(window.location.href).searchParams.get("rigCardPlay") === "random") {
+          return 0;
+        }
+      } catch (eCpRand) {
+        /* ignore */
+      }
+      if (typeof window.risqueArtemisRigCardPlaySlot === "number") {
+        var cpSlot = Number(window.risqueArtemisRigCardPlaySlot);
+        return cpSlot >= 1 ? cpSlot : 1;
+      }
+      return 1;
+    }
+    if (typeof window.risqueArtemisRigSelectSlot === "number") {
+      if (window.risqueArtemisRigSelectSlot < 1) return 0;
+      return window.risqueArtemisRigSelectSlot;
+    }
+    try {
+      var q = new URL(window.location.href).searchParams;
+      if (q.get("rigPick") === "random") return 0;
+      var qs = q.get("artemisPickSlot") || q.get("rigPickSlot");
+      if (qs) {
+        var n = parseInt(String(qs), 10);
+        if (n >= 1) return n;
+      }
+      if (String(q.get("rigPick") || "").toLowerCase() === "guido") return 1;
+    } catch (eQ) {
+      /* ignore */
+    }
+    if (RISQUE_DEV_RIG_PLAYER_SELECT_SLOT == null) return 0;
+    var rig = Number(RISQUE_DEV_RIG_PLAYER_SELECT_SLOT);
+    return rig >= 1 ? rig : 0;
+  }
+
+  /** Pick winner — rigged slot when dev flag set, else random. */
+  function pickRouletteWinner(players, gameState, selectKind) {
+    var rigSlot = resolveRiggedSelectSlot(selectKind);
+    if (rigSlot >= 1) {
+      if (gameState && Array.isArray(gameState.artemisRoster)) {
+        var rosterHit = gameState.artemisRoster.find(function (r) {
+          return Number(r.slot) === rigSlot;
+        });
+        if (rosterHit && rosterHit.name) {
+          var want = normSelectName(rosterHit.name);
+          var byRoster = players.find(function (p) {
+            return normSelectName(p.name) === want;
+          });
+          if (byRoster) return byRoster;
+        }
+      }
+      var byOrder = players.find(function (p) {
+        return Number(p.playerOrder) === rigSlot;
+      });
+      if (byOrder) return byOrder;
+      if (players[rigSlot - 1]) return players[rigSlot - 1];
+    }
+    return players[Math.floor(Math.random() * players.length)];
+  }
+
   function loginRecoveryHref() {
     return window.risqueLoginRecoveryUrl();
   }
@@ -103,6 +201,10 @@
    */
   function mount(stageHost, opts) {
     opts = opts || {};
+    if (window.risqueArtemisMode && window.risqueArtemisNetClient && !window.risqueArtemisHost) {
+      logLines("ARTEMIS client — player select via host mirror only", opts.log);
+      return;
+    }
     var selectKindRaw = opts.selectKind != null ? opts.selectKind : "firstCard";
     var selectKind = canonicalSelectKind(selectKindRaw);
     var logFn = opts.log;
@@ -342,8 +444,18 @@
         if (cycleCount < totalCycles) {
           setTimeout(cycle, 1000 / cyclesPerSecond);
         } else {
-          var randomIndex = Math.floor(Math.random() * players.length);
-          var win = players[randomIndex];
+          var win = pickRouletteWinner(players, gameState, selectKind);
+          if (window.risqueArtemisMode && selectKind === "deployOrder" && resolveRiggedSelectSlot(selectKind) >= 1) {
+            try {
+              console.info(
+                "[ARTEMIS] deploy-order rigged — first deployer:",
+                win.name,
+                "(slot " + resolveRiggedSelectSlot(selectKind) + ")"
+              );
+            } catch (eRigLog) {
+              /* ignore */
+            }
+          }
           gameState.currentPlayer = win.name;
           gameState.turnOrder = [win.name].concat(
             players
@@ -354,7 +466,10 @@
                 return p.name;
               })
           );
-          var cardPlayEntry = "game.html?phase=cardplay&legacyNext=income.html";
+          var cardPlayEntry =
+            window.risqueArtemisMode
+              ? "game.html?phase=cardplay&legacyNext=income.html&postReceive=1"
+              : "game.html?phase=cardplay&legacyNext=income.html";
           var nextByKind = {
             firstCard: "game.html?phase=deal",
             deployOrder: "game.html?phase=deploy&kind=setup",
@@ -377,15 +492,59 @@
             gameState.setupComplete = true;
           }
 
-          delete gameState.risquePublicPlayerSelectFlash;
+          if (window.risqueArtemisMode && (selectKind === "deployOrder" || selectKind === "cardPlay")) {
+            if (selectKind === "deployOrder") {
+              gameState.risqueMirrorDeployRoute = "setup";
+              gameState.risqueArtemisControlSeq = Math.max(Number(gameState.risqueArtemisControlSeq) || 0, 1);
+            }
+            if (typeof window.risqueArtemisStampControlSlot === "function") {
+              window.risqueArtemisStampControlSlot(gameState);
+            }
+            if (selectKind === "deployOrder") {
+              try {
+                delete gameState.risqueControlVoice;
+              } catch (eCv) {
+                /* ignore */
+              }
+            }
+          }
+
           delete gameState.risquePublicUiSelectKind;
           try {
             localStorage.setItem("gameState", JSON.stringify(gameState));
           } catch (e2) {
             logLines("save failed: " + e2.message, logFn);
           }
+          window.gameState = gameState;
+          if (typeof window.risqueHostReplaceShellGameState === "function") {
+            window.risqueHostReplaceShellGameState(gameState);
+          }
+          if (window.risqueArtemisMode) {
+            gameState.risquePublicPlayerSelectFlash = {
+              name: String(win.name || ""),
+              color: String(win.color || ""),
+              selectKind: String(selectKind || "")
+            };
+          }
+          if (typeof window.risquePersistHostGameState === "function") {
+            window.risquePersistHostGameState(gameState);
+          }
 
-          logLines("Selected: " + gameState.currentPlayer + " (" + selectKind + ")", logFn);
+          logLines(
+            "Selected: " + gameState.currentPlayer + " (" + selectKind + ")" +
+              (resolveRiggedSelectSlot(selectKind) >= 1
+                ? " [rig slot " + resolveRiggedSelectSlot(selectKind) + "]"
+                : ""),
+            logFn
+          );
+          if (window.risqueArtemisMode && selectKind === "firstCard") {
+            if (typeof window.risqueArtemisSetupMilestone === "function") {
+              window.risqueArtemisSetupMilestone(
+                "M2-firstCard-winner",
+                gameState.currentPlayer + " deals first"
+              );
+            }
+          }
           if (useVoiceCycle) {
             if (nameCycle) {
               nameCycle.style.display = "none";
@@ -405,9 +564,15 @@
             window.risqueRuntimeHud.setControlVoiceText(win.name.toUpperCase() + " SELECTED", "");
           }
 
+          var navigateDelayMs = window.risqueArtemisMode ? 2200 : 1000;
           setTimeout(function () {
+            try {
+              delete gameState.risquePublicPlayerSelectFlash;
+            } catch (eFlashDel) {
+              /* ignore */
+            }
             navigateGameHtmlPreferSoft(nextByKind[selectKind]);
-          }, 1000);
+          }, navigateDelayMs);
         }
       }
       setTimeout(function () {

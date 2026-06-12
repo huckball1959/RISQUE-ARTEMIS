@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ARTEMIS — Client setup</title>
+  <style>
+    body {
+      font-family: system-ui, Segoe UI, sans-serif;
+      max-width: 640px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      line-height: 1.55;
+      color: #e2e8f0;
+      background: #0f172a;
+    }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    .sub { opacity: 0.85; margin-bottom: 1.5rem; }
+    a.dl {
+      display: block;
+      margin: 0.5rem 0;
+      padding: 12px 16px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #86efac;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    a.dl:hover { background: #334155; }
+    .box {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1rem 0;
+      font-size: 0.95rem;
+    }
+    code { background: #0f172a; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>ARTEMIS client setup</h1>
+  <p class="sub">Laptop 2 and 3 — download these files from the <strong>host</strong>, then double-click your player batch file.</p>
+
+  <div class="box">
+    <strong>Host IP:</strong> <span id="host-ip">this computer</span><br />
+    <strong>Port:</strong> 5700
+  </div>
+
+  <p><strong>Step 1</strong> — Download all three to the same folder (Desktop\ARTEMIS is fine):</p>
+  <a class="dl" href="scripts/artemis-host-ip.txt" download>artemis-host-ip.txt</a>
+  <a class="dl" href="scripts/ARTEMIS-PLAYER2.bat" download>ARTEMIS-PLAYER2.bat (Laptop 2)</a>
+  <a class="dl" href="scripts/ARTEMIS-PLAYER3.bat" download>ARTEMIS-PLAYER3.bat (Laptop 3)</a>
+  <a class="dl" href="scripts/ARTEMIS-FETCH-FROM-HOST.bat" download>ARTEMIS-FETCH-FROM-HOST.bat (auto-download all)</a>
+
+  <p><strong>Step 2</strong> — Double-click <code>ARTEMIS-PLAYER2.bat</code> or <code>ARTEMIS-PLAYER3.bat</code>.</p>
+
+  <p class="sub">Easier: copy only <code>ARTEMIS-FETCH-FROM-HOST.bat</code> to each client once; run it and enter the host IP — it pulls everything automatically.</p>
+
+  <script>
+    (function () {
+      var el = document.getElementById("host-ip");
+      if (el) el.textContent = location.hostname || "host";
+    })();
+  </script>
+</body>
+</html>

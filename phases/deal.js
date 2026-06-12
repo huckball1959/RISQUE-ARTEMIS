@@ -89,6 +89,10 @@
   function run(stageHost, opts) {
     opts = opts || {};
     var logFn = opts.log;
+    if (window.risqueArtemisMode && window.risqueArtemisNetClient && !window.risqueArtemisHost) {
+      logLines("ARTEMIS client — deal animation via host mirror only", logFn);
+      return;
+    }
 
     var gameState = null;
     try {
@@ -118,6 +122,10 @@
       return;
     }
     window.__risqueDealRunActive = true;
+
+    if (window.risqueArtemisMode && typeof window.risqueArtemisSetupMilestone === "function") {
+      window.risqueArtemisSetupMilestone("M3-deal-start", gameState.currentPlayer);
+    }
 
     window.gameUtils.initGameView();
     if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.setControlVoiceText === "function") {
@@ -213,7 +221,9 @@
       window.gameUtils.resizeCanvas();
       /* TV mirror: one-shot territory id so public board can use the same popIn grow as host (see game-shell). */
       gameState.risquePublicDealPopTerritory = territory;
-      if (typeof window.risqueScheduleMirrorPush === "function") {
+      if (typeof window.risqueFlushMirrorPush === "function") {
+        window.risqueFlushMirrorPush();
+      } else if (typeof window.risqueScheduleMirrorPush === "function") {
         window.risqueScheduleMirrorPush();
       } else if (typeof window.risqueMirrorPushGameState === "function") {
         window.risqueMirrorPushGameState();

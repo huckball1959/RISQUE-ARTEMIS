@@ -1633,21 +1633,51 @@ window.gameUtils = {
           typeof gameState.risqueDeployMirrorDraft === 'object'
             ? gameState.risqueDeployMirrorDraft
             : null;
+        var artemisSetupSpectatorMirror =
+          window.risqueArtemisMode &&
+          deployMirrorDraft &&
+          !(
+            typeof window.risqueArtemisLocalOwnsSetupDeploy === 'function' &&
+            window.risqueArtemisLocalOwnsSetupDeploy(gameState)
+          ) &&
+          !(
+            window.risqueArtemisNetClient &&
+            window.risqueArtemisClientPlaying &&
+            typeof window.risqueArtemisIsMyTurn === 'function' &&
+            window.risqueArtemisIsMyTurn(gameState)
+          );
         const pubDeployPlay =
           isPublicView &&
           window.__risquePublicDeployPlayback &&
           typeof window.__risquePublicDeployPlayback === 'object'
             ? window.__risquePublicDeployPlayback
             : null;
+        var draftDeltaMap =
+          deployMirrorDraft &&
+          deployMirrorDraft.deltas &&
+          typeof deployMirrorDraft.deltas === 'object'
+            ? deployMirrorDraft.deltas
+            : null;
+        var draftHasPositive = false;
+        if (draftDeltaMap) {
+          Object.keys(draftDeltaMap).forEach(function (dk) {
+            if (Number(draftDeltaMap[dk]) > 0) draftHasPositive = true;
+          });
+        }
+        var passedHasPositive = false;
+        if (deployedTroops && typeof deployedTroops === 'object') {
+          Object.keys(deployedTroops).forEach(function (pk) {
+            if (Number(deployedTroops[pk]) > 0) passedHasPositive = true;
+          });
+        }
         const effectiveDeployedTroops =
           pubDeployPlay && pubDeployPlay.revealedDeltas
             ? pubDeployPlay.revealedDeltas
-            : isPublicView &&
-                deployMirrorDraft &&
-                deployMirrorDraft.deltas &&
-                typeof deployMirrorDraft.deltas === 'object'
-              ? deployMirrorDraft.deltas
-              : deployedTroops;
+            : (isPublicView || artemisSetupSpectatorMirror) && draftHasPositive
+              ? draftDeltaMap
+              : passedHasPositive
+                ? deployedTroops
+                : draftDeltaMap || deployedTroops;
         const rawDeployDeltaForScale =
           effectiveDeployedTroops && effectiveDeployedTroops[label] != null
             ? Number(effectiveDeployedTroops[label])
@@ -1817,7 +1847,6 @@ window.gameUtils = {
             String(gameState.phase) === 'con-deploy' ||
             !!pubDeployPlay);
         const deployMirrorSelected =
-          isPublicView &&
           deployMirrorDraft &&
           deployMirrorDraft.selected != null &&
           String(deployMirrorDraft.selected) !== ''
@@ -1827,7 +1856,9 @@ window.gameUtils = {
           isDeployPhase &&
           playerName === gameState.currentPlayer &&
           !pubDeployPlay &&
-          (isPublicView ? deployMirrorSelected === label : window.selectedTerritory === label);
+          (isPublicView || artemisSetupSpectatorMirror
+            ? deployMirrorSelected === label
+            : window.selectedTerritory === label);
         if (deployTerritorySelected) {
           surface.classList.add('selected');
         }
@@ -2306,6 +2337,49 @@ window.gameUtils = {
   },
   handleTerritoryClick: function(label, circle, originalR, gameState) {
     risqueCoreDebugLog(`[Core] Clicked territory: ${label}`);
+    if (window.gameState && typeof window.gameState === 'object') {
+      gameState = window.gameState;
+    }
+    if (
+      window.risqueArtemisMode &&
+      typeof window.risqueArtemisCanLocalPlay === 'function' &&
+      !window.risqueArtemisCanLocalPlay()
+    ) {
+      var gsTdClick = window.gameState;
+      var routeClick = gsTdClick ? String(gsTdClick.risqueMirrorDeployRoute || '') : '';
+      if (routeClick !== 'turn' && routeClick !== 'deploy2') {
+        try {
+          var rkC = localStorage.getItem('risqueMirrorDeployRoute');
+          if (rkC === 'turn' || rkC === 'deploy2') routeClick = rkC;
+        } catch (eRkC) {
+          /* ignore */
+        }
+      }
+      var turnDeployActive =
+        gsTdClick &&
+        String(gsTdClick.phase || '') === 'deploy' &&
+        (routeClick === 'turn' || routeClick === 'deploy2') &&
+        document.getElementById('confirm') &&
+        typeof window.risqueArtemisIsMyTurn === 'function' &&
+        window.risqueArtemisIsMyTurn(gsTdClick);
+      var setupDeployActive =
+        gsTdClick &&
+        String(gsTdClick.phase || '') === 'deploy' &&
+        document.getElementById('deploy1-confirm') &&
+        typeof window.risqueArtemisIsSetupDeploy === 'function' &&
+        window.risqueArtemisIsSetupDeploy(gsTdClick) &&
+        typeof window.risqueArtemisIsMyTurn === 'function' &&
+        window.risqueArtemisIsMyTurn(gsTdClick);
+      var reinforceActive =
+        gsTdClick &&
+        String(gsTdClick.phase || '') === 'reinforce' &&
+        document.getElementById('reinforce-btn-skip') &&
+        typeof window.risqueArtemisIsMyTurn === 'function' &&
+        window.risqueArtemisIsMyTurn(gsTdClick);
+      if (!turnDeployActive && !setupDeployActive && !reinforceActive) {
+        return;
+      }
+    }
     var prevDeploySelection =
       gameState && String(gameState.phase) === 'deploy' ? window.selectedTerritory : null;
     if (gameState && String(gameState.phase) === 'deploy' && gameState.risqueDeployTransientPrimary != null) {
@@ -2321,8 +2395,25 @@ window.gameUtils = {
       });
       return;
     }
-    const player = gameState.players.find(p => p.name === gameState.currentPlayer);
-    const territory = player?.territories.find(t => t.name === label);
+    const upNorm = String(gameState.currentPlayer || '').trim().toUpperCase();
+    var player = null;
+    if (
+      gameState &&
+      String(gameState.phase) === 'deploy' &&
+      typeof window.risqueArtemisDeployResolveCurrentPlayer === 'function'
+    ) {
+      player = window.risqueArtemisDeployResolveCurrentPlayer(gameState);
+    }
+    if (!player) {
+      player = gameState.players.find(function (p) {
+        return p && String(p.name || '').trim().toUpperCase() === upNorm;
+      });
+    }
+    const territory = player && player.territories
+      ? player.territories.find(function (t) {
+          return t && t.name === label;
+        })
+      : null;
     if (label === window.selectedTerritory) {
       window.selectedTerritory = null;
       this.showError('');
@@ -2349,6 +2440,15 @@ window.gameUtils = {
         typeof window.risqueRefreshDeployNarration === 'function'
       ) {
         window.risqueRefreshDeployNarration(gameState, { prevSelection: prevDeploySelection });
+      }
+      if (
+        window.risqueArtemisMode &&
+        typeof window.risqueArtemisEnsureDeployOwnerVoiceChrome === 'function'
+      ) {
+        window.risqueArtemisEnsureDeployOwnerVoiceChrome(gameState);
+        requestAnimationFrame(function () {
+          window.risqueArtemisEnsureDeployOwnerVoiceChrome(gameState);
+        });
       }
     });
   },
@@ -2953,7 +3053,6 @@ window.risqueRefreshDeployNarration = function (gameState, opts) {
     });
   if (!player) return;
 
-  var report = window.risqueDeployBankReport(player);
   var pretty = function (id) {
     return window.gameUtils && window.gameUtils.formatTerritoryDisplayName
       ? window.gameUtils.formatTerritoryDisplayName(id)
@@ -2963,12 +3062,22 @@ window.risqueRefreshDeployNarration = function (gameState, opts) {
   if (!window.selectedTerritory && gameState.risqueDeployTransientPrimary) {
     var tp = String(gameState.risqueDeployTransientPrimary);
     delete gameState.risqueDeployTransientPrimary;
-    var transientVoice =
-      String(report || '').trim() ? tp + '\n\n' + report : tp;
+    var voiceReportClass0 = "ucp-voice-report ucp-voice-report--public-deploy";
     try {
-      gameState.risquePublicDeployBanner = transientVoice;
+      gameState.risquePublicDeployBanner = tp;
+      gameState.risquePublicDeployReport = "";
+      gameState.risqueControlVoice = {
+        primary: tp,
+        report: "",
+        reportClass: voiceReportClass0
+      };
     } catch (ePubBanner0) { /* ignore */ }
-    window.risqueRuntimeHud.setControlVoiceText(transientVoice, '');
+    window.risqueRuntimeHud.setControlVoiceText(tp, "", {
+      reportClass: voiceReportClass0
+    });
+    if (typeof window.risqueArtemisStampDeployMirrorDraftOnState === "function") {
+      window.risqueArtemisStampDeployMirrorDraftOnState(gameState);
+    }
     if (typeof window.risqueMirrorPushGameState === 'function') window.risqueMirrorPushGameState();
     else {
       try {
@@ -2981,47 +3090,62 @@ window.risqueRefreshDeployNarration = function (gameState, opts) {
   var dep = window.deployedTroops || {};
   var prev = opts.prevSelection;
   var sel = window.selectedTerritory;
-  var parts = [];
+  var ownerReportParts = [];
+  var spectatorParts = [];
+  var pName = String(player.name || "").trim();
+  var pNameU = pName.toUpperCase();
 
   if (prev && prev !== sel && (dep[prev] || 0) > 0) {
     var nPrev = dep[prev] || 0;
-    parts.push(
-      player.name +
-        ' has deployed ' +
-        window.risqueDeployTroopCountToWord(nPrev) +
-        ' troops to ' +
-        pretty(prev) +
-        '.'
+    var prevWord = window.risqueDeployTroopCountToWord(nPrev);
+    ownerReportParts.push(
+      pretty(prev) + " — " + prevWord + " troop" + (nPrev === 1 ? "" : "s") + " deployed."
+    );
+    spectatorParts.push(
+      pName + " deploys " + prevWord + " troops to " + pretty(prev) + "."
     );
   }
 
   if (sel) {
     var nSel = dep[sel] || 0;
     if (nSel > 0) {
-      parts.push(
-        player.name +
-          ' is deploying to ' +
-          pretty(sel) +
-          ' — ' +
-          window.risqueDeployPlacedPhrase(nSel) +
-          '.'
+      var selWord = window.risqueDeployTroopCountToWord(nSel);
+      ownerReportParts.push(
+        pretty(sel) + " — " + selWord + " troop" + (nSel === 1 ? "" : "s") + " deployed."
+      );
+      spectatorParts.push(
+        pName + " deploys " + selWord + " troops to " + pretty(sel) + "."
       );
     } else {
-      parts.push(player.name + ' has selected ' + pretty(sel) + ' to deploy troops to.');
+      ownerReportParts.push(pretty(sel) + " has been selected for deployment.");
+      spectatorParts.push(pName + " selects " + pretty(sel) + " for Deployment");
     }
   }
 
-  var primary =
-    parts.length > 0
-      ? parts.join('\n')
-      : player.name.toUpperCase() + '\nDEPLOYING TROOPS';
-
-  var deployVoiceFull =
-    String(report || '').trim() ? primary + '\n\n' + report : primary;
+  var ownerPrimary = pNameU + "\nDEPLOY ALL TROOPS FROM YOUR BANK";
+  var ownerReport = ownerReportParts.join("\n");
+  var spectatorPrimary =
+    spectatorParts.length > 0
+      ? spectatorParts.join("\n")
+      : pNameU + " IS DEPLOYING TROOPS";
+  var voiceReportClass = "ucp-voice-report ucp-voice-report--public-deploy";
   try {
-    gameState.risquePublicDeployBanner = deployVoiceFull;
+    gameState.risquePublicDeployBanner = spectatorPrimary;
+    gameState.risquePublicDeployReport = "";
+    gameState.risqueControlVoice = {
+      primary: ownerPrimary,
+      report: ownerReport,
+      reportClass: voiceReportClass
+    };
   } catch (ePubBanner1) { /* ignore */ }
-  window.risqueRuntimeHud.setControlVoiceText(deployVoiceFull, '');
+  window.risqueRuntimeHud.setControlVoiceText(ownerPrimary, ownerReport, {
+    reportClass: voiceReportClass,
+    skipMirror: true,
+    artemisDeployOwner: true
+  });
+  if (typeof window.risqueArtemisStampDeployMirrorDraftOnState === "function") {
+    window.risqueArtemisStampDeployMirrorDraftOnState(gameState);
+  }
   if (typeof window.risqueMirrorPushGameState === 'function') window.risqueMirrorPushGameState();
   else {
     try {

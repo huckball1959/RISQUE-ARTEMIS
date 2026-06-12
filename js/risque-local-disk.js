@@ -58,6 +58,19 @@
 
   /** Bootstrap from risque-launcher-paths.json + health check. */
   window.risqueLocalDiskBootstrap = function () {
+    var isArtemisHosted = false;
+    try {
+      var q = new URL(window.location.href).searchParams;
+      var art = String(q.get("artemis") || "").toLowerCase();
+      isArtemisHosted = art === "host" || art === "client";
+    } catch (eArt) {
+      /* ignore */
+    }
+    if (isArtemisHosted || window.risqueArtemisCycleProbeActive) {
+      window.risqueLocalDiskConfigure("");
+      window.risqueLocalDiskSetActive(false);
+      return Promise.resolve(false);
+    }
     var fallbackBase = "http://127.0.0.1:5599";
     var chain = Promise.resolve(null);
     if (typeof window.risqueFetchLauncherPathsJson === "function") {
@@ -142,6 +155,9 @@
   };
 
   window.risqueLocalDiskRead = function (relPath) {
+    if (!apiBase || !active) {
+      return Promise.resolve({ ok: false, error: "disk api inactive" });
+    }
     var p = String(relPath || "").replace(/\\/g, "/").replace(/^\/+/, "");
     return post("/api/read", { path: p }).then(function (r) {
       if (!r.ok) throw new Error("risque-disk read failed");

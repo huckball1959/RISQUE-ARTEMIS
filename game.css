@@ -820,6 +820,18 @@ html.risque-public-wayback-mirror.risque-view-public #risque-main-panel-body {
 .runtime-hud-root--setup #control-voice-report {
   display: none !important;
 }
+/* ARTEMIS setup deploy: bank / territory narration lives in the report row (matches client mirror). */
+html.risque-artemis-host body[data-risque-phase="deploy"] .runtime-hud-root--setup #control-voice-report,
+html.risque-artemis-client body[data-risque-phase="deploy"] .runtime-hud-root--setup #control-voice-report {
+  display: block !important;
+}
+/* ARTEMIS cardplay spectators: "WAITING..." lives in the report row (setup HUD hides it by default). */
+html.risque-artemis-host body[data-risque-phase="cardplay"] .runtime-hud-root--setup #control-voice-report,
+html.risque-artemis-client body[data-risque-phase="cardplay"] .runtime-hud-root--setup #control-voice-report,
+html.risque-artemis-host body[data-risque-phase="con-cardplay"] .runtime-hud-root--setup #control-voice-report,
+html.risque-artemis-client body[data-risque-phase="con-cardplay"] .runtime-hud-root--setup #control-voice-report {
+  display: block !important;
+}
 .runtime-hud-root--setup #log-text {
   display: none !important;
 }
@@ -898,7 +910,7 @@ html.risque-public-wayback-mirror.risque-view-public #risque-main-panel-body {
 /* Name roulette: instruction + flashing name in primary voice (host + public) */
 #control-voice-text .player-select-voice-instruction {
   display: block;
-  font-size: 13px;
+  font-size: clamp(14px, 1.49vw, 18px);
   font-weight: 800;
   letter-spacing: 0.05em;
   line-height: 1.3;
@@ -909,7 +921,7 @@ html.risque-public-wayback-mirror.risque-view-public #risque-main-panel-body {
 
 #control-voice-text .player-select-cycle-name--hud-primary {
   display: block;
-  font-size: 26px;
+  font-size: clamp(24px, 2.97vw, 35px);
   font-weight: 900;
   letter-spacing: 0.06em;
   line-height: 1.2;
@@ -1004,6 +1016,29 @@ html.risque-public-wayback-mirror.risque-view-public #risque-main-panel-body {
 }
 #risque-board-open-public {
   grid-column: 5;
+}
+/* ARTEMIS host: START + no PUBLIC — six-column top row */
+html.risque-artemis-host .risque-board-corner-top--artemis {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+html.risque-artemis-host .risque-board-corner-top--artemis #risque-board-start-game {
+  grid-column: 2;
+}
+html.risque-artemis-host .risque-board-corner-top--artemis #risque-board-load {
+  grid-column: 3;
+}
+html.risque-artemis-host .risque-board-corner-top--artemis #risque-board-save {
+  grid-column: 4;
+}
+html.risque-artemis-host .risque-board-corner-top--artemis #risque-board-grace {
+  grid-column: 5;
+}
+html.risque-artemis-host .risque-board-corner-top--artemis #risque-board-hide-top-row {
+  grid-column: 6;
+}
+#risque-board-start-game[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 /* Same grid cell + stretch for HIDE and SHOW — typography matches other top-row chips (wrap + height). */
 #risque-board-hide-top-row {
@@ -1674,7 +1709,8 @@ html.risque-view-public .risque-public-ghost-replay-save {
 }
 
 /* Recap shelf mounts inside #hud-main-panel — two IDs beat the five-class “hide main panel” rule above. */
-#runtime-hud-root.runtime-hud-root--cardplay-panel-only.runtime-hud-root--host-cardplay-recap #hud-main-panel {
+#runtime-hud-root.runtime-hud-root--cardplay-panel-only.runtime-hud-root--host-cardplay-recap #hud-main-panel,
+#runtime-hud-root.runtime-hud-root--cardplay-panel-only.runtime-hud-root--public-cardplay-recap #hud-main-panel {
   display: flex !important;
   flex-direction: column !important;
   /* Take almost all column height (phase slot below must not flex-grow like normal cardplay). */
@@ -1682,6 +1718,30 @@ html.risque-view-public .risque-public-ghost-replay-save {
   min-height: 0 !important;
   min-width: 0 !important;
   overflow: hidden !important;
+}
+
+/* ARTEMIS host: book intro + shelf need #hud-main-panel visible (panel-only rule hides it otherwise). */
+html.risque-artemis-host.risque-view-host body[data-risque-phase="cardplay"]:has(#control-voice .risque-public-book-voice)
+  #hud-main-panel,
+html.risque-artemis-host.risque-view-host body[data-risque-phase="cardplay"]:has(
+    #control-voice.ucp-control-voice--public-book-processing
+  )
+  #hud-main-panel,
+html.risque-artemis-host.risque-view-host body[data-risque-phase="cardplay"]:has(#risque-public-cardplay-recap-overlay)
+  #hud-main-panel,
+html.risque-artemis-host.risque-view-host body[data-risque-phase="con-cardplay"]:has(#control-voice .risque-public-book-voice)
+  #hud-main-panel,
+html.risque-artemis-host.risque-view-host body[data-risque-phase="con-cardplay"]:has(
+    #control-voice.ucp-control-voice--public-book-processing
+  )
+  #hud-main-panel,
+html.risque-artemis-host.risque-view-host body[data-risque-phase="con-cardplay"]:has(#risque-public-cardplay-recap-overlay)
+  #hud-main-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
 }
 
 .runtime-hud-root--cardplay-panel-only #hud-title-stack {
@@ -2645,6 +2705,31 @@ html.risque-view-public .risque-public-ghost-replay-save {
   justify-content: flex-start !important;
 }
 
+/* ARTEMIS mock cardplay — Apollo panel-only layout; hand + staging split fills control panel */
+.runtime-hud-root--cardplay-panel-only .risque-artemis-mock-cardplay.cardplay-compact-root .cardplay-staging-wrap {
+  display: flex !important;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.runtime-hud-root--cardplay-panel-only .risque-artemis-mock-cardplay .cardplay-staging-empty-hint {
+  margin: auto 0 0;
+  padding: 10px 6px 4px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #00ff00;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.88;
+  text-align: center;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn .risque-phase-content .risque-artemis-mock-cardplay button:not(:disabled),
+html.risque-artemis-my-turn .risque-phase-content .risque-artemis-mock-cardplay button:not(:disabled) {
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+
 .runtime-hud-root--cardplay-panel-only .cardplay-compact-root .card.selected {
   border-color: #00ff00 !important;
   box-shadow: 0 0 12px rgba(0, 255, 0, 0.55);
@@ -2776,6 +2861,37 @@ html.risque-view-public .risque-public-ghost-replay-save {
 }
 
 /* Host HUD: summary in bordered box; Continue sits below (see .income-hud-phase-stack) */
+html.risque-artemis-host body[data-risque-phase="income"] #runtime-hud-root.runtime-hud-root--host-cardplay-recap #risque-phase-content,
+html.risque-artemis-host body[data-risque-phase="con-income"] #runtime-hud-root.runtime-hud-root--host-cardplay-recap #risque-phase-content {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 4;
+}
+
+html.risque-artemis-host body[data-risque-phase="income"] #risque-phase-content .income-hud-phase-stack,
+html.risque-artemis-host body[data-risque-phase="con-income"] #risque-phase-content .income-hud-phase-stack,
+html.risque-artemis-client body[data-risque-phase="income"] #risque-phase-content .income-hud-phase-stack,
+html.risque-artemis-client body[data-risque-phase="con-income"] #risque-phase-content .income-hud-phase-stack {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 5;
+  min-height: 22px;
+}
+
+html.risque-artemis-host body[data-risque-phase="income"] #risque-phase-content,
+html.risque-artemis-host body[data-risque-phase="con-income"] #risque-phase-content,
+html.risque-artemis-client body[data-risque-phase="income"] #risque-phase-content,
+html.risque-artemis-client body[data-risque-phase="con-income"] #risque-phase-content {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  margin-top: 8px !important;
+  pointer-events: auto !important;
+}
+
 body.risque-view-host[data-risque-phase="income"] #risque-phase-content .income-hud-phase-stack,
 body.risque-view-host[data-risque-phase="con-income"] #risque-phase-content .income-hud-phase-stack {
   display: flex;
@@ -5709,13 +5825,21 @@ body[data-risque-phase="attack"] #hud-attack-chrome {
   width: 100%;
 }
 
-/* Fixed height: matches income / in-game HUD — text scrolls inside, panel size never grows or shrinks */
+/* Control voice: fixed panel; text scales via CSS vars (max ~30px primary / ~23px report); clamp shrinks when tight. */
 .ucp-control-voice {
-  height: 180px;
-  min-height: 180px;
-  max-height: 180px;
-  overflow-x: hidden;
-  overflow-y: auto;
+  --risque-voice-font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+  --risque-voice-font-size: clamp(19px, 2.09vw, 30px);
+  --risque-voice-report-size: clamp(16px, 1.82vw, 23px);
+  --risque-voice-font-weight: 700;
+  --risque-voice-report-weight: 600;
+  --risque-voice-line-height: 1.38;
+  --risque-voice-report-line-height: 1.4;
+  --risque-voice-color: #00ff00;
+  --risque-voice-panel-height: 180px;
+  height: var(--risque-voice-panel-height);
+  min-height: var(--risque-voice-panel-height);
+  max-height: var(--risque-voice-panel-height);
+  overflow: hidden;
   flex-shrink: 0;
   box-sizing: border-box;
   display: flex;
@@ -5728,6 +5852,8 @@ body[data-risque-phase="attack"] #hud-attack-chrome {
   height: auto;
   min-height: 188px;
   max-height: min(52vh, 420px);
+  overflow-x: hidden;
+  overflow-y: hidden;
 }
 
 .ucp-control-voice.ucp-control-voice--campaign-instant .ucp-voice-body {
@@ -5745,6 +5871,7 @@ body[data-risque-phase="attack"] #hud-attack-chrome {
 .ucp-voice-body {
   flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -5758,6 +5885,7 @@ body[data-risque-phase="attack"] #hud-attack-chrome {
 .ucp-voice-messages {
   flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -5771,25 +5899,25 @@ body[data-risque-phase="attack"] #hud-attack-chrome {
 
 .ucp-voice-text {
   width: 100%;
-  font-family: "Segoe UI", Arial, Helvetica, sans-serif;
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.38;
+  font-family: var(--risque-voice-font-family);
+  font-size: var(--risque-voice-font-size);
+  font-weight: var(--risque-voice-font-weight);
+  line-height: var(--risque-voice-line-height);
   white-space: pre-wrap;
   word-break: break-word;
   text-align: center;
-  color: #00ff00;
+  color: var(--risque-voice-color);
 }
 
 .ucp-voice-report {
   margin-top: 0;
   width: 100%;
-  font-family: "Segoe UI", Arial, Helvetica, sans-serif;
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1.4;
+  font-family: var(--risque-voice-font-family);
+  font-size: var(--risque-voice-report-size);
+  font-weight: var(--risque-voice-report-weight);
+  line-height: var(--risque-voice-report-line-height);
   text-align: center;
-  color: #00ff00;
+  color: var(--risque-voice-color);
   display: none;
   white-space: pre-wrap;
   word-break: break-word;
@@ -5798,7 +5926,7 @@ body[data-risque-phase="attack"] #hud-attack-chrome {
 /* Deploy: bank empty / confirm hints — green caps, matches control-voice terminal (not --warn pink) */
 .ucp-voice-report--deploy-hud {
   color: #00ff00 !important;
-  font-size: 17px;
+  font-size: var(--risque-voice-report-size) !important;
   font-weight: 800;
   line-height: 1.35;
   letter-spacing: 0.035em;
@@ -5806,9 +5934,9 @@ body[data-risque-phase="attack"] #hud-attack-chrome {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
-/* Public/TV: battle outcome is primary; dice line is deliberately smaller */
+/* Public/TV: battle outcome is primary; dice line matches report scale */
 .ucp-voice-report--public-battle-detail {
-  font-size: 14px;
+  font-size: var(--risque-voice-report-size);
   font-weight: 600;
   line-height: 1.35;
   color: #00ff00;
@@ -5818,14 +5946,14 @@ body[data-risque-phase="attack"] #hud-attack-chrome {
 .ucp-voice-report--condition-countdown {
   color: #fde047;
   font-weight: 700;
-  font-size: 15px;
+  font-size: var(--risque-voice-report-size);
   line-height: 1.35;
 }
 
 /* Host: troop transfer after capture — two headline lines in #control-voice-text; dice detail below */
 .attack-transfer-voice-line {
-  font-family: "Segoe UI", Arial, Helvetica, sans-serif;
-  font-size: clamp(19px, 2vw, 26px);
+  font-family: var(--risque-voice-font-family);
+  font-size: var(--risque-voice-font-size);
   font-weight: 800;
   line-height: 1.28;
   letter-spacing: 0.05em;
@@ -5840,7 +5968,7 @@ body[data-risque-phase="attack"] #hud-attack-chrome {
 }
 
 .ucp-voice-report--attack-transfer-dice {
-  font-size: clamp(12px, 1.35vw, 15px) !important;
+  font-size: clamp(14px, 1.55vw, 18px) !important;
   font-weight: 700 !important;
   line-height: 1.35 !important;
   letter-spacing: 0.04em !important;
@@ -5873,7 +6001,7 @@ body[data-risque-phase="attack"] #hud-attack-chrome {
 }
 
 .ucp-voice-public-elimination-banner {
-  font-size: 26px;
+  font-size: clamp(24px, 2.7vw, 35px);
   font-weight: 800;
   line-height: 1.25;
   color: #fde68a;
@@ -5884,7 +6012,7 @@ body[data-risque-phase="attack"] #hud-attack-chrome {
 }
 
 .ucp-voice-text-public-rest {
-  font-size: 22px;
+  font-size: var(--risque-voice-font-size);
   font-weight: 700;
   line-height: 1.38;
   color: #00ff00;
@@ -5895,7 +6023,7 @@ body[data-risque-phase="attack"] #hud-attack-chrome {
 
 /* Public mirror: post-conquest card transfer (host game.html ?phase=con-cardtransfer) */
 .ucp-voice-report--public-card-transfer {
-  font-size: 16px;
+  font-size: var(--risque-voice-report-size);
   font-weight: 600;
   line-height: 1.35;
   color: #00ff00;
@@ -5904,7 +6032,7 @@ body[data-risque-phase="attack"] #hud-attack-chrome {
 
 /* Public mirror: card play resolution (host confirms territory effects) */
 .ucp-voice-report--public-cardplay {
-  font-size: 15px;
+  font-size: var(--risque-voice-report-size);
   font-weight: 600;
   line-height: 1.35;
   color: #00ff00;
@@ -5958,7 +6086,7 @@ html.risque-view-public body #control-voice:has(#control-voice-text .risque-publ
 
 .risque-view-public .ucp-voice-report--public-book-step {
   display: block !important;
-  font-size: clamp(15px, 1.75vw, 22px);
+  font-size: var(--risque-voice-report-size);
   font-weight: 800;
   line-height: 1.28;
   letter-spacing: 0.04em;
@@ -5975,7 +6103,7 @@ html.risque-view-public body #control-voice:has(#control-voice-text .risque-publ
 /* Public TV: income breakdown under primary (mirrored from host) — legacy text mirror */
 .risque-view-public .ucp-voice-report--public-income {
   display: block !important;
-  font-size: clamp(14px, 1.65vw, 20px);
+  font-size: var(--risque-voice-report-size);
   font-weight: 800;
   line-height: 1.38;
   letter-spacing: 0.035em;
@@ -5997,9 +6125,34 @@ html.risque-view-host body[data-risque-phase="income"] #control-voice.ucp-termin
 html.risque-view-host body[data-risque-phase="con-income"] #control-voice.ucp-terminal.ucp-control-voice {
   height: auto;
   min-height: 340px;
-  max-height: min(64vh, 580px);
+  max-height: min(72vh, 640px);
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 4px solid #00ff00;
   box-shadow: 0 0 14px rgba(0, 255, 0, 0.45);
+}
+
+/* ARTEMIS laptops: income breakdown needs full height — compact 168px voice clip hides continents + total */
+html.risque-artemis-host body[data-risque-phase="income"] .runtime-hud-root--artemis-compact #control-voice.ucp-control-voice,
+html.risque-artemis-client body[data-risque-phase="income"] .runtime-hud-root--artemis-compact #control-voice.ucp-control-voice,
+html.risque-artemis-host body[data-risque-phase="con-income"] .runtime-hud-root--artemis-compact #control-voice.ucp-control-voice,
+html.risque-artemis-client body[data-risque-phase="con-income"] .runtime-hud-root--artemis-compact #control-voice.ucp-control-voice,
+html.risque-artemis-host body[data-risque-phase="income"] .runtime-hud-root--setup #control-voice.ucp-control-voice,
+html.risque-artemis-host body[data-risque-phase="con-income"] .runtime-hud-root--setup #control-voice.ucp-control-voice {
+  height: auto !important;
+  min-height: 340px !important;
+  max-height: min(72vh, 640px) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+html.risque-artemis-host body[data-risque-phase="income"] .runtime-hud-root--artemis-compact #control-voice-text,
+html.risque-artemis-client body[data-risque-phase="income"] .runtime-hud-root--artemis-compact #control-voice-text,
+html.risque-artemis-host body[data-risque-phase="con-income"] .runtime-hud-root--artemis-compact #control-voice-text,
+html.risque-artemis-client body[data-risque-phase="con-income"] .runtime-hud-root--artemis-compact #control-voice-text,
+html.risque-artemis-host body[data-risque-phase="income"] .runtime-hud-root--setup #control-voice-text,
+html.risque-artemis-host body[data-risque-phase="con-income"] .runtime-hud-root--setup #control-voice-text {
+  overflow: visible !important;
 }
 
 .risque-view-public body[data-risque-phase="income"] .ucp-voice-messages,
@@ -6033,7 +6186,7 @@ body.risque-view-host #control-voice-text.ucp-voice-text--public-income-stack {
 
 .risque-public-income-voice__subhead {
   font-family: "Segoe UI", Arial, Helvetica, sans-serif;
-  font-size: clamp(11px, 1.25vw, 14px);
+  font-size: clamp(13px, 1.42vw, 16px);
   font-weight: 700;
   letter-spacing: 0.1em;
   color: #cbd5e1;
@@ -6068,7 +6221,7 @@ body.risque-view-host #control-voice-text.ucp-voice-text--public-income-stack {
 
 .risque-public-income-voice__label {
   font-family: "Segoe UI", Arial, Helvetica, sans-serif;
-  font-size: clamp(12px, 1.45vw, 17px);
+  font-size: clamp(14px, 1.69vw, 21px);
   font-weight: 700;
   line-height: 1.35;
   letter-spacing: 0.03em;
@@ -6080,7 +6233,7 @@ body.risque-view-host #control-voice-text.ucp-voice-text--public-income-stack {
 
 .risque-public-income-voice__value {
   font-family: "Segoe UI", Arial, Helvetica, sans-serif;
-  font-size: clamp(14px, 1.65vw, 21px);
+  font-size: clamp(15px, 1.96vw, 24px);
   font-weight: 800;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
@@ -6099,7 +6252,7 @@ body.risque-view-host #control-voice-text.ucp-voice-text--public-income-stack {
 /* Total row: label was clamp(13px,1.55vw,19px); +50% → same size for label + number */
 .risque-public-income-voice__row--total .risque-public-income-voice__label,
 .risque-public-income-voice__row--total .risque-public-income-voice__value {
-  font-size: clamp(19.5px, 2.325vw, 28.5px);
+  font-size: clamp(19px, 2.36vw, 30px);
   line-height: 1.15;
 }
 
@@ -6140,6 +6293,7 @@ html.risque-view-public body[data-risque-phase="deploy"] #control-voice.ucp-term
   height: auto;
   min-height: 220px;
   max-height: min(52vh, 480px);
+  overflow: hidden;
   border: 4px solid #00ff00;
   box-shadow: 0 0 14px rgba(0, 255, 0, 0.45);
 }
@@ -6967,7 +7121,7 @@ html.risque-view-host body[data-risque-phase="reinforce"] .ucp-voice-messages {
 }
 
 html.risque-view-host body[data-risque-phase="reinforce"] #control-voice-text {
-  font-size: 24px;
+  font-size: clamp(22px, 2.36vw, 32px);
   font-weight: 800;
   line-height: 1.25;
   letter-spacing: 0.06em;
@@ -6975,7 +7129,7 @@ html.risque-view-host body[data-risque-phase="reinforce"] #control-voice-text {
 
 html.risque-view-host body[data-risque-phase="reinforce"] #control-voice-report.ucp-voice-report--reinforce-hud,
 html.risque-view-public body[data-risque-phase="reinforce"] #control-voice-report.ucp-voice-report--reinforce-hud {
-  font-size: 30px;
+  font-size: clamp(27px, 2.84vw, 38px);
   font-weight: 800;
   line-height: 1.28;
   letter-spacing: 0.04em;
@@ -6984,7 +7138,7 @@ html.risque-view-public body[data-risque-phase="reinforce"] #control-voice-repor
 }
 
 html.risque-view-public body[data-risque-phase="reinforce"] #control-voice-text {
-  font-size: 24px;
+  font-size: clamp(22px, 2.36vw, 32px);
   font-weight: 800;
   line-height: 1.25;
   letter-spacing: 0.06em;
@@ -7389,7 +7543,7 @@ body.risque-view-host[data-risque-phase="con-income"] #attack-dev-row-strip {
 body[data-risque-phase="income"] #control-voice-report.ucp-voice-report--income-total,
 body[data-risque-phase="con-income"] #control-voice-report.ucp-voice-report--income-total {
   display: block !important;
-  font-size: 22px;
+  font-size: var(--risque-voice-font-size);
   font-weight: 800;
   line-height: 1.38;
   letter-spacing: 0.02em;
@@ -7484,6 +7638,68 @@ body.risque-view-host[data-risque-phase="con-income"] .risque-phase-content .inc
   border: 3px solid #000000 !important;
   border-radius: 6px !important;
   box-shadow: 0 0 14px rgba(0, 255, 0, 0.4);
+}
+
+/* ARTEMIS income: hide legacy green Continue in phase slot. */
+html.risque-artemis-host body[data-risque-phase="income"] #risque-phase-content .income-button--hud-solo,
+html.risque-artemis-host body[data-risque-phase="con-income"] #risque-phase-content .income-button--hud-solo,
+html.risque-artemis-client body[data-risque-phase="income"] #risque-phase-content .income-button--hud-solo,
+html.risque-artemis-client body[data-risque-phase="con-income"] #risque-phase-content .income-button--hud-solo {
+  display: none !important;
+}
+
+/* ARTEMIS income Continue — compact, centered on body (JS positions below breakdown). */
+#risque-artemis-income-god-btn.risque-artemis-income-deploy-btn,
+#risque-artemis-income-god-btn.risque-artemis-income-deploy-btn--body {
+  position: fixed;
+  box-sizing: border-box;
+  display: inline-block;
+  width: auto;
+  margin: 0;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+  cursor: pointer;
+  font-family: "Segoe UI", Arial, Helvetica, sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.15;
+  padding: 5px 11px;
+  background: #00ff00 !important;
+  color: #000000 !important;
+  border: 1px solid #000000 !important;
+  border-radius: 3px !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  z-index: 2147483639;
+}
+
+#risque-phase-content #risque-artemis-income-god-btn {
+  display: none !important;
+}
+
+#risque-artemis-income-god-btn.risque-artemis-income-deploy-btn:hover:not(:disabled),
+#risque-artemis-income-god-btn.risque-artemis-income-deploy-btn--body:hover:not(:disabled) {
+  background: #39ff39 !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+}
+
+#risque-artemis-income-god-btn.risque-artemis-income-deploy-btn:active:not(:disabled),
+#risque-artemis-income-god-btn.risque-artemis-income-deploy-btn--body:active:not(:disabled) {
+  transform: translateX(-50%) scale(0.98);
+}
+
+#risque-artemis-income-god-btn.risque-artemis-income-deploy-btn:disabled,
+#risque-artemis-income-god-btn.risque-artemis-income-deploy-btn--body:disabled {
+  background: #14532d !important;
+  color: #bbf7d0 !important;
+  border-color: #166534 !important;
+  box-shadow: none;
+  opacity: 0.92 !important;
+  cursor: wait;
 }
 
 body.risque-view-host[data-risque-phase="income"]
@@ -7781,25 +7997,26 @@ body.risque-view-host[data-risque-phase="attack"] .ucp-control-voice.ucp-control
   height: auto;
   min-height: 0;
   max-height: min(52vh, 400px);
+  overflow: hidden;
 }
 
 body.risque-view-host[data-risque-phase="attack"] #control-voice-text.campaign-instant-voice {
-  font-size: 22px;
+  font-size: var(--risque-voice-font-size);
   line-height: 1.32;
 }
 
 body.risque-view-host[data-risque-phase="attack"] .campaign-voice-kicker {
-  font-size: 18px;
+  font-size: clamp(18px, 1.89vw, 24px);
   margin-bottom: 4px;
 }
 
 body.risque-view-host[data-risque-phase="attack"] .campaign-instant-hud-phase {
-  font-size: 18px;
+  font-size: clamp(18px, 1.89vw, 24px);
   margin: 4px 0 2px;
 }
 
 body.risque-view-host[data-risque-phase="attack"] .campaign-instant-hud-keys {
-  font-size: 22px;
+  font-size: var(--risque-voice-font-size);
   line-height: 1.32;
   margin-top: 8px;
 }
@@ -7866,13 +8083,13 @@ body.risque-view-host[data-risque-phase="attack"] .ucp-control-voice--campaign-i
 }
 
 body.risque-view-host[data-risque-phase="attack"] .ucp-voice-report.ucp-voice-report--instant {
-  font-size: 18px;
+  font-size: var(--risque-voice-report-size);
   line-height: 1.35;
 }
 
 /* Public TV: match host campaign-instant framed strip scale */
 html.risque-view-public[data-risque-phase="attack"] #control-voice-text.campaign-instant-voice {
-  font-size: 22px;
+  font-size: var(--risque-voice-font-size);
   line-height: 1.32;
 }
 
@@ -8690,6 +8907,13 @@ body.risque-view-public[data-risque-tv-cursor-locked="1"] * {
   cursor: none !important;
 }
 
+/* ARTEMIS networked clients: always show the normal cursor on their own laptop. */
+html.risque-artemis-client body.risque-view-public,
+html.risque-artemis-client body.risque-view-public[data-risque-tv-cursor-locked="1"],
+html.risque-artemis-client body.risque-view-public[data-risque-tv-cursor-locked="1"] * {
+  cursor: auto !important;
+}
+
 /* Arrow matching default pointer — position set in JS from host-normalized coords */
 #risque-public-cursor-mirror {
   position: fixed;
@@ -8713,9 +8937,37 @@ body.risque-view-public[data-risque-tv-cursor-locked="1"] * {
   opacity: 1;
 }
 
-/* Public TV: no on-screen buttons (read-only display) */
-.risque-view-public button {
+/* Public TV: no on-screen buttons (read-only display) — ARTEMIS login/lobby + active mock phases exempt */
+.risque-view-public button:not(.risque-artemis-lobby-btn):not(.risque-artemis-login-btn):not(.risque-artemis-login-color):not(.risque-artemis-mock-btn):not(.risque-artemis-mock-continue-fixed) {
   display: none !important;
+}
+
+/* ARTEMIS login/lobby: always visible on client laptops */
+html.risque-artemis-client.risque-artemis-login-active .risque-artemis-login-action:not(#risque-artemis-login-start),
+html.risque-artemis-client.risque-artemis-login-active #risque-artemis-login-btn,
+html.risque-artemis-client.risque-artemis-login-active .risque-artemis-login-form,
+html.risque-artemis-client.risque-artemis-login-active #risque-artemis-login-form,
+html.risque-artemis-client.risque-artemis-login-active .risque-artemis-login-colors,
+html.risque-artemis-client.risque-artemis-login-active .risque-artemis-login-color {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+html.risque-artemis-client.risque-artemis-login-active .risque-artemis-login-colors {
+  display: grid !important;
+}
+
+html.risque-artemis-client.risque-artemis-login-active .risque-artemis-login-color {
+  display: inline-block !important;
+  cursor: pointer;
+}
+
+html.risque-artemis-client.risque-artemis-login-active .risque-artemis-login-name {
+  display: block !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
 }
 
 .risque-view-public input[type="file"] {
@@ -8768,6 +9020,14 @@ html.risque-view-public .runtime-hud-root:not(.runtime-hud-root--login) #hud-ban
 .risque-view-public body[data-risque-phase="cardplay"] #hud-main-panel:not(:has(#control-voice.ucp-control-voice--public-book-processing)):not(:has(.risque-public-book-voice)):not(:has(.risque-public-private-hint)):not(:has(#risque-public-cardplay-recap-overlay)),
 .risque-view-public body[data-risque-phase="con-cardplay"] #hud-main-panel:not(:has(#control-voice.ucp-control-voice--public-book-processing)):not(:has(.risque-public-book-voice)):not(:has(.risque-public-private-hint)):not(:has(#risque-public-cardplay-recap-overlay)) {
   display: none !important;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-public body[data-risque-phase="cardplay"] #hud-main-panel,
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-host body[data-risque-phase="cardplay"] #hud-main-panel,
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-public body[data-risque-phase="con-cardplay"] #hud-main-panel,
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-host body[data-risque-phase="con-cardplay"] #hud-main-panel {
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 /* Public TV — cardplay: sit private hint just under PLAYER · CARD PLAY (no band from voice/log) */
@@ -8881,9 +9141,39 @@ html.risque-view-public
   display: none !important;
 }
 
-/* Deploy on TV: control voice already shows player + bank remaining; hide duplicate bank/hint/buttons */
+/* Deploy on TV: hide duplicate bank/hint/buttons for spectators — active client keeps full panel */
 .risque-view-public .risque-phase-content .deploy2-compact-root {
   display: none !important;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-host .risque-phase-content .deploy2-compact-root,
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-host .risque-artemis-deploy-dock .deploy2-compact-root,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock .deploy2-compact-root {
+  display: flex !important;
+  flex-direction: column;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-host .risque-phase-content .deploy2-bank-row,
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-host .risque-artemis-deploy-dock .deploy2-bank-row {
+  display: flex !important;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-host body[data-risque-phase="deploy"] .deploy1-deploy-actions,
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-host .risque-phase-content .deploy1-deploy-actions,
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-host .risque-artemis-deploy-dock .deploy1-deploy-actions {
+  display: flex !important;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-host .risque-phase-content .deploy1-deploy-actions .deploy1-action-btn,
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-host .risque-artemis-deploy-dock .deploy1-action-btn {
+  display: inline-flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  flex: 1 1 auto;
+  min-width: 72px;
 }
 
 /* Reinforce on TV: control voice carries the story; hide host reinforce UI (log hidden via #log-text rule above) */
@@ -9084,7 +9374,8 @@ html.risque-view-public
 /* Public recap shelf: HUD column uses flex + bottom:0 inside 1080px #ui-overlay; #hud-main-panel gets
  * the remaining height below the title, 25px padding, and the overlay flex-fills (body stack hidden). */
 /* Pin HUD column bottom to canvas (1080px #ui-overlay) so recap never extends below the board. */
-.risque-view-public .runtime-hud-root--public-cardplay-recap {
+.risque-view-public .runtime-hud-root--public-cardplay-recap,
+html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-recap {
   bottom: 0;
   min-height: 0;
   max-height: none;
@@ -9096,13 +9387,15 @@ html.risque-view-public
 }
 
 /* Less air under the title before the first shelf window */
-.risque-view-public .runtime-hud-root--public-cardplay-recap .hud-title-stack {
+.risque-view-public .runtime-hud-root--public-cardplay-recap .hud-title-stack,
+html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-recap .hud-title-stack {
   padding-top: 2px;
   padding-bottom: 0;
   margin-bottom: 0;
 }
 
-.risque-view-public .runtime-hud-root--public-cardplay-recap #hud-main-panel {
+.risque-view-public .runtime-hud-root--public-cardplay-recap #hud-main-panel,
+html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-recap #hud-main-panel {
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
@@ -9123,23 +9416,37 @@ html.risque-view-public
 }
 
 /* Beat .attack-control-panel { background:#111 } and overlay --in-panel #0a0a0a — column black comes from #ui-overlay. */
-.risque-view-public .runtime-hud-root--public-cardplay-recap #hud-main-panel.attack-control-panel {
+.risque-view-public .runtime-hud-root--public-cardplay-recap #hud-main-panel.attack-control-panel,
+html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-recap #hud-main-panel.attack-control-panel {
   background: transparent !important;
 }
-.risque-view-public .runtime-hud-root--public-cardplay-recap .risque-public-cardplay-recap-overlay--in-panel {
+.risque-view-public .runtime-hud-root--public-cardplay-recap .risque-public-cardplay-recap-overlay--in-panel,
+html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-recap .risque-public-cardplay-recap-overlay--in-panel {
   background: transparent !important;
 }
 
 /* Voice/log stack sits under the recap overlay — collapse it so flex height goes to the shelf. */
-.risque-view-public .runtime-hud-root--public-cardplay-recap #risque-main-panel-body {
+.risque-view-public .runtime-hud-root--public-cardplay-recap #risque-main-panel-body,
+html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-recap #risque-main-panel-body {
   display: none !important;
 }
 
 /* During recap, strip non–card-play chrome on public TV (stats, phase slot, turn line under title) */
 .risque-view-public .runtime-hud-root--public-cardplay-recap #hud-stats-panel,
 .risque-view-public .runtime-hud-root--public-cardplay-recap #risque-phase-content,
-.risque-view-public .runtime-hud-root--public-cardplay-recap .hud-phase-player-row {
+.risque-view-public .runtime-hud-root--public-cardplay-recap .hud-phase-player-row,
+html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-recap #hud-stats-panel,
+html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-recap #risque-phase-content,
+html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-recap .hud-phase-player-row {
   display: none !important;
+}
+
+/* ARTEMIS host recap: same bottom pin as public TV (cardplay HUD normally uses bottom: 30px). */
+html.risque-artemis-host.risque-view-host
+  #runtime-hud-root.runtime-hud-root--cardplay-panel-only.runtime-hud-root--public-cardplay-recap,
+body.risque-artemis-host.risque-view-host
+  #runtime-hud-root.runtime-hud-root--cardplay-panel-only.runtime-hud-root--public-cardplay-recap {
+  bottom: 0 !important;
 }
 
 /* Host cardplay recap: match public TV shelf column — stats / phase slot hidden so the two-pane shelf fills like public. */
@@ -9230,6 +9537,89 @@ body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .r
   max-width: min(840px, 100%);
   width: 100%;
   margin: 0 auto;
+  flex: 1 1 auto;
+  min-height: min(720px, 72vh);
+  height: 100%;
+}
+
+html.risque-artemis-host.risque-view-host
+  #runtime-hud-root.runtime-hud-root--host-cardplay-recap
+  .risque-public-cp-shelf-upper,
+html.risque-artemis-host.risque-view-host
+  #runtime-hud-root.runtime-hud-root--host-cardplay-recap
+  .risque-public-cp-shelf-lower {
+  flex: 1 1 0;
+  min-height: min(260px, 30vh);
+}
+
+/* Host staging: lower shelf grows while upper pane is still empty (cards stay in lower window only). */
+html.risque-artemis-host.risque-view-host
+  #runtime-hud-root.runtime-hud-root--host-cardplay-recap
+  .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
+  .risque-public-cp-shelf-lower,
+body.risque-view-host
+  #runtime-hud-root.runtime-hud-root--host-cardplay-recap
+  .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
+  .risque-public-cp-shelf-lower {
+  flex: 1 1 auto;
+  min-height: min(400px, 50vh);
+  max-height: min(78vh, 620px);
+}
+
+html.risque-artemis-host.risque-view-host
+  #runtime-hud-root.runtime-hud-root--host-cardplay-recap
+  .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
+  .risque-public-cp-shelf-upper,
+body.risque-view-host
+  #runtime-hud-root.runtime-hud-root--host-cardplay-recap
+  .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
+  .risque-public-cp-shelf-upper {
+  flex: 0 0 min(72px, 10vh);
+  max-height: min(72px, 10vh);
+  min-height: 0;
+}
+
+.risque-view-public .runtime-hud-root--public-cardplay-recap
+  .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
+  .risque-public-cp-shelf-lower,
+html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-recap
+  .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
+  .risque-public-cp-shelf-lower {
+  flex: 1 1 auto;
+  min-height: min(360px, 46vh);
+  max-height: min(72vh, 560px);
+}
+
+.risque-view-public .runtime-hud-root--public-cardplay-recap
+  .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
+  .risque-public-cp-shelf-upper,
+html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-recap
+  .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
+  .risque-public-cp-shelf-upper {
+  flex: 0 0 min(72px, 10vh);
+  max-height: min(72px, 10vh);
+  min-height: 0;
+}
+
+html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-lower,
+body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-lower {
+  min-height: min(340px, 42vh);
+  padding-bottom: min(14px, 1.6vh);
+}
+
+html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cardplay-recap-book-row,
+body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cardplay-recap-book-row {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+/* Shelf recap: card thumbnails belong in lower/upper panes, never duplicated in control voice. */
+#runtime-hud-root.runtime-hud-root--host-cardplay-recap #control-voice .risque-public-book-voice-cards,
+#runtime-hud-root.runtime-hud-root--public-cardplay-recap #control-voice .risque-public-book-voice-cards,
+#hud-main-panel:has(.risque-public-cardplay-recap-overlay--in-panel)
+  #control-voice
+  .risque-public-book-voice-cards {
+  display: none !important;
 }
 
 html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-upper,
@@ -9564,9 +9954,9 @@ body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap #c
 
 html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-card,
 body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-card {
-  width: clamp(112px, calc((100% - 24px) / 5), 200px);
-  max-width: 200px;
-  max-height: min(36vh, 276px);
+  width: clamp(96px, calc((100% - 24px) / 5), 168px);
+  max-width: 168px;
+  max-height: min(34vh, 252px);
 }
 
 html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-lower .risque-public-cardplay-recap-book-heading,
@@ -10453,45 +10843,40 @@ body.risque-view-host .cardplay-compact-root .cardplay-continue-income-wrap--hos
   display: none !important;
 }
 
-/* TV / public display: badge upper-left — ~2× prior size (removed scale(0.5)), green chip, black caps. */
+/* TV / public display: legacy bar — bottom-right so it never covers map top controls. */
 .risque-public-tv-bar {
   display: none;
   position: fixed;
-  top: 20px;
-  left: 20px;
-  right: auto;
+  top: auto;
+  bottom: 14px;
+  left: auto;
+  right: 14px;
   z-index: 100003;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 16px 24px;
+  gap: 10px;
+  padding: 10px 14px;
   background: #00ff00;
-  border: 3px solid #14532d;
-  border-radius: 12px;
+  border: 2px solid #14532d;
+  border-radius: 10px;
   font-family: Arial, sans-serif;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   pointer-events: auto;
-  transform-origin: top left;
+  transform-origin: bottom right;
 }
 
-.risque-view-public .risque-public-tv-bar {
+.risque-view-public:not(.risque-artemis-client) .risque-public-tv-bar {
   display: flex;
 }
+
 .risque-public-tv-bar[data-risque-pending-fullscreen]::after {
-  content: " · click once for fullscreen";
-  font-size: 14px;
-  font-weight: 800;
-  text-transform: none;
-  letter-spacing: 0.02em;
-  color: #14532d;
-  margin-left: 6px;
-  white-space: nowrap;
+  content: none;
 }
 
 .risque-public-tv-bar-label {
-  font-size: 26px;
+  font-size: 14px;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #000000;
   line-height: 1.05;
@@ -10520,6 +10905,1321 @@ body.risque-view-host .cardplay-compact-root .cardplay-continue-income-wrap--hos
 .risque-public-fullscreen-btn:focus-visible {
   outline: 3px solid #14532d;
   outline-offset: 2px;
+}
+
+/* ARTEMIS: fixed top status bar — game layout lives below (no overlay on map/panel). */
+:root {
+  --risque-artemis-bar-h: 34px;
+}
+
+.risque-artemis-top-bar {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--risque-artemis-bar-h);
+  box-sizing: border-box;
+  padding: 0 12px;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  z-index: 100004;
+  font-family: system-ui, Segoe UI, Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+  pointer-events: auto;
+}
+
+html.risque-artemis-host .risque-artemis-top-bar,
+html.risque-artemis-client .risque-artemis-top-bar {
+  display: flex;
+}
+
+.risque-artemis-top-bar[data-kind="ok"] {
+  background: #14532d;
+  color: #ecfdf5;
+}
+
+.risque-artemis-top-bar[data-kind="wait"] {
+  background: #1e3a5f;
+  color: #e0f2fe;
+}
+
+.risque-artemis-top-bar[data-kind="err"] {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+
+.risque-artemis-top-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.risque-artemis-top-fs-hint {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.92;
+  white-space: nowrap;
+}
+
+.risque-artemis-top-fs-btn {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  color: inherit;
+  cursor: pointer;
+}
+
+.risque-artemis-top-fs-btn:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+html.risque-artemis-host body.runtime-page,
+html.risque-artemis-client body.runtime-page {
+  padding-top: var(--risque-artemis-bar-h) !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  box-sizing: border-box !important;
+}
+
+html.risque-artemis-host body.runtime-page .runtime-shell,
+html.risque-artemis-client body.runtime-page .runtime-shell {
+  flex: 1 1 auto !important;
+  height: auto !important;
+  max-height: none !important;
+  min-height: 0 !important;
+}
+
+html.risque-artemis-fullscreen-active body.runtime-page {
+  padding-top: 0 !important;
+}
+
+html.risque-artemis-fullscreen-active .risque-artemis-top-bar {
+  display: none !important;
+}
+
+html.risque-artemis-fullscreen-active body.runtime-page .runtime-shell {
+  height: 100vh !important;
+  max-height: 100vh !important;
+}
+
+.risque-view-public.risque-artemis-client #risque-artemis-top-bar .risque-artemis-top-fs-btn {
+  display: inline-block !important;
+}
+
+html.risque-artemis-host .risque-artemis-fs-dock,
+html.risque-artemis-client .risque-artemis-fs-dock,
+#risque-artemis-net-banner {
+  display: none !important;
+}
+
+/* Legacy dock — removed from layout */
+.risque-artemis-fs-dock {
+  display: none !important;
+}
+
+html.risque-artemis-host .risque-artemis-host-bar,
+html.risque-artemis-host .risque-public-tv-bar,
+html.risque-artemis-client .risque-public-tv-bar,
+html.risque-artemis-client .risque-artemis-host-bar {
+  display: none !important;
+}
+
+/* ARTEMIS M2 lobby overlay */
+.risque-artemis-lobby {
+  position: fixed;
+  inset: 0;
+  z-index: 100060;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 6, 23, 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.risque-artemis-lobby[hidden] {
+  display: none !important;
+}
+
+.risque-artemis-lobby-card {
+  width: min(480px, 100%);
+  padding: 28px 32px;
+  border-radius: 16px;
+  background: linear-gradient(165deg, #0f172a 0%, #1e293b 100%);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  color: #f1f5f9;
+}
+
+.risque-artemis-lobby-title {
+  margin: 0 0 8px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #38bdf8;
+}
+
+.risque-artemis-lobby-you {
+  margin: 0 0 20px;
+  font-size: 16px;
+  color: #cbd5e1;
+}
+
+.risque-artemis-lobby-slots {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.risque-artemis-lobby-status {
+  margin: 0 0 20px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  color: #f8fafc;
+  background: rgba(51, 65, 85, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.risque-artemis-lobby-status--ready {
+  color: #bbf7d0;
+  background: rgba(22, 101, 52, 0.35);
+  border-color: rgba(74, 222, 128, 0.55);
+}
+
+.risque-artemis-lobby-slot {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(100, 116, 139, 0.35);
+  font-size: 15px;
+  color: #94a3b8;
+  cursor: default;
+  user-select: none;
+}
+
+.risque-artemis-lobby-slot--on {
+  color: #e2e8f0;
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.risque-artemis-lobby-slot--ready {
+  border-color: rgba(74, 222, 128, 0.55);
+  background: rgba(22, 101, 52, 0.18);
+  color: #bbf7d0;
+}
+
+.risque-artemis-lobby-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.risque-artemis-lobby-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #334155;
+  color: #f8fafc;
+}
+
+.risque-artemis-lobby-btn:hover:not(:disabled) {
+  background: #475569;
+}
+
+.risque-artemis-lobby-btn--ready {
+  background: #0ea5e9;
+  font-size: 18px;
+  padding: 14px 18px;
+}
+
+.risque-artemis-lobby-btn--ready:hover:not(:disabled) {
+  background: #0284c7;
+}
+
+.risque-artemis-lobby-btn--primary {
+  background: #0284c7;
+}
+
+.risque-artemis-lobby-btn--primary:hover:not(:disabled) {
+  background: #0369a1;
+}
+
+.risque-artemis-lobby-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.risque-artemis-lobby-hint {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+/* ARTEMIS M2b — per-laptop login panel (clients) */
+.risque-artemis-login {
+  position: fixed;
+  inset: 0;
+  z-index: 100055;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 6, 23, 0.88);
+  backdrop-filter: blur(8px);
+}
+
+.risque-artemis-login[hidden] {
+  display: none !important;
+}
+
+.risque-artemis-login-card {
+  width: min(420px, 100%);
+  padding: 28px 32px;
+  border-radius: 16px;
+  background: linear-gradient(165deg, #0f172a 0%, #1e293b 100%);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  color: #f1f5f9;
+}
+
+.risque-artemis-login-title {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 800;
+  color: #38bdf8;
+}
+
+.risque-artemis-login-lead {
+  margin: 0 0 20px;
+  font-size: 16px;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+
+.risque-artemis-login-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.risque-artemis-login-name {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: #020617;
+  color: #f8fafc;
+  font-size: 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.risque-artemis-login-colors {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.risque-artemis-login-color {
+  padding: 12px 8px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  color: #0f172a;
+}
+
+.risque-artemis-login-color--picked {
+  outline: 3px solid #f8fafc;
+  outline-offset: 2px;
+}
+
+.risque-artemis-login-color:disabled,
+.risque-artemis-login-color--taken,
+.risque-artemis-login-color[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.risque-artemis-login-color--blue { background: #3b82f6; color: #fff; }
+.risque-artemis-login-color--red { background: #ef4444; color: #fff; }
+.risque-artemis-login-color--yellow { background: #eab308; color: #0f172a; }
+.risque-artemis-login-color--green { background: #22c55e; color: #0f172a; }
+.risque-artemis-login-color--pink { background: #ec4899; color: #fff; }
+.risque-artemis-login-color--white { background: #f8fafc; color: #0f172a; }
+
+.risque-artemis-login-error {
+  min-height: 20px;
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: #fca5a5;
+}
+
+.risque-artemis-login-action {
+  user-select: none;
+  text-align: center;
+  cursor: pointer;
+}
+
+.risque-artemis-login-action[hidden] {
+  display: none !important;
+}
+
+.risque-artemis-login-btn {
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 10px;
+  background: #0ea5e9;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.risque-artemis-login-btn:hover {
+  background: #0284c7;
+}
+
+html.risque-artemis-host.risque-artemis-login-active #risque-login-hud-root,
+html.risque-artemis-host.risque-artemis-login-active .risque-login-preset-bar,
+html.risque-artemis-host.risque-artemis-login-active #risque-login-hud-root .color-swatches {
+  display: none !important;
+}
+
+.risque-artemis-login-roster {
+  list-style: none;
+  margin: 20px 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.risque-artemis-login-roster[hidden] {
+  display: none !important;
+}
+
+.risque-artemis-login-roster-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(100, 116, 139, 0.35);
+  font-size: 14px;
+  color: #94a3b8;
+}
+
+.risque-artemis-login-roster-item--ready {
+  color: #bbf7d0;
+  border-color: rgba(74, 222, 128, 0.45);
+}
+
+.risque-artemis-login-sublabel {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.risque-artemis-login-btn--start {
+  background: #16a34a;
+}
+
+.risque-artemis-login-host-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.risque-artemis-login-btn--load {
+  background: #2563eb;
+}
+
+.risque-artemis-login-btn--load:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.risque-artemis-login-btn--start:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.risque-artemis-login-btn--start:disabled,
+.risque-artemis-login-btn--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+html.risque-artemis-client #risque-artemis-login-host-actions,
+html.risque-artemis-client #risque-artemis-login-roster {
+  display: none !important;
+}
+
+html.risque-artemis-client.risque-artemis-login-confirmed .risque-artemis-login-card {
+  border-color: rgba(74, 222, 128, 0.45);
+}
+
+html.risque-artemis-client.risque-artemis-login-active #risque-login-hud-root.risque-login-hud--public-spectator {
+  visibility: hidden !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn .deploy1-action-btn,
+html.risque-artemis-client.risque-artemis-my-turn #deploy1-confirm,
+html.risque-artemis-client.risque-artemis-my-turn #deploy1-reset,
+html.risque-artemis-client.risque-artemis-my-turn button.deploy1-action-btn {
+  display: inline-block !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn #canvas .svg-overlay,
+html.risque-artemis-client.risque-artemis-my-turn #canvas .svg-overlay .territory-circle,
+html.risque-artemis-client.risque-artemis-my-turn #canvas .svg-overlay .territory-number,
+html.risque-artemis-host.risque-artemis-my-turn #canvas .svg-overlay,
+html.risque-artemis-host.risque-artemis-my-turn #canvas .svg-overlay .territory-circle,
+html.risque-artemis-host.risque-artemis-my-turn #canvas .svg-overlay .territory-number {
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+
+/* Pass map clicks through the full-screen ui-overlay; only HUD + deploy dock capture input */
+html.risque-artemis-my-turn #ui-overlay {
+  pointer-events: none !important;
+}
+
+html.risque-artemis-my-turn #ui-overlay #runtime-hud-root,
+html.risque-artemis-my-turn #ui-overlay #runtime-hud-root *,
+html.risque-artemis-my-turn #ui-overlay .risque-artemis-deploy-dock,
+html.risque-artemis-my-turn #ui-overlay .risque-artemis-deploy-dock * {
+  pointer-events: auto !important;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn #ui-overlay {
+  pointer-events: none !important;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn #ui-overlay #runtime-hud-root,
+html.risque-artemis-client.risque-artemis-my-turn #ui-overlay #runtime-hud-root *,
+html.risque-artemis-client.risque-artemis-my-turn #ui-overlay .risque-artemis-deploy-dock,
+html.risque-artemis-client.risque-artemis-my-turn #ui-overlay .risque-artemis-deploy-dock * {
+  pointer-events: auto !important;
+}
+
+/* ARTEMIS traveling CONTROL button — fixed on body, cannot be wiped by HUD mirror refresh */
+.risque-artemis-control-btn {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483640;
+  font-family: Arial, sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 18px 56px;
+  background: #00ff00;
+  color: #000;
+  border: 4px solid #000;
+  border-radius: 6px;
+  cursor: pointer;
+  pointer-events: auto !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.55);
+}
+
+.risque-artemis-control-btn:hover:not(:disabled) {
+  background: #22ff22;
+}
+
+.risque-artemis-control-btn:active:not(:disabled) {
+  transform: translateX(-50%) scale(0.97);
+}
+
+html.risque-artemis-client:not(.risque-artemis-my-turn) .risque-artemis-control-btn:not([data-force-show="1"]) {
+  display: none !important;
+}
+
+html.risque-artemis-client:not(.risque-artemis-my-turn) #risque-artemis-mock-continue-fixed {
+  display: none !important;
+}
+
+html.risque-artemis-my-turn #risque-artemis-mock-continue-fixed {
+  pointer-events: auto !important;
+}
+
+.risque-artemis-control-btn[hidden] {
+  display: none !important;
+}
+
+.risque-artemis-deploy-spectate {
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.85);
+  padding: 6px 0;
+}
+
+.risque-artemis-deploy-spectate strong {
+  color: #fff;
+  text-transform: uppercase;
+}
+
+/* ARTEMIS: cardplay controls in a dock the HUD cannot wipe (same idea as deploy dock). */
+.risque-artemis-cardplay-dock {
+  width: 100%;
+  min-width: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  margin-top: 6px;
+}
+
+.risque-artemis-cardplay-dock[hidden] {
+  display: none !important;
+}
+
+html.risque-artemis-host .risque-artemis-cardplay-dock .cardplay-compact-root,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-cardplay-dock .cardplay-compact-root,
+html.risque-artemis-host .risque-phase-content > .risque-artemis-cardplay-dock .cardplay-compact-root,
+html.risque-artemis-client.risque-artemis-my-turn .risque-phase-content > .risque-artemis-cardplay-dock .cardplay-compact-root {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 220px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+html.risque-artemis-host .risque-artemis-cardplay-dock .cardplay-hand-staging-split,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-cardplay-dock .cardplay-hand-staging-split {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  min-height: 160px !important;
+  gap: 8px !important;
+}
+
+html.risque-artemis-host .risque-artemis-cardplay-dock .cardplay-staging-wrap:not([hidden]),
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-cardplay-dock .cardplay-staging-wrap:not([hidden]) {
+  display: flex !important;
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-cardplay-dock .cardplay-compact-root,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-cardplay-dock .cardplay-compact-toolbar,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-cardplay-dock .cardplay-button,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-cardplay-dock #cardplay-skip-income-btn,
+html.risque-artemis-host.risque-artemis-my-turn .risque-artemis-cardplay-dock .cardplay-compact-toolbar,
+html.risque-artemis-host.risque-artemis-my-turn .risque-artemis-cardplay-dock #cardplay-skip-income-btn {
+  display: inline-flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn #ui-overlay .risque-artemis-cardplay-dock,
+html.risque-artemis-client.risque-artemis-my-turn #ui-overlay .risque-artemis-cardplay-dock * {
+  pointer-events: auto !important;
+}
+
+/* ARTEMIS: deploy controls in a dock the HUD cannot wipe */
+.risque-artemis-deploy-dock {
+  width: 100%;
+  min-width: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  margin-top: 6px;
+}
+
+.risque-artemis-deploy-dock[hidden] {
+  display: none !important;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock .deploy2-compact-root,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock .deploy1-action-btn,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock .deploy2-bank-row,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock .deploy2-hint,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock #deploy1-add-2,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock #deploy1-add-5,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock #deploy1-add-10,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock #deploy1-add-all,
+html.risque-artemis-host.risque-artemis-setup-deploy .risque-artemis-deploy-dock .deploy2-compact-root {
+  display: flex !important;
+  visibility: visible !important;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock #deploy1-add-2,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock #deploy1-add-5,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock #deploy1-add-10,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock #deploy1-add-all,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock #deploy1-confirm,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock #deploy1-reset,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock .deploy1-action-btn {
+  display: inline-flex !important;
+}
+
+.risque-artemis-deploy-dock .deploy2-compact-root {
+  display: flex;
+  flex-direction: column;
+}
+
+.risque-artemis-deploy-dock .deploy1-action-btn,
+.risque-artemis-deploy-dock button.deploy1-action-btn {
+  pointer-events: auto !important;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock .deploy1-action-btn,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock #deploy1-confirm,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock #deploy1-reset {
+  display: inline-flex !important;
+  pointer-events: auto !important;
+}
+
+.risque-artemis-deploy-dock .deploy1-action-btn {
+  position: static !important;
+  flex: 0 0 auto;
+  min-width: 100px;
+  min-height: 40px;
+  padding: 10px 20px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  background: #00ff00 !important;
+  color: #000 !important;
+  border: 2px solid #15803d !important;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+body.risque-view-host .risque-artemis-deploy-dock .deploy1-deploy-actions.deploy1-deploy-actions--hud-row {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 3px;
+}
+
+body.risque-view-host .risque-artemis-deploy-dock .deploy1-deploy-actions.deploy1-deploy-actions--hud-row .deploy1-action-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 32px !important;
+  padding: 6px 4px !important;
+  font-size: 12px !important;
+}
+
+/* ARTEMIS unified control panel: phase title → toggles → voice → phase slot */
+html.risque-artemis-host .runtime-hud-root:not(.runtime-hud-root--login) .hud-title-stack__brand-row,
+html.risque-artemis-client .runtime-hud-root:not(.runtime-hud-root--login) .hud-title-stack__brand-row {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  gap: 4px !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  position: relative;
+  box-sizing: border-box;
+}
+
+html.risque-artemis-host .runtime-hud-root:not(.runtime-hud-root--login) .hud-title-stack__stats-slot,
+html.risque-artemis-client .runtime-hud-root:not(.runtime-hud-root--login) .hud-title-stack__stats-slot {
+  display: none !important;
+}
+
+html.risque-artemis-host .runtime-hud-root:not(.runtime-hud-root--login) #hud-banner-game-title,
+html.risque-artemis-client .runtime-hud-root:not(.runtime-hud-root--login) #hud-banner-game-title,
+html.risque-artemis-host .runtime-hud-root:not(.runtime-hud-root--login) #hud-banner-game-title.hud-banner-phase-title,
+html.risque-artemis-client .runtime-hud-root:not(.runtime-hud-root--login) #hud-banner-game-title.hud-banner-phase-title {
+  order: 1;
+  position: static !important;
+  transform: none !important;
+  right: auto !important;
+  left: auto !important;
+  top: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  flex: none !important;
+  margin: 0 0 2px 0 !important;
+  padding: 0 !important;
+  font-size: clamp(20px, 2.6vw, 26px) !important;
+  line-height: 1.12 !important;
+  letter-spacing: 0.12em !important;
+  font-weight: 900 !important;
+  text-transform: uppercase;
+  pointer-events: none;
+  z-index: auto !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html.risque-artemis-host .runtime-hud-root:not(.runtime-hud-root--login) .hud-title-stack__host-top-buttons,
+html.risque-artemis-client .runtime-hud-root:not(.runtime-hud-root--login) .hud-title-stack__host-top-buttons,
+.runtime-hud-root--artemis-compact:not(.runtime-hud-root--login) .hud-title-stack__host-top-buttons {
+  order: 2;
+  display: flex !important;
+  flex: none !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  align-items: stretch !important;
+  gap: 4px !important;
+  justify-content: space-between !important;
+  padding-left: clamp(4px, 1vw, 8px) !important;
+  padding-right: clamp(4px, 1vw, 8px) !important;
+  box-sizing: border-box !important;
+}
+
+html.risque-artemis-host .runtime-hud-root:not(.runtime-hud-root--login) .risque-host-topbar-btn,
+html.risque-artemis-client .runtime-hud-root:not(.runtime-hud-root--login) .risque-host-topbar-btn,
+.runtime-hud-root--artemis-compact:not(.runtime-hud-root--login) .risque-host-topbar-btn:not(#risque-host-tv-cursor-toggle) {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  min-height: 28px !important;
+  max-height: 32px !important;
+  padding: 2px 3px !important;
+  box-sizing: border-box !important;
+  border-radius: 5px !important;
+  border: 2px solid #000 !important;
+  background: #00ff00 !important;
+  color: #000 !important;
+  font-family: "Segoe UI", Arial, sans-serif !important;
+  font-size: clamp(11px, 1.05vw, 13.5px) !important;
+  font-weight: 900 !important;
+  line-height: 1.1 !important;
+  letter-spacing: 0.02em !important;
+  text-transform: uppercase !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+html.risque-artemis-host .runtime-hud-root--artemis-compact .hud-phase-player-row,
+html.risque-artemis-client .runtime-hud-root--artemis-compact .hud-phase-player-row {
+  display: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  flex: none !important;
+}
+
+/* Active player / host / spectator: one ARTEMIS control-voice size — not during attack (uses native attack chrome). */
+html.risque-artemis-host body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--artemis-compact #control-voice,
+html.risque-artemis-client body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--artemis-compact #control-voice {
+  --risque-voice-font-size: clamp(19px, 2.09vw, 30px);
+  --risque-voice-report-size: clamp(16px, 1.82vw, 23px);
+  height: 168px !important;
+  min-height: 168px !important;
+  max-height: 168px !important;
+  overflow: hidden !important;
+  flex-shrink: 0 !important;
+}
+
+html.risque-artemis-host body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--artemis-compact #control-voice .ucp-voice-body,
+html.risque-artemis-client body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--artemis-compact #control-voice .ucp-voice-body,
+html.risque-artemis-host body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--artemis-compact #control-voice .ucp-voice-messages,
+html.risque-artemis-client body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--artemis-compact #control-voice .ucp-voice-messages,
+html.risque-artemis-host body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--artemis-compact #control-voice-text,
+html.risque-artemis-client body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--artemis-compact #control-voice-text {
+  overflow: hidden !important;
+  font-size: var(--risque-voice-font-size) !important;
+  line-height: 1.38 !important;
+}
+
+html.risque-artemis-host body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--artemis-compact #control-voice-report,
+html.risque-artemis-client body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--artemis-compact #control-voice-report,
+html.risque-artemis-host body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--artemis-compact #control-voice-report[class*="ucp-voice-report--"],
+html.risque-artemis-client body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--artemis-compact #control-voice-report[class*="ucp-voice-report--"] {
+  overflow: hidden !important;
+  font-size: var(--risque-voice-report-size) !important;
+  line-height: 1.4 !important;
+  font-weight: 600 !important;
+}
+
+/*
+ * ARTEMIS host (Guido): match client laptop control-voice typography when setup HUD
+ * lacks runtime-hud-root--artemis-compact (host spectator / refreshSetupStageChrome path).
+ */
+html.risque-artemis-host body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--setup #control-voice.ucp-control-voice {
+  --risque-voice-font-size: clamp(19px, 2.09vw, 30px);
+  --risque-voice-report-size: clamp(16px, 1.82vw, 23px);
+  height: 168px !important;
+  min-height: 168px !important;
+  max-height: 168px !important;
+  overflow: hidden !important;
+  flex-shrink: 0 !important;
+}
+
+html.risque-artemis-host body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--setup #control-voice .ucp-voice-body,
+html.risque-artemis-host body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--setup #control-voice .ucp-voice-messages,
+html.risque-artemis-host body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--setup #control-voice-text {
+  overflow: hidden !important;
+  font-size: var(--risque-voice-font-size) !important;
+  line-height: 1.38 !important;
+}
+
+html.risque-artemis-host body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--setup #control-voice-report,
+html.risque-artemis-host body:not([data-risque-phase="attack"]):not([data-risque-phase="reinforce"]):not([data-risque-phase="income"]):not([data-risque-phase="con-income"]) .runtime-hud-root--setup #control-voice-report[class*="ucp-voice-report--"] {
+  overflow: hidden !important;
+  font-size: var(--risque-voice-report-size) !important;
+  line-height: 1.4 !important;
+  font-weight: 600 !important;
+}
+
+html.risque-artemis-host .runtime-hud-root--setup #control-voice-report {
+  display: block !important;
+}
+
+/*
+ * ARTEMIS setup deploy — active owner control voice (wheel / placement).
+ * Direct #ui-overlay selectors + fixed px so host (Guido) cannot inherit 15px .ucp-terminal
+ * when HUD class chains flicker during mirror sync.
+ */
+html.risque-artemis-host body[data-risque-phase="deploy"] #ui-overlay #control-voice.ucp-control-voice,
+html.risque-artemis-client body[data-risque-phase="deploy"] #ui-overlay #control-voice.ucp-control-voice,
+html.risque-artemis-host body[data-risque-phase="deploy"] #ui-overlay #control-voice.ucp-control-voice--artemis-deploy-owner,
+html.risque-artemis-client body[data-risque-phase="deploy"] #ui-overlay #control-voice.ucp-control-voice--artemis-deploy-owner {
+  --risque-voice-font-size: 30px;
+  --risque-voice-report-size: 23px;
+  height: 168px !important;
+  min-height: 168px !important;
+  max-height: 168px !important;
+  overflow: hidden !important;
+  flex-shrink: 0 !important;
+}
+
+html.risque-artemis-host body[data-risque-phase="deploy"] #ui-overlay #control-voice .ucp-voice-body,
+html.risque-artemis-client body[data-risque-phase="deploy"] #ui-overlay #control-voice .ucp-voice-body,
+html.risque-artemis-host body[data-risque-phase="deploy"] #ui-overlay #control-voice .ucp-voice-messages,
+html.risque-artemis-client body[data-risque-phase="deploy"] #ui-overlay #control-voice .ucp-voice-messages,
+html.risque-artemis-host body[data-risque-phase="deploy"] #ui-overlay #control-voice-text,
+html.risque-artemis-client body[data-risque-phase="deploy"] #ui-overlay #control-voice-text,
+html.risque-artemis-host body[data-risque-phase="deploy"] #ui-overlay #control-voice-text.ucp-voice-text,
+html.risque-artemis-client body[data-risque-phase="deploy"] #ui-overlay #control-voice-text.ucp-voice-text {
+  overflow: hidden !important;
+  font-family: "Segoe UI", Arial, Helvetica, sans-serif !important;
+  font-size: 30px !important;
+  font-weight: 700 !important;
+  line-height: 1.38 !important;
+}
+
+html.risque-artemis-host body[data-risque-phase="deploy"] #ui-overlay #control-voice-report,
+html.risque-artemis-client body[data-risque-phase="deploy"] #ui-overlay #control-voice-report,
+html.risque-artemis-host body[data-risque-phase="deploy"] #ui-overlay #control-voice-report[class*="ucp-voice-report--"],
+html.risque-artemis-client body[data-risque-phase="deploy"] #ui-overlay #control-voice-report[class*="ucp-voice-report--"] {
+  overflow: hidden !important;
+  font-family: "Segoe UI", Arial, Helvetica, sans-serif !important;
+  font-size: 23px !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+}
+
+/* ARTEMIS clients: public-TV cardplay rules hide the HUD stack — keep voice + log visible. */
+html.risque-artemis-client.risque-view-public body[data-risque-phase="cardplay"] #hud-main-panel,
+html.risque-artemis-client.risque-view-public body[data-risque-phase="con-cardplay"] #hud-main-panel {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+html.risque-artemis-host .runtime-hud-root--artemis-compact #control-voice-report,
+html.risque-artemis-client .runtime-hud-root--artemis-compact #control-voice-report {
+  display: block !important;
+}
+
+html.risque-artemis-host .runtime-hud-root--artemis-compact .risque-phase-content,
+html.risque-artemis-client .runtime-hud-root--artemis-compact .risque-phase-content {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  margin-top: 4px !important;
+}
+
+/* Cardplay buttons stay visible on active client even if view class flickers */
+html.risque-artemis-client.risque-artemis-my-turn .risque-phase-content .cardplay-compact-root button,
+html.risque-artemis-client.risque-artemis-my-turn .risque-phase-content .cardplay-button,
+html.risque-artemis-client.risque-artemis-my-turn .risque-phase-content .cardplay-panel-confirm-btn,
+html.risque-artemis-my-turn .risque-phase-content .cardplay-compact-root button,
+html.risque-artemis-my-turn .risque-phase-content .cardplay-panel-confirm-btn {
+  display: inline-flex !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-host .risque-phase-content .cardplay-compact-toolbar,
+html.risque-artemis-client.risque-artemis-my-turn.risque-view-host .risque-phase-content .cardplay-compact-toolbar .cardplay-button {
+  display: inline-flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+/* ARTEMIS client spectators: never hide control voice stack during cardplay (public-TV draft rule). */
+html.risque-artemis-client.risque-view-public body[data-risque-phase="cardplay"] #hud-main-panel,
+html.risque-artemis-client.risque-view-public body[data-risque-phase="con-cardplay"] #hud-main-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+}
+
+html.risque-artemis-client body[data-risque-phase="cardplay"] #control-voice,
+html.risque-artemis-client body[data-risque-phase="con-cardplay"] #control-voice {
+  display: flex !important;
+  visibility: visible !important;
+}
+
+/*
+ * ARTEMIS cardplay: keep omni toggles + control voice on every laptop.
+ * Apollo .runtime-hud-root--cardplay-panel-only and public-TV cardplay rules hide #hud-main-panel.
+ */
+html.risque-artemis-host body[data-risque-phase="cardplay"] #hud-main-panel,
+html.risque-artemis-client body[data-risque-phase="cardplay"] #hud-main-panel,
+html.risque-artemis-host body[data-risque-phase="con-cardplay"] #hud-main-panel,
+html.risque-artemis-client body[data-risque-phase="con-cardplay"] #hud-main-panel,
+html.risque-artemis-host .runtime-hud-root--cardplay-panel-only #hud-main-panel,
+html.risque-artemis-client .runtime-hud-root--cardplay-panel-only #hud-main-panel,
+html.risque-artemis-host .runtime-hud-root--artemis-cardplay #hud-main-panel,
+html.risque-artemis-client .runtime-hud-root--artemis-cardplay #hud-main-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+}
+
+html.risque-artemis-host .runtime-hud-root--artemis-cardplay .risque-phase-content,
+html.risque-artemis-client .runtime-hud-root--artemis-cardplay .risque-phase-content {
+  margin-top: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+}
+
+html.risque-artemis-host .runtime-hud-root--artemis-cardplay .risque-phase-content > .cardplay-compact-root,
+html.risque-artemis-client .runtime-hud-root--artemis-cardplay .risque-phase-content > .cardplay-compact-root {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: #000000 !important;
+  border: 2px solid #00ff00 !important;
+  overflow: hidden !important;
+  max-height: none !important;
+}
+
+html.risque-artemis-host .runtime-hud-root--artemis-cardplay .cardplay-hand-staging-split > .cardplay-hand-stack,
+html.risque-artemis-client .runtime-hud-root--artemis-cardplay .cardplay-hand-staging-split > .cardplay-hand-stack,
+html.risque-artemis-host .runtime-hud-root--artemis-cardplay .cardplay-hand-staging-split > .cardplay-staging-wrap,
+html.risque-artemis-client .runtime-hud-root--artemis-cardplay .cardplay-hand-staging-split > .cardplay-staging-wrap {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+html.risque-artemis-host .runtime-hud-root--artemis-cardplay .cardplay-hand-staging-split > .cardplay-staging-wrap,
+html.risque-artemis-client .runtime-hud-root--artemis-cardplay .cardplay-hand-staging-split > .cardplay-staging-wrap {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/*
+ * ARTEMIS omni cardplay: upper hand + lower staging always visible on the active laptop.
+ * Smaller thumbnails so both panes fit under control voice without clipping card art.
+ */
+html.risque-artemis-host
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .cardplay-hand-staging-split,
+html.risque-artemis-client.risque-artemis-my-turn
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .cardplay-hand-staging-split {
+  flex: 1 1 auto !important;
+  min-height: 210px !important;
+}
+
+html.risque-artemis-host
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .cardplay-hand-staging-split
+  > .cardplay-hand-stack,
+html.risque-artemis-client.risque-artemis-my-turn
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .cardplay-hand-staging-split
+  > .cardplay-hand-stack {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  gap: 8px !important;
+}
+
+html.risque-artemis-host
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .cardplay-staging-wrap--artemis-dual,
+html.risque-artemis-client.risque-artemis-my-turn
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .cardplay-staging-wrap--artemis-dual {
+  display: flex !important;
+  flex: 1 1 0 !important;
+  min-height: 112px !important;
+  overflow-y: auto !important;
+}
+
+html.risque-artemis-host
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .cardplay-staging-empty-hint,
+html.risque-artemis-client.risque-artemis-my-turn
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .cardplay-staging-empty-hint {
+  margin: auto 0 0;
+  padding: 8px 6px 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #00ff00;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.88;
+  text-align: center;
+}
+
+html.risque-artemis-host
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .cardplay-compact-root
+  .cardplay-hand-row.cardplay-card-row,
+html.risque-artemis-client.risque-artemis-my-turn
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .cardplay-compact-root
+  .cardplay-hand-row.cardplay-card-row {
+  padding: 4px 0 2px !important;
+  justify-content: flex-start !important;
+}
+
+html.risque-artemis-host
+  .runtime-hud-root--artemis-cardplay
+  .risque-phase-content
+  .cardplay-compact-root
+  .card.cardplay-compact-card,
+html.risque-artemis-client.risque-artemis-my-turn
+  .runtime-hud-root--artemis-cardplay
+  .risque-phase-content
+  .cardplay-compact-root
+  .card.cardplay-compact-card {
+  width: 68px !important;
+  max-width: 68px !important;
+  max-height: 96px !important;
+}
+
+html.risque-artemis-host .runtime-hud-root--artemis-cardplay .cardplay-hand-slot,
+html.risque-artemis-client.risque-artemis-my-turn .runtime-hud-root--artemis-cardplay .cardplay-hand-slot {
+  width: 68px !important;
+  min-height: 96px !important;
+  max-height: 96px !important;
+}
+
+html.risque-artemis-host
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .risque-phase-content
+  > .cardplay-compact-root,
+html.risque-artemis-client.risque-artemis-my-turn
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .risque-phase-content
+  > .cardplay-compact-root {
+  max-height: none !important;
+  min-height: 220px !important;
+  overflow: hidden !important;
+}
+
+html.risque-artemis-host
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .cardplay-compact-root
+  .cardplay-staging-grid.cardplay-card-row,
+html.risque-artemis-client.risque-artemis-my-turn
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .cardplay-compact-root
+  .cardplay-staging-grid.cardplay-card-row {
+  min-height: 0 !important;
+  align-items: flex-end;
+}
+
+html.risque-artemis-host.risque-artemis-my-turn .risque-phase-content .cardplay-compact-toolbar,
+html.risque-artemis-host.risque-artemis-my-turn .risque-phase-content .cardplay-compact-toolbar .cardplay-button,
+html.risque-artemis-host.risque-artemis-my-turn .risque-phase-content .cardplay-panel-confirm-row .cardplay-button,
+html.risque-artemis-host.risque-artemis-my-turn #ui-overlay .risque-phase-content .cardplay-compact-root,
+html.risque-artemis-host.risque-artemis-my-turn #ui-overlay .risque-phase-content .cardplay-compact-root * {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+html.risque-artemis-host.risque-artemis-my-turn .risque-phase-content .cardplay-button:disabled,
+html.risque-artemis-client.risque-artemis-my-turn .risque-phase-content .cardplay-button:disabled {
+  cursor: not-allowed !important;
+}
+
+/*
+ * ARTEMIS cardplay: reuse Apollo panel-only layout inside .cardplay-compact-root.
+ * Staging lower pane stays visible on active laptop (empty until BOOK/CARD picks).
+ */
+html.risque-artemis-host .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only .cardplay-compact-root,
+html.risque-artemis-client .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only .cardplay-compact-root {
+  max-height: none !important;
+}
+
+html.risque-artemis-host body[data-risque-phase="cardplay"] #runtime-hud-root.runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only #hud-main-panel,
+html.risque-artemis-host body[data-risque-phase="con-cardplay"] #runtime-hud-root.runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only #hud-main-panel,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="cardplay"] #runtime-hud-root.runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only #hud-main-panel,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="con-cardplay"] #runtime-hud-root.runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only #hud-main-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  /* Voice only — do not flex-grow (was leaving a blank band above cardplay). */
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
+/* ARTEMIS cardplay: collapse dead chrome inside the voice panel; card UI lives in #risque-phase-content. */
+html.risque-artemis-host body[data-risque-phase="cardplay"] .runtime-hud-root--artemis-cardplay #ucp-slot-strip,
+html.risque-artemis-host body[data-risque-phase="con-cardplay"] .runtime-hud-root--artemis-cardplay #ucp-slot-strip,
+html.risque-artemis-client body[data-risque-phase="cardplay"] .runtime-hud-root--artemis-cardplay #ucp-slot-strip,
+html.risque-artemis-client body[data-risque-phase="con-cardplay"] .runtime-hud-root--artemis-cardplay #ucp-slot-strip,
+html.risque-artemis-host body[data-risque-phase="cardplay"] .runtime-hud-root--artemis-cardplay #log-text,
+html.risque-artemis-host body[data-risque-phase="con-cardplay"] .runtime-hud-root--artemis-cardplay #log-text,
+html.risque-artemis-client body[data-risque-phase="cardplay"] .runtime-hud-root--artemis-cardplay #log-text,
+html.risque-artemis-client body[data-risque-phase="con-cardplay"] .runtime-hud-root--artemis-cardplay #log-text,
+html.risque-artemis-host body[data-risque-phase="cardplay"] .runtime-hud-root--artemis-cardplay .attack-reinforce-footer,
+html.risque-artemis-host body[data-risque-phase="con-cardplay"] .runtime-hud-root--artemis-cardplay .attack-reinforce-footer,
+html.risque-artemis-host body[data-risque-phase="cardplay"] .runtime-hud-root--artemis-cardplay #hud-attack-chrome,
+html.risque-artemis-host body[data-risque-phase="con-cardplay"] .runtime-hud-root--artemis-cardplay #hud-attack-chrome {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+html.risque-artemis-host body[data-risque-phase="cardplay"] .runtime-hud-root--artemis-cardplay #control-voice-report:empty,
+html.risque-artemis-host body[data-risque-phase="con-cardplay"] .runtime-hud-root--artemis-cardplay #control-voice-report:empty,
+html.risque-artemis-client body[data-risque-phase="cardplay"] .runtime-hud-root--artemis-cardplay #control-voice-report:empty,
+html.risque-artemis-client body[data-risque-phase="con-cardplay"] .runtime-hud-root--artemis-cardplay #control-voice-report:empty {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html.risque-artemis-host body[data-risque-phase="cardplay"] .runtime-hud-root--artemis-cardplay .risque-phase-content,
+html.risque-artemis-host body[data-risque-phase="con-cardplay"] .runtime-hud-root--artemis-cardplay .risque-phase-content,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="cardplay"] .runtime-hud-root--artemis-cardplay .risque-phase-content,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="con-cardplay"] .runtime-hud-root--artemis-cardplay .risque-phase-content {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  margin-top: 0 !important;
+}
+
+html.risque-artemis-host .runtime-hud-root--artemis-cardplay .cardplay-panel-confirm-row,
+html.risque-artemis-client.risque-artemis-my-turn .runtime-hud-root--artemis-cardplay .cardplay-panel-confirm-row {
+  display: none !important;
+}
+
+html.risque-artemis-host body[data-risque-phase="cardplay"] #ui-overlay #runtime-hud-root,
+html.risque-artemis-host body[data-risque-phase="cardplay"] #ui-overlay #runtime-hud-root *,
+html.risque-artemis-host body[data-risque-phase="con-cardplay"] #ui-overlay #runtime-hud-root,
+html.risque-artemis-host body[data-risque-phase="con-cardplay"] #ui-overlay #runtime-hud-root * {
+  pointer-events: auto !important;
+}
+
+html.risque-artemis-host #risque-host-tv-cursor-toggle,
+html.risque-artemis-client #risque-host-tv-cursor-toggle {
+  display: none !important;
+}
+
+/* ARTEMIS: hide optional panel widgets until the local player toggles them on */
+html.risque-artemis-host .runtime-hud-root:not(.runtime-hud-root--host-panel-stats-focus) > #hud-stats-panel,
+html.risque-artemis-client .runtime-hud-root:not(.runtime-hud-root--host-panel-stats-focus) > #hud-stats-panel {
+  display: none !important;
+  margin: 0 !important;
+  min-height: 0 !important;
+}
+
+html.risque-artemis-host .runtime-hud-root:not(.runtime-hud-root--host-panel-cards-focus) > #risque-host-cards-played-panel,
+html.risque-artemis-client .runtime-hud-root:not(.runtime-hud-root--host-panel-cards-focus) > #risque-host-cards-played-panel {
+  display: none !important;
+}
+
+html.risque-artemis-host .runtime-hud-root:not(.runtime-hud-root--host-panel-lucky-focus) > #risque-host-lucky-panel,
+html.risque-artemis-client .runtime-hud-root:not(.runtime-hud-root--host-panel-lucky-focus) > #risque-host-lucky-panel {
+  display: none !important;
+}
+
+html.risque-artemis-host .runtime-hud-root:not(.runtime-hud-root--host-panel-hand-focus) > #risque-host-cards-in-hand-panel,
+html.risque-artemis-client .runtime-hud-root:not(.runtime-hud-root--host-panel-hand-focus) > #risque-host-cards-in-hand-panel {
+  display: none !important;
+}
+
+.risque-artemis-host-bar {
+  display: none !important;
+}
+
+.risque-artemis-host-bar-label {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0c4a6e;
+  line-height: 1.05;
 }
 
 .risque-public-login-hint-inner {
@@ -11338,4 +13038,338 @@ body.replay-machine-page .risque-replay-tape-count-line {
 body.replay-machine-page .risque-replay-tape-count-line:empty {
   display: none;
   margin: 0;
+}
+
+/* ——— ARTEMIS 18-step cycle probe (6 phases × 3 players) ——— */
+.risque-artemis-cycle-probe-dock {
+  width: 100%;
+  min-width: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  margin-top: 8px;
+}
+
+.risque-artemis-cycle-probe-dock[hidden] {
+  display: none !important;
+}
+
+.cycle-probe-panel {
+  border-radius: 10px;
+  padding: 14px 16px;
+  text-align: center;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.cycle-probe-panel--active {
+  background: linear-gradient(180deg, #0d3d1a 0%, #062010 100%);
+  border: 3px solid #00ff66;
+  box-shadow: 0 0 24px rgba(0, 255, 102, 0.25);
+}
+
+.cycle-probe-panel--waiting {
+  background: linear-gradient(180deg, #1a2433 0%, #0d1218 100%);
+  border: 3px solid #8899aa;
+  opacity: 0.95;
+}
+
+.cycle-probe-panel__badge {
+  font-size: clamp(18px, 2vw, 24px);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  margin-bottom: 6px;
+}
+
+.cycle-probe-panel--active .cycle-probe-panel__badge {
+  color: #00ff66;
+}
+
+.cycle-probe-panel--waiting .cycle-probe-panel__badge {
+  color: #cbd5e1;
+}
+
+.cycle-probe-panel__phase {
+  font-size: clamp(20px, 2.4vw, 28px);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #fff;
+}
+
+.cycle-probe-panel__player {
+  margin-top: 6px;
+  font-size: clamp(16px, 1.8vw, 20px);
+  color: #e2e8f0;
+}
+
+.cycle-probe-panel__hint {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.cycle-probe-fake-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.cycle-probe-fake-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  min-height: 38px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 2px solid #000;
+  background: #00ff00;
+  color: #000;
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+
+.cycle-probe-panel--waiting .cycle-probe-fake-toolbar {
+  display: none;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-cycle-probe-dock,
+html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-cycle-probe-dock * {
+  pointer-events: auto !important;
+}
+
+html.risque-artemis-client.risque-artemis-my-turn .cycle-probe-fake-btn {
+  pointer-events: none;
+}
+
+.risque-cycle-probe-host-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 2147483000;
+  min-width: min(96vw, 720px);
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(8, 12, 20, 0.94);
+  border: 2px solid #00ff66;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  color: #e2e8f0;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.risque-cycle-probe-host-bar__title {
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #00ff66;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.risque-cycle-probe-host-bar__step {
+  font-size: 15px;
+  line-height: 1.35;
+  margin-bottom: 10px;
+}
+
+.risque-cycle-probe-host-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.risque-cycle-probe-btn {
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 2px solid #334155;
+  background: #1e293b;
+  color: #f8fafc;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.risque-cycle-probe-btn--go {
+  border-color: #00ff66;
+  background: #0a3d22;
+  color: #00ff66;
+}
+
+.risque-cycle-probe-btn:hover {
+  filter: brightness(1.08);
+}
+
+html.risque-artemis-client .runtime-hud-root--artemis-cycle-probe #hud-main-panel,
+html.risque-artemis-host .runtime-hud-root--artemis-cycle-probe #hud-main-panel {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* ARTEMIS cardplay recap: reuse hot-seat shelf — map + staged cards fill the column below toggles. */
+html.risque-artemis-client .runtime-hud-root--public-cardplay-recap,
+html.risque-artemis-host .runtime-hud-root--host-cardplay-recap {
+  bottom: 0;
+  min-height: 0;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+html.risque-artemis-client
+  #runtime-hud-root.runtime-hud-root--cardplay-panel-only.runtime-hud-root--public-cardplay-recap,
+html.risque-artemis-host
+  #runtime-hud-root.runtime-hud-root--cardplay-panel-only.runtime-hud-root--host-cardplay-recap {
+  bottom: 0 !important;
+}
+
+html.risque-artemis-client .runtime-hud-root--public-cardplay-recap #hud-main-panel,
+html.risque-artemis-host .runtime-hud-root--host-cardplay-recap #hud-main-panel {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  max-height: none !important;
+  position: relative;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding: 25px !important;
+  box-sizing: border-box;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  gap: 0;
+}
+
+/*
+ * ARTEMIS recap: control voice stays visible; two-window shelf fills the rest of #hud-main-panel.
+ * (Hot-seat TV hides #risque-main-panel-body — ARTEMIS keeps voice + shelf stacked.)
+ */
+html.risque-artemis-client
+  .runtime-hud-root--public-cardplay-recap
+  #risque-main-panel-body,
+html.risque-artemis-host
+  .runtime-hud-root--host-cardplay-recap
+  #risque-main-panel-body,
+html.risque-artemis-client.risque-view-public
+  .runtime-hud-root--public-cardplay-recap
+  #risque-main-panel-body,
+html.risque-artemis-host.risque-view-host
+  .runtime-hud-root--host-cardplay-recap
+  #risque-main-panel-body {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+}
+
+html.risque-artemis-client
+  #runtime-hud-root.runtime-hud-root--cardplay-panel-only.runtime-hud-root--public-cardplay-recap
+  #hud-main-panel,
+html.risque-artemis-host
+  #runtime-hud-root.runtime-hud-root--cardplay-panel-only.runtime-hud-root--host-cardplay-recap
+  #hud-main-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 0 !important;
+  min-height: 200px !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+html.risque-artemis-client .runtime-hud-root--public-cardplay-recap #hud-stats-panel,
+html.risque-artemis-client .runtime-hud-root--public-cardplay-recap .hud-phase-player-row,
+html.risque-artemis-host .runtime-hud-root--host-cardplay-recap #hud-stats-panel,
+html.risque-artemis-host .runtime-hud-root--host-cardplay-recap .hud-phase-player-row {
+  display: none !important;
+}
+
+html.risque-artemis-client
+  .runtime-hud-root--public-cardplay-recap
+  #risque-phase-content:not(:has(#cardplay-host-income-gate-root)),
+html.risque-artemis-host
+  .runtime-hud-root--host-cardplay-recap
+  #risque-phase-content:not(:has(#cardplay-host-income-gate-root)) {
+  display: none !important;
+}
+
+html.risque-artemis-host
+  .runtime-hud-root--host-cardplay-recap
+  #risque-phase-content:has(#cardplay-host-income-gate-root),
+html.risque-artemis-client.risque-artemis-my-turn
+  .runtime-hud-root--host-cardplay-recap
+  #risque-phase-content:has(#cardplay-host-income-gate-root),
+html.risque-artemis-client
+  .runtime-hud-root--public-cardplay-recap
+  #risque-phase-content:has(#cardplay-host-income-gate-root) {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  margin-top: 6px !important;
+}
+
+html.risque-artemis-client .runtime-hud-root--public-cardplay-recap .hud-title-stack,
+html.risque-artemis-host .runtime-hud-root--host-cardplay-recap .hud-title-stack {
+  padding-top: 2px;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+html.risque-artemis-client
+  .runtime-hud-root--public-cardplay-recap
+  .risque-public-cardplay-recap-overlay--in-panel,
+html.risque-artemis-host
+  .runtime-hud-root--host-cardplay-recap
+  .risque-public-cardplay-recap-overlay--in-panel {
+  position: relative !important;
+  inset: auto !important;
+  background: transparent !important;
+  flex: 1 1 auto !important;
+  min-height: 140px !important;
+  width: 100% !important;
+  height: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+html.risque-artemis-client
+  #runtime-hud-root.runtime-hud-root--public-cardplay-recap
+  .risque-public-cardplay-recap-panel--shelf,
+html.risque-artemis-host
+  #runtime-hud-root.runtime-hud-root--host-cardplay-recap
+  .risque-public-cardplay-recap-panel--shelf {
+  flex: 1 1 auto !important;
+  min-height: 120px !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+html.risque-artemis-client
+  #runtime-hud-root.runtime-hud-root--public-cardplay-recap
+  .risque-public-cp-shelf-card,
+html.risque-artemis-host
+  #runtime-hud-root.runtime-hud-root--host-cardplay-recap
+  .risque-public-cp-shelf-card {
+  width: clamp(72px, calc((100% - 16px) / 3), 160px);
+  max-width: 160px;
+  max-height: min(28vh, 200px);
+}
+
+html.risque-artemis-client
+  #runtime-hud-root.runtime-hud-root--public-cardplay-recap
+  .risque-public-cp-shelf-upper
+  .risque-public-book-voice-title,
+html.risque-artemis-host
+  #runtime-hud-root.runtime-hud-root--host-cardplay-recap
+  .risque-public-cp-shelf-upper
+  .risque-public-book-voice-title {
+  font-size: clamp(12px, 2vh, 18px);
 }

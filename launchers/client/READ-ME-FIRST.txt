@@ -1,0 +1,22 @@
+ARTEMIS — client launcher (copy this ONE file)
+===============================================
+
+Copy to each client laptop desktop:
+  ARTEMIS-JOIN.bat
+
+Optional helper (also from host):
+  _artemis-launch-browser.bat
+
+First double-click asks:
+  - Host IP (saved to artemis-host-ip.txt)
+  - Seat 2 or 3 (saved to artemis-seat.txt)
+
+Every game night after that:
+  - Host runs START-ARTEMIS.bat (or cycle/probe starter on host)
+  - Client double-clicks ARTEMIS-JOIN.bat — done
+
+The batch file never needs updating. It hits the host traffic cop
+(/join/p2 or /join/p3). The host decides normal game vs cycle probe
+via launchers\active-mode.txt (set automatically by host START scripts).
+
+Dev changes ?v= or mock flags in launchers\profiles.json on the host only.

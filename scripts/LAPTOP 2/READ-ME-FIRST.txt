@@ -1,0 +1,29 @@
+ARTEMIS — LAPTOP 2 (MICTOR)
+============================
+
+COPY THIS ENTIRE FOLDER to Mictor's laptop desktop.
+
+Files in this folder:
+  JOIN.bat                    <- double-click this every game night
+  ARTEMIS-JOIN.bat            <- same launcher (JOIN.bat calls this)
+  _artemis-launch-browser.bat <- helper (do not delete)
+  artemis-host-ip.txt         <- host IP (updated when Guido runs START)
+  artemis-seat.txt            <- already set to Player 2 (do not change)
+
+HOST DEV FOLDER (Guido only — not copied to this laptop)
+  C:\Users\huckb\OneDrive\Documents\GitHub\RISQUE-ARTEMIS\scripts\SERVER\START-ARTEMIS.bat
+
+SETUP
+  1. Guido runs START-ARTEMIS.bat on the host PC first
+  2. Copy this folder to Mictor's desktop (overwrite old folder if asked)
+  3. Mictor double-clicks JOIN.bat
+
+NO OTHER FILES NEEDED. Do not copy LAPTOP 3 folder to this laptop.
+
+The host traffic cop sends this laptop to whatever test is active
+(normal game, cycle probe, etc.). You never edit URL params here.
+
+FULLSCREEN: Ctrl+Shift+F toggle   Esc exit
+
+If host IP changed: artemis-host-ip.txt is refreshed when Guido
+runs START and re-copies this folder, or edit the IP in that file.

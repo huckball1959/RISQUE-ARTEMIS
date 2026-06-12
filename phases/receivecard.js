@@ -583,14 +583,6 @@
             : diskChain;
       }
       function runReceiveCardHandoffAndNavigate(periodicEveryRounds) {
-        if (typeof window.risqueHostReplaceShellGameState === "function") {
-          window.risqueHostReplaceShellGameState(gsAfter);
-        }
-        if (typeof window.risqueMirrorPushGameState === "function") {
-          window.risqueMirrorPushGameState();
-        }
-        var nextHandoffMsg =
-          "Next player\n\nHand the tablet to " + nextPlayerName + " for card play.\n\nOnly this player should tap Continue.";
         function goNextPlayerCardplay() {
           var target = "game.html?phase=cardplay&legacyNext=income.html&postReceive=1";
           if (typeof window.risqueMarkPostReceiveCardplayBlackout === "function") {
@@ -611,6 +603,21 @@
             window.location.href = target;
           }
         }
+        if (window.risqueArtemisMode && typeof window.risqueArtemisStampControlSlot === "function") {
+          window.risqueArtemisStampControlSlot(gsAfter);
+        }
+        if (typeof window.risqueHostReplaceShellGameState === "function") {
+          window.risqueHostReplaceShellGameState(gsAfter);
+        }
+        if (typeof window.risqueMirrorPushGameState === "function") {
+          window.risqueMirrorPushGameState();
+        }
+        if (window.risqueArtemisMode && !window.risqueDisplayIsPublic) {
+          goNextPlayerCardplay();
+          return;
+        }
+        var nextHandoffMsg =
+          "Next player\n\nHand the tablet to " + nextPlayerName + " for card play.\n\nOnly this player should tap Continue.";
         var PGn = window.risquePhases && window.risquePhases.privacyGate;
         var pe = periodicEveryRounds != null ? Math.floor(Number(periodicEveryRounds)) : 0;
         if (!isFinite(pe) || pe < 0) {
@@ -793,6 +800,9 @@
       round: gameState.round,
       phase: gameState.phase
     });
+    if (window.risqueArtemisMode && typeof window.risqueArtemisStampControlSlot === "function") {
+      window.risqueArtemisStampControlSlot(gameState);
+    }
     if (typeof window.risqueReplayOnHostEnterCardplay === "function" && !window.risqueDisplayIsPublic) {
       window.risqueReplayOnHostEnterCardplay(gameState);
     }

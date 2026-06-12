@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ARTEMIS — network test</title>
+  <style>
+    body {
+      font-family: system-ui, Segoe UI, sans-serif;
+      max-width: 720px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      line-height: 1.5;
+    }
+    h1 { font-size: 1.35rem; }
+    input, button { font-size: 1rem; padding: 0.4rem 0.6rem; }
+    #log {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 8px;
+      font-family: Consolas, monospace;
+      font-size: 0.85rem;
+      white-space: pre-wrap;
+      min-height: 200px;
+    }
+    .ok { color: #86efac; }
+    .bad { color: #fca5a5; }
+  </style>
+</head>
+<body>
+  <h1>ARTEMIS network test (M0)</h1>
+  <p>
+    Confirms this laptop can reach the <strong>host server</strong> over HTTP and WebSocket.
+    Open the same page on each laptop (host + clients) once the host is running.
+  </p>
+  <p>
+    <label>Name <input id="name" value="Player" maxlength="32" /></label>
+    <button type="button" id="connect">Connect</button>
+    <button type="button" id="ping" disabled>Ping</button>
+  </p>
+  <div id="log"></div>
+  <script>
+    (function () {
+      "use strict";
+      var logEl = document.getElementById("log");
+      var ws = null;
+
+      function line(text, cls) {
+        var d = document.createElement("div");
+        if (cls) d.className = cls;
+        d.textContent = new Date().toLocaleTimeString() + "  " + text;
+        logEl.appendChild(d);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      function wsUrl() {
+        var proto = location.protocol === "https:" ? "wss:" : "ws:";
+        return proto + "//" + location.host + "/ws";
+      }
+
+      document.getElementById("connect").addEventListener("click", function () {
+        if (ws) {
+          ws.close();
+          ws = null;
+        }
+        var url = wsUrl();
+        line("Connecting " + url + " …");
+        ws = new WebSocket(url);
+        ws.onopen = function () {
+          line("WebSocket open", "ok");
+          document.getElementById("ping").disabled = false;
+          ws.send(JSON.stringify({ type: "join", name: document.getElementById("name").value }));
+        };
+        ws.onmessage = function (ev) {
+          line("← " + ev.data, "ok");
+        };
+        ws.onerror = function () {
+          line("WebSocket error", "bad");
+        };
+        ws.onclose = function () {
+          line("WebSocket closed");
+          document.getElementById("ping").disabled = true;
+        };
+      });
+
+      document.getElementById("ping").addEventListener("click", function () {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ type: "ping", t: Date.now() }));
+      });
+
+      fetch("/api/artemis/health", { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          line("HTTP health OK — protocol v" + j.protocolVersion + ", clients=" + j.clients, "ok");
+        })
+        .catch(function (e) {
+          line("HTTP health failed: " + e, "bad");
+        });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ARTEMIS Turn Probe</title>
+  <link rel="stylesheet" href="probe.css?v=probe-2" />
+</head>
+<body>
+  <header class="probe-bar" id="probe-bar">
+    <span class="probe-bar-title">ARTEMIS TURN PROBE</span>
+    <span class="probe-bar-status" id="probe-bar-status">Connecting…</span>
+  </header>
+
+  <main class="probe-main">
+    <!-- Lobby -->
+    <section class="probe-panel" id="panel-lobby">
+      <h1>Lobby</h1>
+      <p class="probe-lead" id="lobby-you"></p>
+      <ul class="probe-slots" id="lobby-slots"></ul>
+      <div class="probe-actions" id="lobby-actions"></div>
+      <p class="probe-hint" id="lobby-hint"></p>
+    </section>
+
+    <!-- Login -->
+    <section class="probe-panel" id="panel-login" hidden>
+      <h1>Sign in</h1>
+      <p class="probe-lead" id="login-lead"></p>
+      <label class="probe-label" for="login-name">Your name</label>
+      <input type="text" id="login-name" class="probe-input" maxlength="32" autocomplete="off" placeholder="Name" />
+      <p class="probe-error" id="login-error"></p>
+      <button type="button" class="probe-btn probe-btn--primary" id="login-btn">LOG IN</button>
+      <ul class="probe-roster" id="login-roster"></ul>
+      <button type="button" class="probe-btn probe-btn--go" id="begin-probe-btn" hidden>Begin turn probe</button>
+    </section>
+
+    <!-- Turn probe -->
+    <section class="probe-panel probe-panel--turn" id="panel-turn" hidden>
+      <div class="probe-turn-banner" id="turn-banner">Waiting…</div>
+      <div class="probe-countdown" id="turn-countdown" hidden></div>
+      <button type="button" class="probe-btn probe-btn--control" id="control-btn" disabled>I TOOK CONTROL</button>
+      <p class="probe-spectator" id="turn-spectator"></p>
+    </section>
+  </main>
+
+  <aside class="probe-debug">
+    <h2>Truth panel</h2>
+    <dl class="probe-truth" id="probe-truth"></dl>
+    <h2>Event log</h2>
+    <ol class="probe-log" id="probe-log" reversed></ol>
+  </aside>
+
+  <script src="probe.js?v=probe-2"></script>
+</body>
+</html>

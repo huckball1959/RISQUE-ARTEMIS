@@ -1,0 +1,17 @@
+{
+  "name": "artemis-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ARTEMIS LAN host: serves the game and syncs clients over WebSocket",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}

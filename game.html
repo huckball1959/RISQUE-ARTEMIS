@@ -20,11 +20,66 @@
   <title>RISQUE Runtime</title>
   <script>
     (function () {
+      window.risqueArtemisFastBoot = true;
+      try {
+        if (new URL(window.location.href).searchParams.get("artemisFastBoot") === "0") {
+          window.risqueArtemisFastBoot = false;
+        }
+      } catch (eFb) {
+        /* ignore */
+      }
+      window.risqueArtemisFixedProfiles = {
+        1: { name: "GUIDO", color: "blue" },
+        2: { name: "MICTOR", color: "red" },
+        3: { name: "NOOCH", color: "yellow" }
+      };
+      try {
+        var presetParam = new URL(window.location.href).searchParams.get("artemisPreset");
+        if (presetParam) {
+          window.risqueArtemisPresetMode = presetParam;
+        }
+      } catch (ePreset) {
+        /* ignore */
+      }
+      try {
+        var cq = new URL(window.location.href).searchParams;
+        if (
+          cq.get("artemisCycleProbe") === "1" ||
+          sessionStorage.getItem("risqueArtemisCycleProbe") === "1"
+        ) {
+          window.risqueArtemisCycleProbeActive = true;
+        }
+      } catch (eCycle) {
+        /* ignore */
+      }
+    })();
+  </script>
+  <script src="js/artemis-net.js?v=artemis-m144-map-start-idle-2026-06-09"></script>
+  <script src="js/artemis-diagnostics.js?v=artemis-m58-deploy-finish-bus-2026-06-07"></script>
+  <script src="js/artemis-control-bus.js?v=artemis-m58-deploy-finish-bus-2026-06-07"></script>
+  <script src="js/artemis-lobby.js?v=artemis-m142-autologin-cardplay-ui-2026-06-09"></script>
+  <script src="js/artemis-login.js?v=artemis-m144-map-start-idle-2026-06-09"></script>
+  <script src="js/artemis-play.js?v=artemis-m168-income-mini-btn-2026-06-09"></script>
+  <script src="js/artemis-turn-deploy-panel.js?v=artemis-m99-client-cardplay-fix-2026-06-09"></script>
+  <script src="js/artemis-cardplay-panel.js?v=artemis-m168-income-mini-btn-2026-06-09"></script>
+  <script src="js/artemis-income-panel.js?v=artemis-m168-income-mini-btn-2026-06-09"></script>
+  <script src="js/artemis-reinforce-panel.js?v=artemis-m99-client-cardplay-fix-2026-06-09"></script>
+  <script src="js/artemis-attack-panel.js?v=artemis-m118-deploy-live-relay-2026-06-07"></script>
+  <script src="js/artemis-deploy-panel.js?v=artemis-m136-host-start-load-2026-06-09"></script>
+  <script src="js/artemis-setup-milestones.js?v=artemis-m50-sequential-setup-2026-06-07"></script>
+  <script src="js/artemis-setup-flow.js?v=artemis-m142-autologin-cardplay-ui-2026-06-09"></script>
+  <script src="js/artemis-fast.js?v=artemis-m50-sequential-setup-2026-06-07"></script>
+  <script src="js/artemis-mock-phases.js?v=artemis-m99-client-cardplay-fix-2026-06-09"></script>
+  <script src="js/artemis-preset.js?v=artemis-m75-skip-income-fix-2026-06-08"></script>
+  <script>
+    (function () {
       try {
         /* file://: some builds expose an empty location.search while href still has ?display=public — use URL(href). */
         var q = new URL(window.location.href).searchParams;
+        var artemisMode = String(q.get("artemis") || "").toLowerCase();
         var disp = String(q.get("display") || "").toLowerCase();
-        window.risqueDisplayIsPublic = disp === "public";
+        window.risqueDisplayIsPublic =
+          disp === "public" || artemisMode === "client" || !!window.risqueArtemisNetClient;
         window.risqueDisplayMode = window.risqueDisplayIsPublic ? "public" : "host";
         if (window.risqueDisplayIsPublic && window.opener && !window.opener.closed) {
           try {
@@ -141,7 +196,7 @@
       background-color: #000;
     }
   </style>
-  <link rel="stylesheet" href="game.css?v=receivecard-upper-hand-five-2026-05-20" />
+  <link rel="stylesheet" href="game.css?v=artemis-m168-income-mini-btn-2026-06-09" />
   <script>
     (function () {
       try {
@@ -329,6 +384,13 @@
   </script>
 </head>
 <body class="runtime-page">
+  <div id="risque-artemis-top-bar" class="risque-artemis-top-bar" data-kind="wait" aria-label="ARTEMIS status" hidden>
+    <span id="risque-artemis-top-status" class="risque-artemis-top-status">ARTEMIS</span>
+    <span class="risque-artemis-top-fs-hint">Ctrl+Shift+F · Esc exit</span>
+    <button type="button" id="risque-artemis-fs-btn" class="risque-artemis-top-fs-btn" title="Toggle fullscreen">
+      Fullscreen
+    </button>
+  </div>
   <script>
     (function () {
       var pub = !!window.risqueDisplayIsPublic;
@@ -400,6 +462,18 @@
     </div>
   </div>
 
+  <div id="risque-artemis-host-bar" class="risque-artemis-host-bar" aria-hidden="true" hidden>
+    <span class="risque-artemis-host-bar-label">HOST</span>
+    <button
+      type="button"
+      id="risque-artemis-host-fullscreen-btn"
+      class="risque-public-fullscreen-btn"
+      title="Fill the screen (hides browser tabs and address bar)"
+    >
+      Fullscreen
+    </button>
+  </div>
+
   <div id="risque-public-tv-bar" class="risque-public-tv-bar" aria-label="Public display">
     <span class="risque-public-tv-bar-label">TV view</span>
     <button
@@ -413,20 +487,46 @@
   </div>
   <script>
     (function () {
-      if (!window.risqueDisplayIsPublic) return;
+      var isArtemis = !!(window.risqueArtemisHost || window.risqueArtemisNetClient);
+      var isPublic = !!window.risqueDisplayIsPublic;
+      if (!isArtemis && !isPublic) return;
+
+      window.risqueArtemisScheduleLayoutSync = function () {
+        if (window.gameUtils && typeof window.gameUtils.resizeCanvas === "function") {
+          requestAnimationFrame(function () {
+            window.gameUtils.resizeCanvas();
+          });
+        }
+        if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.syncPosition === "function") {
+          requestAnimationFrame(function () {
+            window.risqueRuntimeHud.syncPosition();
+          });
+        }
+      };
 
       var TV_PING_STORAGE_KEY = "risquePublicTvCommand";
+      var btn = document.getElementById(isArtemis ? "risque-artemis-fs-btn" : "risque-public-fullscreen-btn");
+      var bar = document.getElementById(isArtemis ? "risque-artemis-top-bar" : "risque-public-tv-bar");
+      if (!btn) return;
 
-      function wirePublicFullscreen() {
-        var btn = document.getElementById("risque-public-fullscreen-btn");
-        var bar = document.getElementById("risque-public-tv-bar");
-        if (!btn) return;
-
+      function wireFullscreen() {
         function syncLabel() {
           var fs = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
           btn.textContent = fs ? "Exit fullscreen" : "Fullscreen";
           btn.setAttribute("aria-pressed", fs ? "true" : "false");
-          if (bar && fs) bar.removeAttribute("data-risque-pending-fullscreen");
+          if (isArtemis) {
+            document.documentElement.classList.toggle("risque-artemis-fullscreen-active", !!fs);
+          } else if (bar) {
+            bar.classList.toggle("risque-artemis-fs-dock--active", !!fs);
+          }
+          if (window.gameUtils && typeof window.gameUtils.resizeCanvas === "function") {
+            requestAnimationFrame(function () {
+              window.gameUtils.resizeCanvas();
+            });
+          }
+          if (typeof window.risqueArtemisScheduleLayoutSync === "function") {
+            window.risqueArtemisScheduleLayoutSync();
+          }
         }
 
         function requestFullscreenDoc() {
@@ -450,18 +550,29 @@
           return exitFullscreenDoc().catch(function () {});
         }
 
+        function shortcutBlockedTarget(t) {
+          var tag = t && t.tagName ? String(t.tagName).toLowerCase() : "";
+          return tag === "input" || tag === "textarea" || tag === "select" || (t && t.isContentEditable);
+        }
+
         btn.addEventListener("click", function () {
           toggleFullscreenFromGesture();
         });
 
-        /* Match the Fullscreen button: public view never wired F11, and native F11 is unreliable in popups / unfocused TV windows. */
         document.addEventListener(
           "keydown",
           function (e) {
+            var ctrlShiftF =
+              e.ctrlKey && e.shiftKey && !e.altKey && (e.key === "f" || e.key === "F");
+            if (ctrlShiftF) {
+              if (shortcutBlockedTarget(e.target)) return;
+              e.preventDefault();
+              e.stopPropagation();
+              toggleFullscreenFromGesture();
+              return;
+            }
             if (e.key !== "F11") return;
-            var t = e.target;
-            var tag = t && t.tagName ? String(t.tagName).toLowerCase() : "";
-            if (tag === "input" || tag === "textarea" || (t && t.isContentEditable)) return;
+            if (shortcutBlockedTarget(e.target)) return;
             e.preventDefault();
             e.stopPropagation();
             toggleFullscreenFromGesture();
@@ -474,68 +585,31 @@
         document.addEventListener("MSFullscreenChange", syncLabel);
         syncLabel();
 
-        function setPendingFullscreenUi(on) {
-          if (!bar) return;
-          if (on) bar.setAttribute("data-risque-pending-fullscreen", "1");
-          else bar.removeAttribute("data-risque-pending-fullscreen");
-        }
-
-        function armOneClickFullscreen() {
-          setPendingFullscreenUi(true);
-          function onFirstPointer() {
-            document.removeEventListener("pointerdown", onFirstPointer, true);
-            setPendingFullscreenUi(false);
-            var fs = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-            if (!fs) {
-              requestFullscreenDoc().catch(function () {});
-            }
+        if (isPublic && !isArtemis) {
+          function isHttpLike() {
+            return window.location.protocol === "http:" || window.location.protocol === "https:";
           }
-          document.addEventListener("pointerdown", onFirstPointer, true);
-        }
-
-        function consumeTvFullscreenQuery() {
-          try {
-            var u = new URL(window.location.href);
-            if (u.searchParams.get("risqueTvFullscreen") !== "1" && u.searchParams.get("tvFullscreen") !== "1") {
-              return false;
-            }
-            u.searchParams.delete("risqueTvFullscreen");
-            u.searchParams.delete("tvFullscreen");
-            history.replaceState(null, "", u.href);
-            return true;
-          } catch (e) {
-            return false;
+          if (isHttpLike()) {
+            window.addEventListener("storage", function (ev) {
+              if (!ev.key || ev.key !== TV_PING_STORAGE_KEY) return;
+              var raw = ev.newValue;
+              if (!raw) return;
+              try {
+                var o = JSON.parse(raw);
+                if (!o || String(o.action || "") !== "fullscreen") return;
+              } catch (eSt) {
+                return;
+              }
+              toggleFullscreenFromGesture();
+            });
           }
-        }
-
-        if (consumeTvFullscreenQuery()) {
-          armOneClickFullscreen();
-        }
-
-        function isHttpLike() {
-          return window.location.protocol === "http:" || window.location.protocol === "https:";
-        }
-
-        if (isHttpLike()) {
-          window.addEventListener("storage", function (ev) {
-            if (!ev.key || ev.key !== TV_PING_STORAGE_KEY) return;
-            var raw = ev.newValue;
-            if (!raw) return;
-            try {
-              var o = JSON.parse(raw);
-              if (!o || String(o.action || "") !== "fullscreen") return;
-            } catch (eSt) {
-              return;
-            }
-            armOneClickFullscreen();
-          });
         }
       }
 
       if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", wirePublicFullscreen);
+        document.addEventListener("DOMContentLoaded", wireFullscreen);
       } else {
-        wirePublicFullscreen();
+        wireFullscreen();
       }
     })();
   </script>
@@ -543,23 +617,24 @@
   <script src="js/risque-colors.js?v=map-saturation-plus25pct-2026-05-07u"></script>
   <script src="js/replay-tape.js?v=skip-sidecar-battle-stills-2026-05-18c"></script>
   <script src="js/risque-cheap-replay.js?v=round-flush-disk-stills-2026-05-18d"></script>
-  <script src="js/core.js?v=cardplay-standard-income-routing-2026-05-16"></script>
+  <script src="js/core.js?v=artemis-m130-deploy-voice-inline-2026-06-09"></script>
   <script src="js/risque-session-disk.js?v=skip-turn-checkpoint-battle-stills-2026-05-18d"></script>
   <script src="js/risque-session-staging.js?v=staging-disk-opt-in-2026-04-29"></script>
   <script src="js/risque-external-urls.js?v=launcher-paths-fresh-fetch-2026-05-12"></script>
   <script src="js/risque-local-disk.js?v=lab-wipe-save-root-2026-05-21d"></script>
-  <script src="phases/privacy-gate.js?v=privacy-retain-overlay-periodic-restart-2026-05-12"></script>
-  <script src="phases/player-select.js?v=roulette-max-2s-2026-05-09"></script>
-  <script src="phases/deal.js?v=lite-ls-no-per-step-deal-2026-05-18"></script>
-  <script src="phases/deploy.js?v=lite-ls-deploy-wheel-2026-05-18"></script>
+  <script src="phases/privacy-gate.js?v=artemis-m34-spectate-stable-2026-06-07"></script>
+  <script src="phases/player-select.js?v=artemis-m99-client-cardplay-fix-2026-06-09"></script>
+  <script src="phases/deal.js?v=artemis-m118-deploy-live-relay-2026-06-07"></script>
+  <script src="phases/firstdeploy.js?v=artemis-m136-host-start-load-2026-06-09"></script>
+  <script src="phases/deploy.js?v=artemis-m46-deploy-attack-advance-2026-06-07"></script>
   <script src="phases/conquer.js?v=conquer-mirror-order-2026-04-14"></script>
-  <script src="phases/attack.js?v=battle-outcome-stills-2026-05-18"></script>
-  <script src="phases/runtime-hud.js?v=deploy-protect-all-no-scroll-2026-05-16"></script>
+  <script src="phases/attack.js?v=artemis-m118-deploy-live-relay-2026-06-07"></script>
+  <script src="phases/runtime-hud.js?v=artemis-m168-income-mini-btn-2026-06-09"></script>
   <script src="js/post-cardplay-navigator.js?v=con-income-requires-chain-2026-05-16"></script>
-  <script src="phases/cardplay.js?v=cardplay-income-nav-host-map-2026-05-17"></script>
-  <script src="phases/income.js?v=income-standard-con-guard-quota-2026-05-17"></script>
-  <script src="phases/reinforce.js?v=reinforce-split-confirm-buttons-2026-05-16"></script>
-  <script src="phases/receivecard.js?v=receivecard-hand-staging-split-2026-05-16"></script>
+  <script src="phases/cardplay.js?v=artemis-m156-recap-income-fix-2026-06-09"></script>
+  <script src="phases/income.js?v=artemis-m168-income-mini-btn-2026-06-09"></script>
+  <script src="phases/reinforce.js?v=artemis-m71-reinforce-clicks-2026-06-08"></script>
+  <script src="phases/receivecard.js?v=artemis-m68-mictor-controls-2026-06-08"></script>
   <script src="phases/postgame.js?v=flat-archive-msg-2026-05-02"></script>
   <script src="phases/conquer-phase.js?v=con-chain-game-html-only-2026-05-09"></script>
   <script src="phases/con-cardtransfer-phase.js?v=con-chain-game-html-only-2026-05-09"></script>
@@ -567,7 +642,8 @@
   <script src="js/risque-save-folder-idb.js?v=autosave-folder-2026-04-30"></script>
   <script src="js/replay-machine.js?v=battle-outcome-stills-kind-2026-05-18"></script>
   <script src="phases/login.js?v=autosave-tier5-default-2026-05-21"></script>
-  <script src="js/game-shell.js?v=autosave-tier5-default-2026-05-21"></script>
+  <script src="js/artemis-cycle-probe.js?v=artemis-cycle2-player-first-2026-06-09"></script>
+  <script src="js/game-shell.js?v=artemis-m168-income-mini-btn-2026-06-09"></script>
 </body>
 </html>
 

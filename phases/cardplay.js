@@ -290,6 +290,7 @@
       delete disk.risquePublicCardplayRecapAckRequiredSeq;
       delete disk.risquePublicCardplayAerialSkipHostDecisionSeq;
       delete disk.risqueCardplayTvRecapPublished;
+      delete disk.risquePublicIncomeGateToken;
       disk.risqueCardplaySuppressPublicSpectator = false;
     }
     /**
@@ -954,8 +955,75 @@
       return groups;
     }
 
+    /** ARTEMIS client: host must receive income phase or mirror keeps forcing cardplay. */
+    function artemisPushLeaveCardplayToHost(gs, reason) {
+      if (!window.risqueArtemisMode || !window.risqueArtemisNetClient || !gs) return false;
+      window.__risqueArtemisCardplayLeftAt = Date.now();
+      window.gameState = gs;
+      try {
+        localStorage.setItem("gameState", JSON.stringify(gs));
+      } catch (eLsPush) {
+        /* ignore */
+      }
+      var pushed = false;
+      if (typeof window.risqueArtemisFlushClientStatePush === "function") {
+        try {
+          window.risqueArtemisFlushClientStatePush(gs);
+          pushed = true;
+        } catch (eFlush) {
+          /* ignore */
+        }
+      }
+      if (!pushed && typeof window.risquePersistHostGameState === "function") {
+        try {
+          window.risquePersistHostGameState(gs);
+          pushed = true;
+        } catch (ePersist) {
+          /* ignore */
+        }
+      }
+      if (!pushed && typeof window.risqueArtemisOnClientStatePush === "function") {
+        try {
+          window.risqueArtemisOnClientStatePush(gs);
+          pushed = true;
+        } catch (ePush) {
+          /* ignore */
+        }
+      }
+      if (typeof window.risqueArtemisDiag === "function") {
+        window.risqueArtemisDiag(
+          reason || "cardplay_host_income_push",
+          "P" + (window.risqueArtemisPlayerSlot || "?") + " → income (host sync)",
+          { phase: gs.phase, pushed: pushed, currentPlayer: gs.currentPlayer }
+        );
+      }
+      return pushed;
+    }
+
     function proceedCardplayToIncome(delayMs) {
       if (!window.gameState) return;
+      if (
+        window.risqueArtemisMode &&
+        String(window.gameState.phase || "") !== "cardplay"
+      ) {
+        var stuckPh = String(window.gameState.phase || "");
+        if (stuckPh === "income" || stuckPh === "con-income") {
+          if (typeof window.risqueArtemisUnmountPortableCardplay === "function") {
+            window.risqueArtemisUnmountPortableCardplay();
+          }
+          artemisPushLeaveCardplayToHost(window.gameState, "cardplay_continue_income");
+          if (typeof window.risqueArtemisSyncFromState === "function") {
+            window.risqueArtemisSyncFromState(window.gameState);
+          }
+        }
+        cardplaySkipToIncomeInFlight = false;
+        try {
+          delete window.__risqueArtemisLeavingCardplay;
+        } catch (ePhGuard) {
+          /* ignore */
+        }
+        return;
+      }
       if (!window.risqueDisplayIsPublic) {
         window.__risqueSuppressHostMapRedraw = true;
       }
@@ -1000,7 +1068,79 @@
       var wait = delayMs != null ? Number(delayMs) : 0;
       if (!Number.isFinite(wait) || wait < 0) wait = 0;
 
+      function artemisFinishLeaveCardplayDeferred(deferredGs, deferredNav, deferredNext) {
+        setTimeout(function () {
+          var navOk = false;
+          try {
+            if (typeof window.risqueArtemisPrepareFastIncomeTransition === "function") {
+              window.risqueArtemisPrepareFastIncomeTransition();
+            }
+            var dest = deferredNext || deferredNav.href || "game.html?phase=income";
+            if (
+              dest === "income.html" ||
+              dest === "in-come.html" ||
+              String(dest).indexOf("phase=income") === -1
+            ) {
+              dest = deferredNav.href || "game.html?phase=income";
+            }
+            if (window.risqueArtemisNetClient) {
+              if (typeof window.risqueArtemisFlushClientStatePush === "function") {
+                window.risqueArtemisFlushClientStatePush(deferredGs);
+              }
+              artemisPushLeaveCardplayToHost(deferredGs, "cardplay_skip_income");
+            }
+            navOk =
+              !window.risqueDisplayIsPublic &&
+              typeof window.risqueNavigateGameHtmlSoft === "function" &&
+              window.risqueNavigateGameHtmlSoft(dest);
+            if (typeof window.risqueArtemisUnmountPortableCardplay === "function") {
+              window.risqueArtemisUnmountPortableCardplay();
+            }
+            if (!window.risqueArtemisNetClient && !navOk && typeof window.risqueFlushMirrorPush === "function") {
+              window.risqueFlushMirrorPush();
+            }
+            if (typeof window.risqueArtemisSyncFromState === "function") {
+              window.risqueArtemisSyncFromState(deferredGs);
+            }
+          } catch (eArtemisSkip) {
+            if (typeof window.risqueArtemisDiag === "function") {
+              window.risqueArtemisDiag("cardplay_skip_income_fail", String(eArtemisSkip && eArtemisSkip.message ? eArtemisSkip.message : eArtemisSkip), null);
+            }
+          } finally {
+            cardplaySkipToIncomeInFlight = false;
+            try {
+              delete window.__risqueArtemisLeavingCardplay;
+            } catch (eClrLeave) {
+              /* ignore */
+            }
+          }
+        }, 0);
+      }
+
       function finishLeaveCardplay() {
+        if (window.risqueArtemisMode) {
+          if (typeof window.risqueArtemisBeginPhaseTransition === "function") {
+            window.risqueArtemisBeginPhaseTransition(nav.phase);
+          }
+          window.__risqueArtemisLeavingCardplay = true;
+          gs.phase = nav.phase;
+          applyCardplayIncomeExitToDisk(gs);
+          window.gameState = gs;
+          try {
+            localStorage.setItem("gameState", JSON.stringify(gs));
+          } catch (eArtemisSave) {
+            /* ignore */
+          }
+          if (
+            !window.risqueArtemisNetClient &&
+            typeof window.risqueArtemisUnmountPortableCardplay === "function"
+          ) {
+            window.risqueArtemisUnmountPortableCardplay();
+          }
+          artemisFinishLeaveCardplayDeferred(gs, nav, _nextLegacy);
+          return;
+        }
+
         function persistAndGo() {
           function doSave() {
             try {
@@ -1048,10 +1188,16 @@
 
       if (wait > 0) {
         setTimeout(finishLeaveCardplay, wait);
-      } else {
+      } else if (window.risqueArtemisMode) {
         finishLeaveCardplay();
+      } else {
+        requestAnimationFrame(function () {
+          finishLeaveCardplay();
+        });
       }
     }
+
+    var cardplaySkipToIncomeInFlight = false;
 
     function wireHostContinueToIncomeBtn(btn) {
       if (!btn || btn.dataset.risqueWired) return;
@@ -1161,6 +1307,20 @@
      */
     function mountCardplayHostIncomeGateUi() {
       if (window.risqueDisplayIsPublic) return;
+      if (
+        typeof window.risqueArtemisClientIsHostOnlyUi === "function" &&
+        !window.risqueArtemisClientIsHostOnlyUi()
+      ) {
+        if (
+          !window.risqueArtemisMode ||
+          !window.gameState ||
+          !window.gameState.risqueCardplayTvRecapPublished ||
+          typeof window.risqueArtemisIsMyTurn !== "function" ||
+          !window.risqueArtemisIsMyTurn(window.gameState)
+        ) {
+          return;
+        }
+      }
       window.__risqueCardplayHostIncomeOnly = true;
       var inner = '<div class="cardplay-host-income-gate" id="cardplay-host-income-gate-root">' + cardplayHostIncomeGateInnerHtml() + "</div>";
       var slot = document.getElementById("risque-phase-content");
@@ -1191,6 +1351,31 @@
           window.risqueRuntimeHud.syncPosition();
         });
       }
+    }
+
+    function artemisCardplayRecapAckSatisfiedLocal() {
+      if (cardplayRecapAckSatisfied()) return true;
+      if (!window.risqueArtemisMode) return false;
+      var req = window.gameState && window.gameState.risquePublicCardplayRecapAckRequiredSeq;
+      if (req == null || req === "") return true;
+      if (typeof window.risquePublicBookSequencePhase === "function") {
+        return window.risquePublicBookSequencePhase() === "done";
+      }
+      return false;
+    }
+
+    function artemisCardplayRecapProcessingDoneLocal(reqSeq) {
+      if (!needAckForSeq(reqSeq)) return true;
+      if (cardplayIsPublicProcessingDone(reqSeq)) return true;
+      if (!window.risqueArtemisMode) return false;
+      if (typeof window.risquePublicBookSequencePhase === "function") {
+        return window.risquePublicBookSequencePhase() === "done";
+      }
+      return false;
+    }
+
+    function needAckForSeq(reqSeq) {
+      return reqSeq != null && reqSeq !== "";
     }
 
     function refreshHostIncomeGateUi() {
@@ -1252,8 +1437,15 @@
         aerialCounterRow.setAttribute("hidden", "");
       }
       var counterHold = !!(needAck && cardplayAerialCounterHoldActive(reqSeq));
-      var publicDone = !needAck || cardplayIsPublicProcessingDone(reqSeq);
-      var ackOk = (!needAck || cardplayRecapAckSatisfied()) && !counterHold && publicDone;
+      var publicDone = window.risqueArtemisMode
+        ? artemisCardplayRecapProcessingDoneLocal(reqSeq)
+        : !needAck || cardplayIsPublicProcessingDone(reqSeq);
+      var ackOk =
+        (window.risqueArtemisMode
+          ? artemisCardplayRecapAckSatisfiedLocal()
+          : !needAck || cardplayRecapAckSatisfied()) &&
+        !counterHold &&
+        publicDone;
       if (autoMsg) {
         autoMsg.textContent = ackOk
           ? "Card processing complete. Moving to income..."
@@ -1279,6 +1471,18 @@
     }
 
     function updateCardplayTvGateVisibility() {
+      if (
+        window.risqueArtemisNetClient &&
+        typeof window.risqueArtemisClientIsHostOnlyUi === "function" &&
+        !window.risqueArtemisClientIsHostOnlyUi()
+      ) {
+        var wrapClient = document.getElementById("cardplay-continue-income-wrap");
+        if (wrapClient) {
+          wrapClient.setAttribute("hidden", "");
+          wrapClient.classList.remove("cardplay-continue-income-wrap--visible");
+        }
+        return;
+      }
       if (window.__risqueCardplayHostIncomeOnly) {
         refreshHostIncomeGateUi();
         return;
@@ -1438,6 +1642,9 @@
         return;
       }
       normalizeAllPlayerCards(gameState);
+      if (typeof window.risqueArtemisEnsurePresetCardplayHands === "function") {
+        window.risqueArtemisEnsurePresetCardplayHands(gameState);
+      }
       normalizeCardplayRecapForCurrentPlayer(gameState);
       if (
         window.gameUtils &&
@@ -1446,6 +1653,9 @@
         window.gameUtils.clearStaleConquestCardplayFieldsUnlessChain(gameState);
       }
       gameState.risqueCardplaySuppressPublicSpectator = true;
+      if (window.risqueArtemisMode) {
+        publishArtemisCardplayWaitingToMirror();
+      }
       const currentPlayer = gameState.players.find(p => p.name === gameState.currentPlayer);
       if (!currentPlayer) {
         logToStorage('Current player not found');
@@ -1457,6 +1667,31 @@
         return;
       }
       if (window.risqueDisplayIsPublic) {
+        var artemisActiveClient =
+          window.risqueArtemisMode &&
+          window.risqueArtemisNetClient &&
+          typeof window.risqueArtemisIsMyTurn === "function" &&
+          window.risqueArtemisIsMyTurn(gameState);
+        if (artemisActiveClient) {
+          if (typeof window.risqueArtemisEnterClientPlayMode === "function") {
+            window.risqueArtemisEnterClientPlayMode();
+          } else {
+            window.risqueArtemisClientPlaying = true;
+            window.risqueDisplayIsPublic = false;
+            window.risqueDisplayMode = "host";
+            document.documentElement.classList.remove("risque-view-public");
+            document.documentElement.classList.add("risque-view-host");
+            document.body.classList.remove("risque-view-public");
+            document.body.classList.add("risque-view-host");
+          }
+        } else if (
+          window.risqueArtemisNetClient &&
+          window.risqueArtemisClientPlaying &&
+          typeof window.risqueArtemisIsMyTurn === "function" &&
+          window.risqueArtemisIsMyTurn(gameState)
+        ) {
+          /* Active ARTEMIS laptop — full controls even if display flag lagged. */
+        } else {
         logToStorage("Cardplay public view: HUD + map; card play is host-only");
         const uiPub = document.getElementById("ui-overlay");
         if (typeof window.risqueDismissAttackPrompt === "function") {
@@ -1503,8 +1738,12 @@
           window.gameUtils.renderStats(window.gameState);
         });
         return;
+        }
       }
       // Normalize current player cards too (canonical names + unique ids for compact grid / getUnplayedCards).
+      if (!Array.isArray(currentPlayer.cards)) {
+        currentPlayer.cards = [];
+      }
       var seenCur = {};
       currentPlayer.cards = currentPlayer.cards
         .map(function (card) {
@@ -1672,9 +1911,25 @@
         hudHintInitial +
         "</div>" +
         "</div>" +
-        '<div id="cardplay-staging-wrap" class="cardplay-staging-wrap" hidden>' +
-        '<div id="cardplay-staging-grid" class="cardplay-card-row cardplay-staging-grid"></div>' +
-        "</div>" +
+        (function () {
+          var artemisCp = !!window.risqueArtemisMode;
+          var stagingCls =
+            "cardplay-staging-wrap" + (artemisCp ? " cardplay-staging-wrap--artemis-dual" : "");
+          var stagingHidden = artemisCp ? "" : " hidden";
+          var stagingHint = artemisCp
+            ? '<p id="cardplay-staging-empty-hint" class="cardplay-compact-msg cardplay-staging-empty-hint">Tap CARD or BOOK, then pick cards here.</p>'
+            : "";
+          return (
+            '<div id="cardplay-staging-wrap" class="' +
+            stagingCls +
+            '"' +
+            stagingHidden +
+            ">" +
+            '<div id="cardplay-staging-grid" class="cardplay-card-row cardplay-staging-grid"></div>' +
+            stagingHint +
+            "</div>"
+          );
+        })() +
         "</div>" +
         '<div id="cardplay-continue-income-wrap" class="cardplay-continue-income-wrap cardplay-continue-income-wrap--host" hidden>' +
         '<button type="button" id="cardplay-continue-income-btn" class="cardplay-button cardplay-btn-compact cardplay-continue-income-btn">Continue to Income</button>' +
@@ -1696,8 +1951,20 @@
           if (grid && cardHtmlCompact) grid.innerHTML = cardHtmlCompact;
         }
         var rhRoot = document.getElementById("runtime-hud-root");
-        /* Panel-only layout: hide HUD stats + full control panel (dice/voice/slots/log); card UI lives in #risque-phase-content. */
-        if (rhRoot) rhRoot.classList.add("runtime-hud-root--cardplay-panel-only");
+        if (rhRoot) {
+          if (window.risqueArtemisMode) {
+            /* ARTEMIS: omni HUD + control voice; Apollo panel-only flex drives hand/staging split. */
+            rhRoot.classList.add("runtime-hud-root--artemis-cardplay");
+            rhRoot.classList.add("runtime-hud-root--artemis-compact");
+            rhRoot.classList.add("runtime-hud-root--cardplay-panel-only");
+          } else {
+            /* Panel-only layout: hide HUD stats + full control panel (dice/voice/slots/log); card UI lives in #risque-phase-content. */
+            rhRoot.classList.add("runtime-hud-root--cardplay-panel-only");
+          }
+        }
+        if (window.risqueArtemisMode && typeof window.risqueArtemisEnsureCardplayDualPane === "function") {
+          window.risqueArtemisEnsureCardplayDualPane(gameState);
+        }
         requestAnimationFrame(function () {
           if (window.risqueRuntimeHud) window.risqueRuntimeHud.syncPosition();
         });
@@ -1734,10 +2001,58 @@
           window.gameUtils.showError(`Button ${button.id} not found`);
         }
       });
+      window.__risqueCardplayButtonHandlers = {
+        "play-card-button": handlePlayCard,
+        "select-cards-button": handleSelectCards,
+        "reset-button": handleReset,
+        "next-phase-button": handleCompactConfirmOrNext,
+        "cardplay-panel-confirm-btn": handleCompactConfirmOrNext,
+        "cardplay-skip-income-btn": handleSkipCardplayToIncome
+      };
+      window.risqueArtemisRewireCardplayButtons = function () {
+        var map = window.__risqueCardplayButtonHandlers;
+        if (!map) return false;
+        var wired = false;
+        Object.keys(map).forEach(function (id) {
+          var el = document.getElementById(id);
+          var fn = map[id];
+          if (!el || typeof fn !== "function") return;
+          el.onclick = fn;
+          wired = true;
+        });
+        return wired;
+      };
+      if (!window.__risqueCardplayDelegatedClicks) {
+        window.__risqueCardplayDelegatedClicks = true;
+        document.addEventListener(
+          "click",
+          function (ev) {
+            var slot = document.getElementById("risque-phase-content");
+            if (!slot || !slot.querySelector(".cardplay-compact-root")) return;
+            var t = ev.target;
+            if (!t || !t.closest) return;
+            if (!t.closest("#risque-phase-content")) return;
+            var btn = t.closest(
+              "#play-card-button, #select-cards-button, #reset-button, #next-phase-button, #cardplay-panel-confirm-btn, #cardplay-skip-income-btn"
+            );
+            if (!btn || btn.disabled) return;
+            var map = window.__risqueCardplayButtonHandlers;
+            if (!map) return;
+            var fn = map[btn.id];
+            if (typeof fn !== "function") return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            fn();
+          },
+          true
+        );
+      }
+      window.__risqueArtemisCardplayControlsLive = true;
       var skipIncBtn = document.getElementById("cardplay-skip-income-btn");
       if (skipIncBtn) {
         skipIncBtn.addEventListener("click", handleSkipCardplayToIncome);
       }
+      window.risqueArtemisTriggerCardplaySkipToIncome = handleSkipCardplayToIncome;
       if (hasCards) {
         if (useHud) {
           rebuildCardplayHandAndStaging();
@@ -1778,7 +2093,11 @@
         setCardplayError(`You have ${currentPlayer.cardCount} cards. Must play/dump to 4 or fewer.`);
       }
       localStorage.setItem('gameState', JSON.stringify(gameState));
-      if (!window.risqueDisplayIsPublic && typeof window.risqueMirrorPushGameState === "function") {
+      if (
+        !window.risqueDisplayIsPublic &&
+        !window.__risqueArtemisCardplayMountInProgress &&
+        typeof window.risqueMirrorPushGameState === "function"
+      ) {
         window.risqueMirrorPushGameState();
       }
       refreshCardplayPublicHandCountMirror();
@@ -1902,11 +2221,43 @@
         wireCardplayCardClicks(stagingGrid);
       }
       if (stagingWrap && isCardplayHudCompact()) {
+        var artemisTwoPane =
+          window.risqueArtemisMode &&
+          (function () {
+            if (window.risqueArtemisHost && !window.risqueArtemisNetClient) return true;
+            if (
+              typeof window.risqueArtemisIsMyTurn === "function" &&
+              window.risqueArtemisIsMyTurn(window.gameState)
+            ) {
+              return true;
+            }
+            return false;
+          })();
         const showStaging =
+          artemisTwoPane ||
           isBookSelectionMode ||
           isIndividualSelectionMode ||
           stagingInfo.refs.length > 0;
-        stagingWrap.hidden = !showStaging;
+        if (artemisTwoPane) {
+          stagingWrap.classList.add("cardplay-staging-wrap--artemis-dual");
+          stagingWrap.removeAttribute("hidden");
+          var stagingHint = document.getElementById("cardplay-staging-empty-hint");
+          if (!stagingHint) {
+            stagingHint = document.createElement("p");
+            stagingHint.id = "cardplay-staging-empty-hint";
+            stagingHint.className = "cardplay-compact-msg cardplay-staging-empty-hint";
+            stagingHint.textContent = "Tap CARD or BOOK, then pick cards here.";
+            stagingWrap.appendChild(stagingHint);
+          }
+          if (stagingHint) {
+            stagingHint.hidden = stagingInfo.refs.length > 0;
+          }
+        } else {
+          stagingWrap.hidden = !showStaging;
+        }
+      }
+      if (typeof window.risqueArtemisEnsureCardplayDualPane === "function") {
+        window.risqueArtemisEnsureCardplayDualPane(window.gameState);
       }
       refreshValidBookReminder();
     }
@@ -3721,6 +4072,59 @@
       return books.concat(singles);
     }
 
+    /** ARTEMIS: observers see "{Name} is in card play — waiting" while the active laptop plays privately. */
+    function publishArtemisCardplayWaitingToMirror() {
+      if (!window.risqueArtemisMode || !window.gameState) return;
+      if (typeof window.risqueArtemisStampCardplayWaitingMirror === "function") {
+        window.risqueArtemisStampCardplayWaitingMirror(window.gameState);
+      } else {
+        if (window.gameState.risqueCardplayTvRecapPublished) return;
+        if (
+          window.gameState.risquePublicCardplayRecap &&
+          Array.isArray(window.gameState.risquePublicCardplayRecap.lines) &&
+          window.gameState.risquePublicCardplayRecap.lines.length > 0
+        ) {
+          return;
+        }
+        var nm = String(window.gameState.currentPlayer || "Player").trim();
+        if (!nm) return;
+        var disp = nm.charAt(0).toUpperCase() + nm.slice(1);
+        window.gameState.risquePublicCardplayPrimary = disp.toUpperCase() + " IS IN CARD PLAY";
+        window.gameState.risquePublicCardplayReport = "WAITING...";
+        delete window.gameState.risquePublicCardplayBookCards;
+      }
+      try {
+        localStorage.setItem("gameState", JSON.stringify(window.gameState));
+      } catch (eWaitMir) {
+        /* ignore */
+      }
+      if (typeof window.risqueMirrorPushGameState === "function") {
+        window.risqueMirrorPushGameState();
+      }
+    }
+
+    function mountArtemisCardplayPostRecapChrome() {
+      if (typeof window.risqueArtemisSyncCardplayRecapUi === "function") {
+        try {
+          window.risqueArtemisSyncCardplayRecapUi(window.gameState);
+        } catch (eArtRecap) {
+          /* ignore */
+        }
+      }
+      var showIncomeGate = false;
+      if (window.risqueArtemisHost && !window.risqueArtemisNetClient) {
+        showIncomeGate = true;
+      } else if (
+        typeof window.risqueArtemisIsMyTurn === "function" &&
+        window.risqueArtemisIsMyTurn(window.gameState)
+      ) {
+        showIncomeGate = true;
+      }
+      if (showIncomeGate) {
+        mountCardplayHostIncomeGateUi();
+      }
+    }
+
     function publishCardplayRecapToPublicMirror() {
       clearCardplayPublicBoardSnapshot();
       var nextSeq = (Number(window.gameState.risquePublicCardplayRecapSeq) || 0) + 1;
@@ -3838,6 +4242,7 @@
     }
 
     function handleSkipCardplayToIncome() {
+      if (cardplaySkipToIncomeInFlight) return;
       if (pendingElimination) {
         setCardplayError("Resolve elimination before skipping.");
         return;
@@ -3875,6 +4280,16 @@
         delete window.gameState.risquePublicCardplayRecapAckRequiredSeq;
         delete window.gameState.risquePublicCardplayAerialSkipHostDecisionSeq;
       } catch (eSk) {}
+      var skipBtn = document.getElementById("cardplay-skip-income-btn");
+      if (skipBtn) {
+        skipBtn.disabled = true;
+        try {
+          skipBtn.textContent = "LEAVING…";
+        } catch (eSkLbl) {
+          /* ignore */
+        }
+      }
+      cardplaySkipToIncomeInFlight = true;
       proceedCardplayToIncome(0);
     }
 
@@ -3933,7 +4348,11 @@
         !document.getElementById("cardplay-host-income-gate-root") &&
         !window.risqueDisplayIsPublic
       ) {
-        mountCardplayHostIncomeGateUi();
+        if (window.risqueArtemisMode) {
+          mountArtemisCardplayPostRecapChrome();
+        } else if (!window.risqueArtemisNetClient || window.risqueArtemisHost) {
+          mountCardplayHostIncomeGateUi();
+        }
       }
       const currentPlayer = window.gameState.players.find(p => p.name === window.gameState.currentPlayer);
       if (currentPlayer.cardCount > 4) {
@@ -3947,7 +4366,11 @@
         try {
           localStorage.setItem('gameState', JSON.stringify(window.gameState));
         } catch (ePub) {}
-        mountCardplayHostIncomeGateUi();
+        if (window.risqueArtemisMode) {
+          mountArtemisCardplayPostRecapChrome();
+        } else if (!window.risqueArtemisNetClient || window.risqueArtemisHost) {
+          mountCardplayHostIncomeGateUi();
+        }
         return;
       }
       if (hadPlays && !cardplayRecapAckSatisfied()) {
@@ -4006,6 +4429,10 @@
       /* ignore */
     }
     gs.risqueCardplaySuppressPublicSpectator = true;
+    if (typeof window.risqueArtemisEnsurePresetCardplayHands === "function") {
+      window.risqueArtemisEnsurePresetCardplayHands(gs);
+    }
+    window.gameState = gs;
     window.__risqueCardplayHostIncomeOnly = false;
     delete gs.risqueCardplayTvRecapPublished;
     recapMirrorSentForCommit = false;
@@ -4037,6 +4464,41 @@
     if (typeof window.risqueRepaintHostMapSoon === "function" && window.gameState) {
       window.risqueRepaintHostMapSoon(window.gameState);
     }
+
+    window.risqueArtemisMountCardplayIncomeGateIfNeeded = function () {
+      if (!window.risqueArtemisMode || !window.gameState) return;
+      if (String(window.gameState.phase || "") !== "cardplay") return;
+      if (!window.gameState.risqueCardplayTvRecapPublished) return;
+      if (document.getElementById("cardplay-host-income-gate-root")) {
+        refreshHostIncomeGateUi();
+        return;
+      }
+      var showGate =
+        (window.risqueArtemisHost && !window.risqueArtemisNetClient) ||
+        (typeof window.risqueArtemisIsMyTurn === "function" &&
+          window.risqueArtemisIsMyTurn(window.gameState));
+      if (showGate) {
+        mountCardplayHostIncomeGateUi();
+      }
+    };
+
+    window.risqueArtemisOnCardplayRecapFinished = function (gs) {
+      if (!window.risqueArtemisMode) return;
+      gs = gs || window.gameState;
+      if (!gs || String(gs.phase || "") !== "cardplay") return;
+      if (typeof window.risqueArtemisMountCardplayIncomeGateIfNeeded === "function") {
+        window.risqueArtemisMountCardplayIncomeGateIfNeeded();
+      }
+      refreshHostIncomeGateUi();
+      var mine =
+        (typeof window.risqueArtemisIsMyTurn === "function" && window.risqueArtemisIsMyTurn(gs)) ||
+        (window.risqueArtemisHost && !window.risqueArtemisNetClient);
+      if (!mine) return;
+      if (window.__risqueHostAutoIncomeTimer) return;
+      if (!artemisCardplayRecapAckSatisfiedLocal()) return;
+      if (!artemisCardplayRecapProcessingDoneLocal(gs.risquePublicCardplayRecapAckRequiredSeq)) return;
+      proceedCardplayToIncome(180);
+    };
   }
 
   window.risquePhases = window.risquePhases || {};

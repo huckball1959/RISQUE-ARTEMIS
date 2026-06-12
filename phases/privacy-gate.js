@@ -164,7 +164,7 @@
     var onContinue = opts.onContinue;
     var logFn = opts.onLog;
     if (typeof onContinue !== "function") return;
-    if (window.risqueDisplayIsPublic) {
+    if (window.risqueDisplayIsPublic || window.risqueArtemisMode) {
       onContinue();
       return;
     }

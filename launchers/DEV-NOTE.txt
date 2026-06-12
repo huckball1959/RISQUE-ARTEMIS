@@ -1,0 +1,20 @@
+ARTEMIS launchers — developer note
+==================================
+
+CLIENTS COPY ONE FILE: launchers/client/ARTEMIS-JOIN.bat
+  - First run saves host IP + seat (2/3) beside the bat
+  - Always opens http://HOST:5700/join/p2 or /join/p3
+  - Never edit URL params on clients
+
+TRAFFIC COP (host decides the test):
+  launchers/active-mode.txt — written by host START scripts:
+    START-ARTEMIS.bat      → normal
+    START-CYCLE-PROBE.bat  → cycle
+    START-PROBE.bat        → turn-probe
+
+  launchers/profiles.json modeMap routes p2/p3/host per mode.
+  Also edit profile params + cacheVersion here for ?v= and mock flags.
+
+Test:
+  http://127.0.0.1:5700/join/
+  http://127.0.0.1:5700/api/artemis/launchers

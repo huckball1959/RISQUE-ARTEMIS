@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ARTEMIS — Join</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: #0b1220;
+      color: #e8eef8;
+      padding: 24px;
+    }
+    h1 { margin: 0 0 8px; font-size: 1.6rem; }
+    .sub { color: #9fb0cc; margin-bottom: 24px; }
+    .grid { display: grid; gap: 12px; max-width: 520px; }
+    a.btn {
+      display: block;
+      padding: 16px 18px;
+      border-radius: 10px;
+      text-decoration: none;
+      color: #fff;
+      font-weight: 600;
+      font-size: 1.05rem;
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+    a.btn:hover { filter: brightness(1.08); }
+    .host { background: #1d4ed8; }
+    .p2 { background: #047857; }
+    .p3 { background: #7c3aed; }
+    .cycle { background: #0f766e; }
+    .probe { background: #b45309; }
+    .section { margin-top: 28px; color: #9fb0cc; font-size: 0.9rem; }
+    code { background: #1e293b; padding: 2px 6px; border-radius: 4px; }
+    .ok { color: #86efac; }
+    .bad { color: #fca5a5; }
+  </style>
+</head>
+<body>
+  <h1>ARTEMIS Join</h1>
+  <p class="sub">Pick your seat. URLs always come from the host — no stale batch files.</p>
+  <p id="status" class="sub">Checking server…</p>
+  <p id="mode" class="sub"></p>
+
+  <div class="section">Normal game</div>
+  <div class="grid">
+    <a class="btn host" href="/join/host">Guido — Host (P1)</a>
+    <a class="btn p2" href="/join/p2">Mictor — Player 2</a>
+    <a class="btn p3" href="/join/p3">Nooch — Player 3</a>
+  </div>
+
+  <div class="section">Cycle probe (18-step shell test)</div>
+  <div class="grid">
+    <a class="btn cycle" href="/join/host-cycle">Guido — Cycle probe host</a>
+    <a class="btn cycle" href="/join/p2-cycle">Mictor — Cycle probe</a>
+    <a class="btn cycle" href="/join/p3-cycle">Nooch — Cycle probe</a>
+  </div>
+
+  <div class="section">Turn probe (legacy probe page)</div>
+  <div class="grid">
+    <a class="btn probe" href="/join/p2-probe">Mictor — Turn probe</a>
+    <a class="btn probe" href="/join/p3-probe">Nooch — Turn probe</a>
+  </div>
+
+  <div class="section">
+    Client laptops: bookmark this page as
+    <code id="bookmark"></code>
+    <br /><br />
+    One-time client setup: copy <code>ARTEMIS-JOIN.bat</code> from
+    <code>/launchers/client/</code> — the only file clients need.
+  </div>
+
+  <script>
+    (function () {
+      var el = document.getElementById("status");
+      var modeEl = document.getElementById("mode");
+      var bm = document.getElementById("bookmark");
+      bm.textContent = location.origin + "/join/";
+      fetch("/api/artemis/launchers")
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (j.ok) {
+            el.innerHTML = 'Server OK — build <span class="ok">' + (j.cacheVersion || "?") + "</span>";
+            modeEl.innerHTML =
+              'Traffic cop mode: <span class="ok">' + (j.activeMode || "normal") + "</span>" +
+              " — clients with ARTEMIS-JOIN.bat follow this automatically.";
+          } else {
+            el.innerHTML = '<span class="bad">Launcher config error</span>';
+          }
+        })
+        .catch(function () {
+          el.innerHTML = '<span class="bad">Cannot reach ARTEMIS server</span>';
+        });
+    })();
+  </script>
+</body>
+</html>

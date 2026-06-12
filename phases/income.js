@@ -26,6 +26,87 @@
     }
   }
 
+  var incomeConfirmInFlight = false;
+  var __risqueIncomeInitKey = "";
+
+  function incomeArtemisMountKey(gs) {
+    if (!gs) return "";
+    return (
+      String(gs.phase || "income") +
+      ":" +
+      String(gs.currentPlayer || "") +
+      ":" +
+      String(gs.round || 0)
+    );
+  }
+
+  function artemisClearIncomeTvGates(gs) {
+    if (!window.risqueArtemisMode || !gs) return;
+    try {
+      delete gs.risquePublicIncomeGateToken;
+    } catch (eGate) {
+      /* ignore */
+    }
+  }
+
+  function artemisFastLeaveIncome(gs, destUrl, targetPhase) {
+    if (!window.risqueArtemisMode) return false;
+    if (incomeConfirmInFlight) return true;
+    incomeConfirmInFlight = true;
+    if (typeof window.risqueArtemisTeardownCardplayRecapChrome === "function") {
+      window.risqueArtemisTeardownCardplayRecapChrome();
+    }
+    if (typeof window.risqueArtemisBeginPhaseTransition === "function") {
+      window.risqueArtemisBeginPhaseTransition(targetPhase || "deploy");
+    }
+    var dest = destUrl;
+    if (typeof dest === "string" && dest.indexOf("deploy2.html") !== -1) {
+      dest = "game.html?phase=deploy&kind=turn";
+    }
+    window.gameState = gs;
+    if (typeof window.risqueArtemisFlushClientStatePush === "function") {
+      window.risqueArtemisFlushClientStatePush(gs);
+    }
+    var navOk = false;
+    try {
+      navOk =
+        typeof window.risqueNavigateGameHtmlSoft === "function" &&
+        window.risqueNavigateGameHtmlSoft(dest);
+    } catch (eNav) {
+      navOk = false;
+    }
+    if (!navOk) {
+      try {
+        if (window.risqueNavigateWithFade) {
+          window.risqueNavigateWithFade(dest);
+          navOk = true;
+        } else {
+          window.location.href = dest;
+          navOk = true;
+        }
+      } catch (eHref) {
+        navOk = false;
+      }
+    }
+    if (!navOk) {
+      incomeConfirmInFlight = false;
+      return false;
+    }
+    if (typeof window.risqueArtemisSyncFromState === "function") {
+      window.risqueArtemisSyncFromState(gs);
+    }
+    if (typeof window.risqueArtemisEndPhaseTransition === "function") {
+      window.risqueArtemisEndPhaseTransition(gs);
+    }
+    if (typeof window.risqueFlushMirrorPush === "function") {
+      window.risqueFlushMirrorPush();
+    }
+    setTimeout(function () {
+      incomeConfirmInFlight = false;
+    }, 3000);
+    return true;
+  }
+
   function injectStyles() {
     var legacy = document.getElementById("risque-income-styles");
     if (legacy) legacy.remove();
@@ -289,6 +370,7 @@
           }, 2000);
           return;
         }
+        artemisClearIncomeTvGates(gameState);
         var currentPlayer = gameState.players.find(function (p) {
           return (
             p &&
@@ -425,20 +507,25 @@
           }
         }
         applyHostConIncomeGrid();
-        requestAnimationFrame(function () {
-          applyHostConIncomeGrid();
-          if (typeof window.risqueMirrorPushGameState === "function") {
-            window.risqueMirrorPushGameState();
-          }
-        });
-        setTimeout(function () {
-          applyHostConIncomeGrid();
-          if (typeof window.risqueMirrorPushGameState === "function") {
-            window.risqueMirrorPushGameState();
-          }
-        }, 120);
+        if (window.risqueArtemisMode) {
+          requestAnimationFrame(applyHostConIncomeGrid);
+        } else {
+          requestAnimationFrame(function () {
+            applyHostConIncomeGrid();
+            if (typeof window.risqueMirrorPushGameState === "function") {
+              window.risqueMirrorPushGameState();
+            }
+          });
+          setTimeout(function () {
+            applyHostConIncomeGrid();
+            if (typeof window.risqueMirrorPushGameState === "function") {
+              window.risqueMirrorPushGameState();
+            }
+          }, 120);
+        }
 
         var handleConfirm = function () {
+          if (incomeConfirmInFlight) return;
           logToStorage("Con-income confirm clicked");
           try {
             delete gameState.risquePublicIncomeBreakdown;
@@ -511,6 +598,11 @@
               window.risqueMirrorPushGameState();
             }
             logToStorage("Con-income zero bank → attack", { phase: gameState.phase });
+            if (
+              artemisFastLeaveIncome(gameState, "game.html?phase=attack", "attack")
+            ) {
+              return;
+            }
             window.gameUtils.showError("No troops available to deploy. Returning to attack.");
             setTimeout(function () {
               navigateGameHtmlPreferSoft("game.html?phase=attack");
@@ -532,6 +624,15 @@
               window.risqueMirrorPushGameState();
             }
             logToStorage("Con-income → deploy (conquest)", { bankValue: currentPlayer.bankValue });
+            if (
+              artemisFastLeaveIncome(
+                gameState,
+                "game.html?phase=deploy&kind=turn&conquestAfterDeploy=1",
+                "deploy"
+              )
+            ) {
+              return;
+            }
             setTimeout(function () {
               navigateGameHtmlPreferSoft(
                 "game.html?phase=deploy&kind=turn&conquestAfterDeploy=1"
@@ -557,13 +658,21 @@
             incSlot.innerHTML = "";
             var incStack = document.createElement("div");
             incStack.className = "income-hud-phase-stack";
-            var incBtn = document.createElement("button");
-            incBtn.type = "button";
-            incBtn.className = "income-button visible income-button--hud income-button--hud-solo";
-            incBtn.textContent = "Continue";
-            incStack.appendChild(incBtn);
+            if (!window.risqueArtemisMode) {
+              var incBtn = document.createElement("button");
+              incBtn.type = "button";
+              incBtn.className = "income-button visible income-button--hud income-button--hud-solo";
+              incBtn.textContent = "Continue";
+              incStack.appendChild(incBtn);
+              confirmButton = incBtn;
+            }
             incSlot.appendChild(incStack);
-            confirmButton = incBtn;
+            if (
+              window.risqueArtemisMode &&
+              typeof window.risqueArtemisEnsureIncomeGodButton === "function"
+            ) {
+              window.risqueArtemisEnsureIncomeGodButton(gameState);
+            }
           }
           requestAnimationFrame(function () {
             if (window.risqueRuntimeHud && window.risqueRuntimeHud.syncPosition) {
@@ -637,8 +746,41 @@
     }
 
     function incomeInit() {
+      var gameStateEarly = window.gameState;
+      var initKey =
+        gameStateEarly && gameStateEarly.currentPlayer
+          ? String(gameStateEarly.phase || "income") +
+            ":" +
+            String(gameStateEarly.currentPlayer) +
+            ":" +
+            String(gameStateEarly.round || 0)
+          : "";
+      if (
+        initKey &&
+        __risqueIncomeInitKey === initKey &&
+        (document.querySelector("#risque-phase-content .income-button") ||
+          (window.risqueArtemisMode &&
+            document.getElementById("risque-artemis-income-god-btn"))) &&
+        typeof window.risqueArtemisTriggerIncomeContinue === "function"
+      ) {
+        if (
+          gameStateEarly &&
+          gameStateEarly.risquePublicIncomeBreakdown &&
+          typeof window.risqueHostApplyIncomeBreakdownVoice === "function"
+        ) {
+          window.risqueHostApplyIncomeBreakdownVoice(gameStateEarly);
+        }
+        return;
+      }
+      if (initKey) __risqueIncomeInitKey = initKey;
       console.log("[Income] Initializing income phase");
       try {
+        if (typeof window.risqueArtemisTeardownCardplayRecapChrome === "function") {
+          window.risqueArtemisTeardownCardplayRecapChrome();
+        }
+        if (typeof window.risqueArtemisStripCardplayHudClassesForIncome === "function") {
+          window.risqueArtemisStripCardplayHudClassesForIncome();
+        }
         var uiOverlay = document.getElementById("ui-overlay");
         if (!uiOverlay) {
           console.error("[Income] UI overlay not found");
@@ -655,6 +797,7 @@
           return;
         }
         ensureContinentCollectionCounts(gameState);
+        artemisClearIncomeTvGates(gameState);
         var currentPlayer = gameState.players.find(function (p) {
           return p.name === gameState.currentPlayer;
         });
@@ -713,6 +856,9 @@
           bookBonus: bookBonus,
           total: total
         };
+        if (typeof window.risqueHostReplaceShellGameState === "function") {
+          window.risqueHostReplaceShellGameState(gameState);
+        }
         var useHud = !!window.risqueRuntimeHud;
         var incomeDoneButtonLabel = useHud ? "Continue" : "Confirm";
         var btnClass =
@@ -806,9 +952,6 @@
           } catch (eCv) {
             /* ignore */
           }
-          if (typeof window.risqueMirrorPushGameState === "function") {
-            window.risqueMirrorPushGameState();
-          }
           function applyHostIncomeVoiceDom() {
             var gs = window.gameState || gameState;
             if (!gs || !gs.risquePublicIncomeBreakdown) return;
@@ -835,18 +978,26 @@
             }
           }
           applyHostIncomeVoiceDom();
-          requestAnimationFrame(function () {
-            applyHostIncomeVoiceDom();
+          if (window.risqueArtemisMode) {
+            requestAnimationFrame(applyHostIncomeVoiceDom);
+            setTimeout(applyHostIncomeVoiceDom, 120);
+          } else {
             if (typeof window.risqueMirrorPushGameState === "function") {
               window.risqueMirrorPushGameState();
             }
-          });
-          setTimeout(function () {
-            applyHostIncomeVoiceDom();
-            if (typeof window.risqueMirrorPushGameState === "function") {
-              window.risqueMirrorPushGameState();
-            }
-          }, 120);
+            requestAnimationFrame(function () {
+              applyHostIncomeVoiceDom();
+              if (typeof window.risqueMirrorPushGameState === "function") {
+                window.risqueMirrorPushGameState();
+              }
+            });
+            setTimeout(function () {
+              applyHostIncomeVoiceDom();
+              if (typeof window.risqueMirrorPushGameState === "function") {
+                window.risqueMirrorPushGameState();
+              }
+            }, 120);
+          }
           if (typeof window.risqueClearSpectatorFocus === "function") {
             window.risqueClearSpectatorFocus();
           }
@@ -855,12 +1006,20 @@
             incSlot.innerHTML = "";
             var incStack = document.createElement("div");
             incStack.className = "income-hud-phase-stack";
-            var incBtn = document.createElement("button");
-            incBtn.type = "button";
-            incBtn.className = btnClass;
-            incBtn.textContent = incomeDoneButtonLabel;
-            incStack.appendChild(incBtn);
+            if (!window.risqueArtemisMode) {
+              var incBtn = document.createElement("button");
+              incBtn.type = "button";
+              incBtn.className = btnClass;
+              incBtn.textContent = incomeDoneButtonLabel;
+              incStack.appendChild(incBtn);
+            }
             incSlot.appendChild(incStack);
+            if (
+              window.risqueArtemisMode &&
+              typeof window.risqueArtemisEnsureIncomeGodButton === "function"
+            ) {
+              window.risqueArtemisEnsureIncomeGodButton(gameState);
+            }
           }
           /* Do not re-apply .runtime-hud-root--cardplay-panel-only during host income: that class hides
            * #hud-main-panel, which contains #control-voice-text where the mirrored income grid is painted
@@ -889,7 +1048,7 @@
         var PUBLIC_INCOME_GATE_KEY = "risquePublicIncomeGateAck";
         var incomeGateToken = gameState.risquePublicIncomeGateToken;
         function incomeGateAckMatches() {
-          if (!incomeGateToken || window.risqueDisplayIsPublic) return true;
+          if (!incomeGateToken || window.risqueDisplayIsPublic || window.risqueArtemisMode) return true;
           try {
             var raw = localStorage.getItem(PUBLIC_INCOME_GATE_KEY);
             var ack = raw ? JSON.parse(raw) : null;
@@ -939,8 +1098,13 @@
           }
           var handleConfirm = function () {
             logToStorage("Confirm button clicked");
+            if (incomeConfirmInFlight) return;
+            if (confirmButton.disabled) return;
             if (incomeGateToken && !window.risqueDisplayIsPublic && !incomeGateAckMatches()) {
               return;
+            }
+            if (window.risqueArtemisMode && typeof window.risqueArtemisBeginPhaseTransition === "function") {
+              window.risqueArtemisBeginPhaseTransition("deploy");
             }
             if (typeof window.risqueClearCardplayPublicSpectatorForMirror === "function") {
               window.risqueClearCardplayPublicSpectatorForMirror();
@@ -1000,8 +1164,21 @@
             }
             gameState.bookPlayedThisTurn = false;
             currentPlayer.bookValue = 0;
-            gameState.phase = "income";
+            gameState.phase = "deploy";
+            gameState.risqueMirrorDeployRoute = "turn";
+            if (typeof window.risqueSetMirrorDeployRoute === "function") {
+              window.risqueSetMirrorDeployRoute("turn");
+            }
+            if (window.risqueArtemisMode && typeof window.risqueArtemisStampControlSlot === "function") {
+              window.risqueArtemisStampControlSlot(gameState);
+            }
+            if (typeof window.risqueArtemisClearTurnDeployHandoffFlags === "function") {
+              window.risqueArtemisClearTurnDeployHandoffFlags(gameState);
+            }
             var persisted = persistGameStateSafe(gameState);
+            if (typeof window.risquePersistHostGameState === "function") {
+              window.risquePersistHostGameState(gameState);
+            }
             logToStorage("Game state updated after income", {
               bankValue: currentPlayer.bankValue,
               phase: gameState.phase,
@@ -1015,20 +1192,37 @@
               );
             }
             if (uiOverlay) uiOverlay.classList.remove("fade-out");
-            setTimeout(function () {
-              var dest = legacyNext;
-              // Convert old legacy destination into runtime URL if needed.
-              /* Old continental / saved URLs pointed at deploy2.html; canonical deploy is game.html?phase=deploy&kind=turn */
-              if (typeof dest === "string" && dest.indexOf("deploy2.html") !== -1) {
-                dest = "game.html?phase=deploy&kind=turn";
+            var dest = legacyNext;
+            if (typeof dest === "string" && dest.indexOf("deploy2.html") !== -1) {
+              dest = "game.html?phase=deploy&kind=turn";
+            }
+            if (window.risqueArtemisMode) {
+              confirmButton.disabled = true;
+              if (artemisFastLeaveIncome(gameState, dest, "deploy")) {
+                return;
               }
+              confirmButton.disabled = false;
+              return;
+            }
+            confirmButton.disabled = true;
+            setTimeout(function () {
               navigateGameHtmlPreferSoft(dest);
             }, 0);
           };
+          window.risqueArtemisTriggerIncomeContinue = handleConfirm;
           confirmButton.addEventListener("click", handleConfirm);
           confirmButton.addEventListener("keydown", function (e) {
             if (e.key === "Enter" || e.key === " ") handleConfirm();
           });
+          if (window.risqueArtemisMode) {
+            if (typeof window.risqueScheduleMirrorPush === "function") {
+              window.risqueScheduleMirrorPush();
+            } else if (typeof window.risqueFlushMirrorPush === "function") {
+              window.risqueFlushMirrorPush();
+            } else if (typeof window.risqueMirrorPushGameState === "function") {
+              window.risqueMirrorPushGameState();
+            }
+          }
         } else {
           console.error("[Income] Confirm button not found");
           window.gameUtils.showError("Confirm button not found");
@@ -1062,6 +1256,30 @@
     }
 
     ensureContinentCollectionCounts(gameState);
+
+    if (!conquerIncome) {
+      if (window.__risqueIncomeMountInProgress) {
+        return;
+      }
+      var incomeStableKey = incomeArtemisMountKey(gameState);
+      if (
+        window.risqueArtemisMode &&
+        incomeStableKey &&
+        window.__risqueIncomeMountStableKey === incomeStableKey &&
+        (document.querySelector("#risque-phase-content .income-button") ||
+          (window.risqueArtemisMode &&
+            document.getElementById("risque-artemis-income-god-btn"))) &&
+        typeof window.risqueArtemisTriggerIncomeContinue === "function"
+      ) {
+        if (
+          gameState.risquePublicIncomeBreakdown &&
+          typeof window.risqueHostApplyIncomeBreakdownVoice === "function"
+        ) {
+          window.risqueHostApplyIncomeBreakdownVoice(gameState);
+        }
+        return;
+      }
+    }
 
     if (conquerIncome) {
       try {
@@ -1142,36 +1360,61 @@
       return;
     }
 
+    window.__risqueIncomeMountInProgress = true;
     try {
-      document.body.classList.remove("risque-con-income-mounted");
-    } catch (eRmCiBody) {
-      /* ignore */
-    }
+      try {
+        document.body.classList.remove("risque-con-income-mounted");
+      } catch (eRmCiBody) {
+        /* ignore */
+      }
 
-    applyRoundOneCardCap(gameState);
-    logToStorage("Player card counts on load", {
-      players: gameState.players.map(function (p) {
-        return { name: p.name, cardCount: p.cardCount, cards: p.cards };
-      })
-    });
-    try {
-      localStorage.setItem("gameState", JSON.stringify(sanitizeGameState(gameState)));
-    } catch (e2) {
-      /* ignore */
-    }
-
-    gameState.phase = "income";
-    try {
-      localStorage.setItem("gameState", JSON.stringify(gameState));
-    } catch (e3) {
-      /* ignore */
-    }
-
-    incomeInit();
-    if (window.gameUtils && window.gameUtils.resizeCanvas) {
-      requestAnimationFrame(function () {
-        window.gameUtils.resizeCanvas();
+      applyRoundOneCardCap(gameState);
+      logToStorage("Player card counts on load", {
+        players: gameState.players.map(function (p) {
+          return { name: p.name, cardCount: p.cardCount, cards: p.cards };
+        })
       });
+      try {
+        localStorage.setItem("gameState", JSON.stringify(sanitizeGameState(gameState)));
+      } catch (e2) {
+        /* ignore */
+      }
+
+      gameState.phase = "income";
+      try {
+        localStorage.setItem("gameState", JSON.stringify(gameState));
+      } catch (e3) {
+        /* ignore */
+      }
+
+      if (
+        window.risqueArtemisMode &&
+        window.risqueArtemisLobbyStarted &&
+        typeof window.risqueArtemisIsMyTurn === "function" &&
+        window.risqueArtemisIsMyTurn(gameState)
+      ) {
+        if (window.risqueArtemisNetClient) {
+          window.risqueArtemisClientPlaying = true;
+          window.risqueDisplayIsPublic = false;
+          window.risqueDisplayMode = "host";
+        }
+        document.documentElement.classList.remove("risque-view-public");
+        document.documentElement.classList.add("risque-view-host");
+        document.body.classList.remove("risque-view-public");
+        document.body.classList.add("risque-view-host");
+      }
+
+      incomeInit();
+      if (window.gameUtils && window.gameUtils.resizeCanvas) {
+        requestAnimationFrame(function () {
+          window.gameUtils.resizeCanvas();
+        });
+      }
+      if (window.gameState) {
+        window.__risqueIncomeMountStableKey = incomeArtemisMountKey(window.gameState);
+      }
+    } finally {
+      window.__risqueIncomeMountInProgress = false;
     }
   }
 

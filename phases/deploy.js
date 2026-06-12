@@ -1,9 +1,9 @@
-/**
- * Deployment — one module, all deploy behaviors.
+﻿/**
+ * Deployment â€” one module, all deploy behaviors.
  *
- * URL: game.html?phase=deploy&kind=setup — first deployment (all players, starting armies).
- * URL: game.html?phase=deploy&kind=turn — income deploy, then attack.
- * URL: game.html?phase=con-deploy — continental conquer deploy after con-income (opts.continentalDeploy).
+ * URL: game.html?phase=deploy&kind=setup â€” first deployment (all players, starting armies).
+ * URL: game.html?phase=deploy&kind=turn â€” income deploy, then attack.
+ * URL: game.html?phase=con-deploy â€” continental conquer deploy after con-income (opts.continentalDeploy).
  * Legacy ?phase=deploy1|deploy2 is rewritten to the above by game-shell.js.
  */
 (function () {
@@ -15,21 +15,6 @@
     "EXHOSTED ALL TROOPS, FAILED TO PROTECT ALL TERRITORIES";
 
   var STYLE_ID_DEPLOY_TURN = "risque-deploy2-styles-v1";
-
-  /** Setup/turn deploy: do not stringify the full replay tape into localStorage on every wheel click. */
-  function persistGameStateLite(gs) {
-    var target = gs && typeof gs === "object" ? gs : window.gameState;
-    if (!target) return;
-    if (typeof window.risqueWriteGameStateLocalStorageLite === "function") {
-      window.risqueWriteGameStateLocalStorageLite(target);
-      return;
-    }
-    try {
-      localStorage.setItem("gameState", JSON.stringify(target));
-    } catch (err) {
-      console.warn("[Deploy] Failed to save game state.");
-    }
-  }
 
   function deployContinentDisplayName(contKey) {
     var gu = window.gameUtils;
@@ -393,14 +378,14 @@
         ? "No troops left in bank"
         : "Open menu: ALL protects every owned territory below " +
           RISQUE_DEPLOY_PROTECT_TROOPS +
-          " (continents A→Z); or pick one fully owned continent";
+          " (continents Aâ†’Z); or pick one fully owned continent";
   }
+
 
   function loginRecoveryHref() {
     return window.risqueLoginRecoveryViaPrivacyUrl();
   }
 
-  /** Prefer same-document game.html navigation (no full reload); fallback fade or location. */
   function navigateGameHtmlPreferSoft(url) {
     try {
       if (typeof window.risqueNavigateGameHtmlSoft === "function" && window.risqueNavigateGameHtmlSoft(url)) {
@@ -414,44 +399,6 @@
     } else {
       window.location.href = url;
     }
-  }
-
-  /**
-   * Full-screen handoff before setup deploy UI is shown (streaming / hot-seat).
-   * @param {string} playerName
-   * @param {"first"|"next"} kind
-   * @param {function()} onContinue
-   * @param {function(string)=} logFn
-   */
-  function mountSetupDeployHandoff(playerName, kind, onContinue, logFn) {
-    var label = (playerName || "the next player").toString();
-    var msg =
-      kind === "first"
-        ? "Setup deployment\n\nHand the tablet to " +
-          label +
-          ".\n\nOnly this player should tap Continue."
-        : "Hand the tablet to " +
-          label +
-          " for deployment.\n\nOnly this player should tap Continue.";
-    if (
-      !window.risquePhases ||
-      !window.risquePhases.privacyGate ||
-      typeof window.risquePhases.privacyGate.mount !== "function"
-    ) {
-      if (typeof logFn === "function") {
-        logFn("[DeploySetup] Privacy gate unavailable; skipping handoff overlay.");
-      }
-      if (typeof onContinue === "function") onContinue();
-      return;
-    }
-    window.risquePhases.privacyGate.mount(document.body, {
-      message: msg,
-      buttonLabel: "Continue",
-      onContinue: function () {
-        if (typeof onContinue === "function") onContinue();
-      },
-      onLog: logFn
-    });
   }
 
   function injectDeployTurnStyles() {
@@ -472,637 +419,6 @@
       ".deploy-button:active:not(:disabled){transform:scale(0.95);}" +
       ".deploy-button:disabled{background:#e0e0e0;border-color:#999999;color:#999999;cursor:not-allowed;}";
     document.head.appendChild(s);
-  }
-
-  function logLineSetup(message, logFn) {
-    var ts = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
-    var line = "[" + ts + "] [DeploySetup] " + message;
-    console.log(line);
-    if (typeof logFn === "function") logFn(line);
-    try {
-      var logs = JSON.parse(localStorage.getItem("gameLogs") || "[]");
-      if (!Array.isArray(logs)) logs = [];
-      logs.push(line);
-      localStorage.setItem("gameLogs", JSON.stringify(logs));
-    } catch (e) {
-      /* ignore */
-    }
-  }
-
-  /** Initial setup: cycle players until all starting banks empty → card-play order. */
-  function runSetupDeploy(stageHost, opts) {
-    opts = opts || {};
-    var logFn = opts.log;
-    window.risqueDeploy1Active = true;
-    window.viewTroopsActive = false;
-    if (typeof window.risqueSetMirrorDeployRoute === "function") {
-      window.risqueSetMirrorDeployRoute("setup");
-    }
-
-    var canvas = document.getElementById("canvas");
-    var uiOverlay = document.getElementById("ui-overlay");
-    if (!canvas || !uiOverlay || !window.gameUtils) {
-      logLineSetup("Missing canvas, ui-overlay, or gameUtils", logFn);
-      return;
-    }
-
-    var phaseSlot = document.getElementById("risque-phase-content");
-    if (!phaseSlot) {
-      logLineSetup("Missing #risque-phase-content (setup HUD not ready)", logFn);
-      return;
-    }
-
-    var psFromSelect = document.getElementById("risque-player-select-root");
-    if (psFromSelect && psFromSelect.parentNode) psFromSelect.parentNode.removeChild(psFromSelect);
-
-    uiOverlay.className = "ui-overlay visible";
-    uiOverlay.classList.remove("fade-out");
-
-    phaseSlot.innerHTML =
-      '<div class="deploy2-compact-root">' +
-      '<div class="deploy2-bank-row">' +
-      '<span class="deploy2-bank-label">Bank</span>' +
-      '<span id="deploy1-bank-number" class="deploy2-bank-number">000</span>' +
-      "</div>" +
-      '<p class="deploy2-hint">Select a territory. Scroll the wheel or type a number and press Enter. Use − for removals.</p>' +
-      '<div class="deploy2-actions deploy1-deploy-actions deploy1-deploy-actions--hud-row">' +
-      '<button type="button" id="deploy1-reset" class="deploy1-action-btn">RESET</button>' +
-      '<button type="button" id="deploy1-add-2" class="deploy1-action-btn">+2</button>' +
-      '<button type="button" id="deploy1-add-5" class="deploy1-action-btn">+5</button>' +
-      '<button type="button" id="deploy1-add-10" class="deploy1-action-btn">+10</button>' +
-      '<button type="button" id="deploy1-add-all" class="deploy1-action-btn">ALL</button>' +
-      '<button type="button" id="deploy1-confirm" class="deploy1-action-btn">CONFIRM</button>' +
-      "</div>" +
-      "</div>";
-
-    var bankNumber = document.getElementById("deploy1-bank-number");
-    var confirmButton = document.getElementById("deploy1-confirm");
-    var resetButton = document.getElementById("deploy1-reset");
-
-    var gameState = null;
-    var deploymentOrder = [];
-    var currentPlayerIndex = 0;
-    var initialBankValues = {};
-    var deploymentInitialized = false;
-    var keyboardBuffer = "";
-    var negativeInput = false;
-    var deployedTroops = {};
-
-    function renderMap(changedLabel) {
-      window.gameState = gameState;
-      window.deployedTroops = deployedTroops[gameState.currentPlayer] || {};
-      window.gameUtils.renderAll(gameState, changedLabel, window.deployedTroops);
-      if (typeof window.risquePersistHostGameState === "function") {
-        window.risquePersistHostGameState();
-      }
-    }
-
-    /** Drop deploy-only UI (bumps, white “bank” fill, +N satellites, mirror draft) and redraw — call after phase leaves deploy. */
-    function clearDeployChromeThenRedraw() {
-      window.gameState = gameState;
-      window.selectedTerritory = null;
-      window.viewTroopsActive = false;
-      window.deployedTroops = {};
-      if (gameState.risqueDeployMirrorDraft) {
-        delete gameState.risqueDeployMirrorDraft;
-      }
-      if (gameState.risqueDeployTransientPrimary) {
-        delete gameState.risqueDeployTransientPrimary;
-      }
-      if (typeof window.risqueSetSpectatorFocus === "function") {
-        window.risqueSetSpectatorFocus([]);
-      }
-      window.gameUtils.renderTerritories(null, gameState, {});
-      window.gameUtils.renderStats(gameState);
-    }
-
-    function persistGameStateForPublicMirror() {
-      try {
-        if (window.gameState && !window.risqueDisplayIsPublic) {
-          persistGameStateLite(window.gameState);
-        }
-      } catch (e0) {
-        /* ignore */
-      }
-    }
-
-    function updateDeployVoice(warnMessage) {
-      if (!window.risqueRuntimeHud || typeof window.risqueRuntimeHud.setControlVoiceText !== "function") {
-        return;
-      }
-      if (!gameState) return;
-      var player = gameState.players && gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
-      if (!player) return;
-      var primary = player.name.toUpperCase() + "\nDEPLOY ALL TROOPS FROM YOUR BANK";
-      if (warnMessage) {
-        try {
-          gameState.risquePublicDeployBanner =
-            player.name.toUpperCase() + " IS DEPLOYING TROOPS.\n\n" + String(warnMessage);
-        } catch (eBanner0) {}
-        window.risqueRuntimeHud.setControlVoiceText(primary + "\n\n" + String(warnMessage), "");
-        persistGameStateForPublicMirror();
-        return;
-      }
-      if (typeof window.risqueRefreshDeployNarration === "function") {
-        window.risqueRefreshDeployNarration(gameState);
-        persistGameStateForPublicMirror();
-        return;
-      }
-      var bank = Math.max(0, Number(player.bankValue) || 0);
-      var r =
-        bank === 0
-          ? "0 troops remaining in bank — confirm when finished"
-          : bank === 1
-            ? "1 troop remaining in bank"
-            : bank + " troops remaining in bank";
-      try {
-        gameState.risquePublicDeployBanner =
-          player.name.toUpperCase() + " IS DEPLOYING TROOPS.\n\n" + r;
-      } catch (eBanner1) {}
-      window.risqueRuntimeHud.setControlVoiceText(primary + "\n\n" + r, "");
-      persistGameStateForPublicMirror();
-    }
-
-    function updateBankDisplay() {
-      var player = gameState.players && gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
-      bankNumber.textContent = player ? player.bankValue.toString().padStart(3, "0") : "000";
-      updateDeployVoice();
-    }
-
-    function onWheel(e) {
-      if (!gameState || !window.selectedTerritory) return;
-      e.preventDefault();
-      var player = gameState.players && gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
-      var territory = player && player.territories.find(function (t) {
-        return t.name === window.selectedTerritory;
-      });
-      if (!territory) return;
-      var delta = e.deltaY > 0 ? -1 : 1;
-      var newTroops = territory.troops + delta;
-      if (newTroops < 1) {
-        return;
-      }
-      if (delta > 0 && player.bankValue === 0) {
-        window.gameUtils.showError("");
-        updateDeployVoice("No troops left in bank.");
-        return;
-      }
-      territory.troops = newTroops;
-      player.bankValue -= delta;
-      player.troopsTotal += delta;
-      deployedTroops[player.name][territory.name] = territory.troops - 1;
-      renderMap(window.selectedTerritory);
-      updateBankDisplay();
-      window.gameUtils.showError("");
-      if (typeof window.risqueSetSpectatorFocus === "function" && window.selectedTerritory) {
-        window.risqueSetSpectatorFocus([window.selectedTerritory]);
-      }
-      try {
-        persistGameStateLite(gameState);
-      } catch (err) {
-        console.warn("[Deploy] Failed to save game state.");
-      }
-    }
-
-    /** Move bank to selected territory until `leaveInBank` troops remain (wheel shortcut). */
-    function applyBulkDeploySetup(leaveInBank) {
-      leaveInBank = Math.max(0, Math.floor(Number(leaveInBank) || 0));
-      if (!gameState || !window.selectedTerritory) {
-        return;
-      }
-      var player = gameState.players && gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
-      if (!player) return;
-      var territory = player.territories.find(function (t) {
-        return t.name === window.selectedTerritory;
-      });
-      if (!territory) return;
-      var bank = Math.max(0, Number(player.bankValue) || 0);
-      var toAdd = bank - leaveInBank;
-      if (toAdd <= 0) {
-        window.gameUtils.showError("");
-        updateDeployVoice(
-          bank <= leaveInBank
-            ? "Not enough in bank to leave " + leaveInBank + " behind on this territory."
-            : ""
-        );
-        return;
-      }
-      territory.troops += toAdd;
-      player.bankValue -= toAdd;
-      player.troopsTotal += toAdd;
-      deployedTroops[player.name][territory.name] = territory.troops - 1;
-      renderMap(window.selectedTerritory);
-      updateBankDisplay();
-      window.gameUtils.showError("");
-      if (typeof window.risqueSetSpectatorFocus === "function" && window.selectedTerritory) {
-        window.risqueSetSpectatorFocus([window.selectedTerritory]);
-      }
-      try {
-        persistGameStateLite(gameState);
-      } catch (err) {
-        console.warn("[Deploy] Failed to save game state.");
-      }
-    }
-
-    function applyDeployFromBankSetup(troopChange) {
-      troopChange = Math.floor(Number(troopChange) || 0);
-      if (troopChange <= 0 || !gameState) return;
-      if (!window.selectedTerritory) {
-        return;
-      }
-      var player = gameState.players && gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
-      if (!player) return;
-      var territory = player.territories.find(function (t) {
-        return t.name === window.selectedTerritory;
-      });
-      if (!territory) return;
-      var newTroops = territory.troops + troopChange;
-      if (newTroops < 1) {
-        return;
-      }
-      if (troopChange > player.bankValue) {
-        window.gameUtils.showError("");
-        updateDeployVoice(
-          "Only " +
-            player.bankValue +
-            " troop" +
-            (player.bankValue === 1 ? "" : "s") +
-            " left in bank."
-        );
-        return;
-      }
-      territory.troops = newTroops;
-      player.bankValue -= troopChange;
-      player.troopsTotal += troopChange;
-      deployedTroops[player.name][territory.name] = territory.troops - 1;
-      renderMap(window.selectedTerritory);
-      updateBankDisplay();
-      window.gameUtils.showError("");
-      if (typeof window.risqueSetSpectatorFocus === "function" && window.selectedTerritory) {
-        window.risqueSetSpectatorFocus([window.selectedTerritory]);
-      }
-      try {
-        persistGameStateLite(gameState);
-      } catch (err) {
-        console.warn("[Deploy] Failed to save game state.");
-      }
-    }
-
-    function installDeploySetupAuxMenu() {
-      window.risqueGetAuxMouseMenu = function () {
-        if (!window.risqueDeploy1Active || !gameState) {
-          return null;
-        }
-        return {
-          title: "Deployment",
-          hint: window.selectedTerritory
-            ? "Thumb-button menu — or keep using the wheel on the map."
-            : "Select a territory on the map first.",
-          anchor: true,
-          actions: [
-            {
-              label: "Confirm",
-              action: function () {
-                if (confirmButton) confirmButton.click();
-              }
-            },
-            { label: "Cancel", action: function () {} },
-            {
-              label: "Put all but 1 in bank on territory",
-              action: function () {
-                applyBulkDeploySetup(1);
-              }
-            },
-            {
-              label: "Put all but 3 in bank on territory",
-              action: function () {
-                applyBulkDeploySetup(3);
-              }
-            },
-            {
-              label: "Reset",
-              action: function () {
-                if (resetButton) resetButton.click();
-              }
-            }
-          ]
-        };
-      };
-    }
-
-    function onKeyDown(e) {
-      if (!gameState || !window.selectedTerritory) return;
-      var player = gameState.players && gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
-      var territory = player && player.territories.find(function (t) {
-        return t.name === window.selectedTerritory;
-      });
-      if (!territory) return;
-      if (e.key === "Enter") {
-        if (keyboardBuffer === "") return;
-        var troops = parseInt(keyboardBuffer, 10);
-        if (isNaN(troops)) {
-          keyboardBuffer = "";
-          negativeInput = false;
-          return;
-        }
-        var troopChange = negativeInput ? -troops : troops;
-        var newTroops2 = territory.troops + troopChange;
-        if (newTroops2 < 1) {
-          keyboardBuffer = "";
-          negativeInput = false;
-          return;
-        }
-        if (troopChange > player.bankValue) {
-          window.gameUtils.showError("");
-          updateDeployVoice(
-            "Only " + player.bankValue + " troop" + (player.bankValue === 1 ? "" : "s") + " left in bank."
-          );
-          keyboardBuffer = "";
-          negativeInput = false;
-          return;
-        }
-        territory.troops = newTroops2;
-        player.bankValue -= troopChange;
-        player.troopsTotal += troopChange;
-        deployedTroops[player.name][territory.name] = territory.troops - 1;
-        keyboardBuffer = "";
-        negativeInput = false;
-        var prettyT1 =
-          window.gameUtils && window.gameUtils.formatTerritoryDisplayName
-            ? window.gameUtils.formatTerritoryDisplayName(territory.name)
-            : territory.name.replace(/_/g, " ");
-        if (troopChange > 0 && typeof window.risqueDeployTroopCountToWord === "function") {
-          gameState.risqueDeployTransientPrimary =
-            player.name +
-            " has deployed " +
-            window.risqueDeployTroopCountToWord(Math.abs(troopChange)) +
-            " troops to " +
-            prettyT1 +
-            ".";
-        } else if (troopChange < 0 && typeof window.risqueDeployTroopCountToWord === "function") {
-          gameState.risqueDeployTransientPrimary =
-            player.name +
-            " has removed " +
-            window.risqueDeployTroopCountToWord(Math.abs(troopChange)) +
-            " troops from " +
-            prettyT1 +
-            ".";
-        }
-        window.selectedTerritory = null;
-        window.gameUtils.showError("");
-        renderMap(null);
-        updateBankDisplay();
-        try {
-          persistGameStateLite(gameState);
-        } catch (err2) {
-          console.warn("[Deploy] Failed to save game state.");
-        }
-      } else if (e.key === "-") {
-        negativeInput = true;
-        keyboardBuffer = "";
-      } else if (e.key >= "0" && e.key <= "9") {
-        keyboardBuffer += e.key;
-        if (keyboardBuffer.length > 3) {
-          keyboardBuffer = keyboardBuffer.slice(0, -1);
-        }
-      }
-    }
-
-    function initializeDeployment() {
-      if (deploymentInitialized) return;
-      window.gameUtils.loadGameState(function (loadedGameState) {
-        if (!loadedGameState) {
-          console.warn("[Deploy] Invalid game state. Redirecting.");
-          setTimeout(function () {
-            window.location.href = loginRecoveryHref();
-          }, 1000);
-          return;
-        }
-        gameState = loadedGameState;
-        var invalidPlayer = gameState.players.find(function (p) {
-          return !p.territories || p.territories.length === 0;
-        });
-        if (invalidPlayer) {
-          console.warn("[Deploy] Invalid: player has no territories.");
-          setTimeout(function () {
-            window.location.href = loginRecoveryHref();
-          }, 1000);
-          return;
-        }
-        if (!gameState.currentPlayer || gameState.turnOrder.indexOf(gameState.currentPlayer) === -1) {
-          console.warn("[Deploy] Invalid current player.");
-          setTimeout(function () {
-            window.location.href = loginRecoveryHref();
-          }, 1000);
-          return;
-        }
-        deploymentOrder = gameState.turnOrder.slice();
-        currentPlayerIndex = deploymentOrder.indexOf(gameState.currentPlayer);
-        gameState.phase = "deploy";
-        gameState.players.forEach(function (player) {
-          initialBankValues[player.name] = player.bankValue || 0;
-          deployedTroops[player.name] = {};
-          player.territories.forEach(function (t) {
-            deployedTroops[player.name][t.name] = t.troops - 1;
-          });
-        });
-        deploymentInitialized = true;
-        logLineSetup("Initialized: currentPlayer=" + gameState.currentPlayer, logFn);
-        window.viewTroopsActive = false;
-        window.gameState = gameState;
-        installDeploySetupAuxMenu();
-        function revealSetupDeployAfterHandoff() {
-          renderMap(null);
-          updateBankDisplay();
-          if (typeof window.risqueReplaySeedOpening === "function") {
-            window.risqueReplaySeedOpening(gameState);
-          }
-          if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.updateTurnBannerFromState === "function") {
-            window.risqueRuntimeHud.updateTurnBannerFromState(gameState);
-          }
-          if (window.risqueRuntimeHud && window.risqueRuntimeHud.syncPosition) {
-            requestAnimationFrame(function () {
-              window.risqueRuntimeHud.syncPosition();
-            });
-          }
-        }
-        mountSetupDeployHandoff(gameState.currentPlayer, "first", revealSetupDeployAfterHandoff, logFn);
-      });
-    }
-
-    resetButton.addEventListener("click", function () {
-      var player = gameState && gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
-      if (!player) {
-        console.warn("[Deploy] No current player.");
-        return;
-      }
-      player.bankValue = initialBankValues[player.name] || 0;
-      player.territories.forEach(function (t) {
-        t.troops = 1;
-        deployedTroops[player.name][t.name] = 0;
-      });
-      player.troopsTotal = player.territories.length;
-      keyboardBuffer = "";
-      negativeInput = false;
-      window.selectedTerritory = null;
-      window.viewTroopsActive = false;
-      window.gameUtils.showError("");
-      renderMap(null);
-      updateBankDisplay();
-      try {
-        persistGameStateLite(gameState);
-      } catch (e) {
-        console.warn("[Deploy] Failed to save game state.");
-      }
-    });
-
-    confirmButton.addEventListener("click", function () {
-      var player = gameState && gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
-      if (!player) {
-        console.warn("[Deploy] No current player.");
-        return;
-      }
-      if (player.bankValue > 0) {
-        window.gameUtils.showError("");
-        updateDeployVoice("Deploy every troop from your bank before confirming.");
-        return;
-      }
-      if (gameState.players.every(function (p) {
-        return p.bankValue === 0;
-      })) {
-        try {
-          /* Next URL is playerSelect&selectKind=cardPlay — not cardplay yet; mirror/TV need phase playerSelect for name roulette. */
-          gameState.phase = "playerSelect";
-          clearDeployChromeThenRedraw();
-          if (typeof window.risqueReplayRecordDeploy === "function") {
-            window.risqueReplayRecordDeploy(gameState);
-          }
-          if (typeof window.risqueCheapReplayCapturePostSetupDeploy === "function") {
-            try {
-              window.risqueCheapReplayCapturePostSetupDeploy(gameState);
-            } catch (eCheapPd) {
-              /* ignore */
-            }
-          }
-          if (typeof window.risqueReplayTryWriteDdJsonAfterSetupDeploy === "function") {
-            window.risqueReplayTryWriteDdJsonAfterSetupDeploy(gameState, { sealAfterWrite: true });
-          }
-          if (typeof window.risqueReplayPersistTapeSidecarImmediate === "function") {
-            try {
-              window.risqueReplayPersistTapeSidecarImmediate(gameState);
-            } catch (eSideDep) {
-              /* ignore */
-            }
-          }
-          if (typeof window.risquePersistHostGameState === "function") {
-            window.risquePersistHostGameState(gameState);
-          } else {
-            persistGameStateLite(gameState);
-          }
-          if (window.gameUtils && typeof window.gameUtils.risqueLogDeckSnapshot === "function") {
-            window.gameUtils.risqueLogDeckSnapshot(gameState, "post-setup-deploy");
-          }
-          if (uiOverlay) uiOverlay.classList.remove("fade-out");
-          setTimeout(function () {
-            if (typeof window.risqueSetMirrorDeployRoute === "function") {
-              window.risqueSetMirrorDeployRoute(null);
-            }
-            window.risqueDeploy1Active = false;
-            navigateGameHtmlPreferSoft("game.html?phase=playerSelect&selectKind=cardPlay");
-          }, 0);
-        } catch (e) {
-          console.warn("[Deploy] Failed to save game state.");
-        }
-        return;
-      }
-      currentPlayerIndex = (currentPlayerIndex + 1) % deploymentOrder.length;
-      gameState.currentPlayer = deploymentOrder[currentPlayerIndex];
-      keyboardBuffer = "";
-      negativeInput = false;
-      window.selectedTerritory = null;
-      window.viewTroopsActive = false;
-      if (gameState.risqueDeployTransientPrimary) {
-        delete gameState.risqueDeployTransientPrimary;
-      }
-      window.gameUtils.showError("");
-      try {
-        persistGameStateLite(gameState);
-      } catch (e2) {
-        console.warn("[Deploy] Failed to save game state.");
-      }
-      if (typeof window.risqueReplayRecordDeploy === "function") {
-        window.risqueReplayRecordDeploy(gameState);
-      }
-      /* Handoff before the next deployer sees the map (streaming / hot-seat). */
-      mountSetupDeployHandoff(gameState.currentPlayer, "next", function () {
-        /* Redraw + mirror push BEFORE spectator focus: risqueSetSpectatorFocus pushes gameState and must see the new deployer’s window.deployedTroops (not the previous player’s). */
-        renderMap(null);
-        if (typeof window.risqueSetSpectatorFocus === "function") {
-          window.risqueSetSpectatorFocus([]);
-        }
-        updateBankDisplay();
-        if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.updateTurnBannerFromState === "function") {
-          window.risqueRuntimeHud.updateTurnBannerFromState(gameState);
-        }
-        if (window.risqueRuntimeHud && window.risqueRuntimeHud.syncPosition) {
-          requestAnimationFrame(function () {
-            window.risqueRuntimeHud.syncPosition();
-          });
-        }
-      }, logFn);
-    });
-
-    var deploy1Add2 = document.getElementById("deploy1-add-2");
-    var deploy1Add5 = document.getElementById("deploy1-add-5");
-    var deploy1Add10 = document.getElementById("deploy1-add-10");
-    var deploy1AddAll = document.getElementById("deploy1-add-all");
-    if (deploy1Add2) {
-      deploy1Add2.addEventListener("click", function () {
-        applyDeployFromBankSetup(2);
-      });
-    }
-    if (deploy1Add5) {
-      deploy1Add5.addEventListener("click", function () {
-        applyDeployFromBankSetup(5);
-      });
-    }
-    if (deploy1Add10) {
-      deploy1Add10.addEventListener("click", function () {
-        applyDeployFromBankSetup(10);
-      });
-    }
-    if (deploy1AddAll) {
-      deploy1AddAll.addEventListener("click", function () {
-        applyBulkDeploySetup(0);
-      });
-    }
-    var canvasWheel = document.getElementById("canvas");
-    var svg = canvasWheel ? canvasWheel.querySelector(".svg-overlay") : null;
-    if (svg) svg.addEventListener("wheel", onWheel, { passive: false });
-
-    document.addEventListener("keydown", onKeyDown);
-
-    window.gameUtils.initGameView();
-    initializeDeployment();
-    requestAnimationFrame(function () {
-      window.gameUtils.resizeCanvas();
-    });
   }
 
   /** Turn deploy: single player, then attack (classic or continental con-deploy when opts.continentalDeploy). */
@@ -1195,12 +511,12 @@
     }
 
     /**
-     * Classic turn deploy (income → deploy with no conquestAfterDeploy) must drop conquer-mode-only
+     * Classic turn deploy (income â†’ deploy with no conquestAfterDeploy) must drop conquer-mode-only
      * cardplay/income flags. Otherwise stale risqueRuntimeCardplayIncomeMode + risqueConquestChainActive
-     * from an old elimination/conquest session force con-income (books + “new” continents only) on the
+     * from an old elimination/conquest session force con-income (books + â€œnewâ€ continents only) on the
      * next cardplay even during normal Risk turns.
      * Conquest deploy always uses ?conquestAfterDeploy=1 (see phases/income.js conquer income); keep flags until
-     * con-transfertroops → attack or a later classic deploy clears them.
+     * con-transfertroops â†’ attack or a later classic deploy clears them.
      */
     if (!conquestAfterDeployQuery && !window.risqueDisplayIsPublic) {
       var clearedConquestIncome = false;
@@ -1248,6 +564,20 @@
     var deployedTroops = {};
     var deploymentInitialized = false;
 
+    function persistGameStateLite(gs) {
+      var target = gs && typeof gs === "object" ? gs : gameState;
+      if (!target) return;
+      if (typeof window.risqueWriteGameStateLocalStorageLite === "function") {
+        window.risqueWriteGameStateLocalStorageLite(target);
+        return;
+      }
+      try {
+        localStorage.setItem("gameState", JSON.stringify(target));
+      } catch (err) {
+        console.warn("[Deploy] Failed to save game state.");
+      }
+    }
+
     function persistGameStateForPublicMirror() {
       try {
         if (window.gameState && !window.risqueDisplayIsPublic) {
@@ -1258,7 +588,18 @@
       }
     }
 
-    function pushDeployMirror() {
+    function pushDeployMirror(immediate) {
+      if (
+        window.risqueArtemisNetClient &&
+        immediate &&
+        typeof window.risqueArtemisFlushClientStatePush === "function"
+      ) {
+        if (typeof window.risqueArtemisStampDeployMirrorDraftOnState === "function" && gameState) {
+          window.risqueArtemisStampDeployMirrorDraftOnState(gameState);
+        }
+        window.risqueArtemisFlushClientStatePush(gameState);
+        return;
+      }
       if (typeof window.risquePersistHostGameState === "function") {
         window.risquePersistHostGameState();
       }
@@ -1266,6 +607,19 @@
 
     function refreshPublicDeployPrivateMirror() {
       if (!gameState || window.risqueDisplayIsPublic) return;
+      if (
+        window.risqueArtemisNetClient &&
+        typeof window.risqueArtemisIsMyTurn === "function" &&
+        window.risqueArtemisIsMyTurn(gameState)
+      ) {
+        try {
+          delete gameState.risquePublicDeployBanner;
+          delete gameState.risquePublicDeployReport;
+        } catch (eSkipPriv) {
+          /* ignore */
+        }
+        return;
+      }
       var player = gameState.players.find(function (p) {
         return p.name === gameState.currentPlayer;
       });
@@ -1273,7 +627,7 @@
       var bank = Math.max(0, Number(player.bankValue) || 0);
       try {
         gameState.risquePublicDeployBanner =
-          player.name.toUpperCase() + " — DEPLOYMENT IS PRIVATE";
+          player.name.toUpperCase() + " â€” DEPLOYMENT IS PRIVATE";
         gameState.risquePublicDeployReport =
           bank === 0
             ? "Waiting for host to confirm deployment."
@@ -1375,6 +729,10 @@
     }
 
     function publishTurnDeployToTvThenAdvance(advanceFn, pendingConTransfer) {
+      if (window.risqueArtemisMode) {
+        advanceFn();
+        return;
+      }
       var player = gameState.players.find(function (p) {
         return p.name === gameState.currentPlayer;
       });
@@ -1423,7 +781,7 @@
       if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.setControlVoiceText === "function") {
         window.risqueRuntimeHud.setControlVoiceText(
           nm.toUpperCase() + "\nDEPLOYMENT",
-          "Showing deployment on the public screen…"
+          "Showing deployment on the public screenâ€¦"
         );
       }
       try {
@@ -1469,7 +827,7 @@
       var r =
         warnMessage ||
         (bank === 0
-          ? "0 troops remaining in bank — confirm when finished"
+          ? "0 troops remaining in bank â€” confirm when finished"
           : bank === 1
             ? "1 troop remaining in bank"
             : bank + " troops remaining in bank");
@@ -1574,7 +932,7 @@
     }
 
     function rerender(changedLabel) {
-      /* Match setup deploy (renderMap): full map + stats; never toggle viewTroopsActive — markers use deploy bump + satellite. */
+      /* Match setup deploy (renderMap): full map + stats; never toggle viewTroopsActive â€” markers use deploy bump + satellite. */
       window.gameState = gameState;
       window.deployedTroops = deployedTroops;
       window.gameUtils.renderAll(gameState, changedLabel, deployedTroops);
@@ -1793,7 +1151,7 @@
           '<span id="bank-label" class="deploy2-bank-label">Bank</span>' +
           '<span id="bank-number" class="deploy2-bank-number">000</span>' +
           "</div>" +
-          '<p class="deploy2-hint">Select a territory. Scroll the wheel or type a number and press Enter. Use − for removals.</p>' +
+          '<p class="deploy2-hint">Select a territory. Scroll the wheel or type a number and press Enter. Use âˆ’ for removals.</p>' +
           '<div class="deploy2-actions deploy1-deploy-actions deploy1-deploy-actions--hud-row">' +
           '<button type="button" id="reset" class="deploy1-action-btn" aria-label="Reset deployment">RESET</button>' +
           '<button type="button" id="deploy-add-2" class="deploy1-action-btn" aria-label="Add two troops from bank">+2</button>' +
@@ -2205,7 +1563,7 @@
         return {
           title: "Deployment",
           hint: window.selectedTerritory
-            ? "Thumb-button menu — or keep using the wheel on the map."
+            ? "Thumb-button menu â€” or keep using the wheel on the map."
             : "Select a territory on the map first.",
           anchor: true,
           actions: [
@@ -2287,7 +1645,7 @@
                 window.risqueReplayRecordDeploy(gameState);
               }
               persistGameStateLite(gameState);
-              pushDeployMirror();
+              pushDeployMirror(true);
               if (typeof window.risqueHostReplaceShellGameState === "function") {
                 window.risqueHostReplaceShellGameState(gameState);
               }
@@ -2309,6 +1667,10 @@
             return;
           }
 
+          var dest = attackUrl;
+          if (typeof dest === "string" && dest.indexOf("attack.html") !== -1) {
+            dest = "game.html?phase=attack";
+          }
           try {
             if (typeof window.risqueSetMirrorDeployRoute === "function") {
               window.risqueSetMirrorDeployRoute(null);
@@ -2333,24 +1695,35 @@
                 /* ignore */
               }
             }
+          } catch (ePrep) {
+            console.warn("[Deploy] Failed to prepare attack transition.", ePrep);
+            return;
+          }
+          try {
             persistGameStateLite(gameState);
-            pushDeployMirror();
+          } catch (eSave) {
+            /* ignore */
+          }
+          try {
+            pushDeployMirror(true);
             if (typeof window.risqueHostReplaceShellGameState === "function") {
               window.risqueHostReplaceShellGameState(gameState);
             }
             if (uiOverlay) uiOverlay.classList.remove("fade-out");
-            var dest = attackUrl;
-            if (typeof dest === "string" && dest.indexOf("attack.html") !== -1) {
-              dest = "game.html?phase=attack";
-            }
             if (typeof window.risqueFlushMirrorPush === "function") {
               window.risqueFlushMirrorPush();
             } else {
-              pushDeployMirror();
+              pushDeployMirror(true);
+            }
+            if (
+              window.risqueArtemisMode &&
+              typeof window.risqueArtemisSyncFromState === "function"
+            ) {
+              window.risqueArtemisSyncFromState(gameState);
             }
             navigateGameHtmlPreferSoft(dest);
-          } catch (e) {
-            console.warn("[Deploy] Failed to save game state.");
+          } catch (eNav) {
+            console.warn("[Deploy] Failed to advance to attack.", eNav);
           }
         }
 
@@ -2377,10 +1750,15 @@
   }
 
   window.risquePhases = window.risquePhases || {};
-  window.risquePhases.deploy1 = { run: runSetupDeploy };
+  window.risquePhases.deploy1 = { run: function (host, opts) { return window.risquePhases.firstDeploy && window.risquePhases.firstDeploy.run(host, opts); } };
   window.risquePhases.deploy2 = { mount: mountTurnDeploy };
   window.risquePhases.deploy = {
-    runSetup: runSetupDeploy,
+    runSetup: function (host, opts) {
+      if (window.risquePhases.firstDeploy && typeof window.risquePhases.firstDeploy.run === "function") {
+        return window.risquePhases.firstDeploy.run(host, opts);
+      }
+      console.error("[Deploy] firstdeploy.js not loaded — setup deploy unavailable.");
+    },
     runTurn: mountTurnDeploy,
     /** Continental conquer chain after con-income (?phase=con-deploy). */
     runContinentalDeploy: function (host, opts) {

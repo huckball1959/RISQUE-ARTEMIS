@@ -204,6 +204,9 @@
 
     pushPublicLoginFadeStartForMirror();
     var gs = buildGameStateFromRows(filled);
+    if (ui.artemisRoster && Array.isArray(ui.artemisRoster)) {
+      gs.artemisRoster = ui.artemisRoster;
+    }
     copyHostPreflightReplaySaveFlagIntoNewGame(gs);
     if (typeof window.risqueReplayClearTapeSidecar === "function") {
       window.risqueReplayClearTapeSidecar();
@@ -640,6 +643,7 @@
   function readFilledPlayerRows(root) {
     var out = [];
     Array.prototype.forEach.call(root.querySelectorAll(".player-row"), function (row) {
+      if (row.style.display === "none") return;
       var input = row.querySelector("input");
       var colorField = row.querySelector(".color-field");
       if (!input || !colorField) return;
@@ -950,6 +954,69 @@
     }
   }
 
+  function paintLoginRowColor(root, row, color) {
+    if (!root || !row || !color) return;
+    var colorField = row.querySelector(".color-field");
+    var swatch = root.querySelector('.color-swatch[data-color="' + color + '"]');
+    if (colorField && swatch) {
+      colorField.style.background = window.getComputedStyle(swatch).backgroundColor;
+      colorField.dataset.color = color;
+      swatch.classList.remove("active");
+      swatch.classList.add("unavailable");
+    }
+  }
+
+  function setArtemisRemoteRowWaiting(root, slot) {
+    if (!root || slot < 2 || slot > 3) return;
+    var row = root.querySelectorAll(".player-row")[slot - 1];
+    if (!row || row.classList.contains("risque-login-row--artemis-filled")) return;
+    row.classList.add("risque-login-row--artemis-remote");
+    var input = row.querySelector("input");
+    if (input) {
+      input.readOnly = true;
+      input.value = "";
+      input.placeholder = "Waiting on laptop " + slot + "…";
+      input.classList.add("risque-login-row--waiting");
+    }
+  }
+
+  function applyArtemisRemoteProfile(root, slot, name, color) {
+    if (!root || slot < 2 || slot > 6) return false;
+    var row = root.querySelectorAll(".player-row")[slot - 1];
+    if (!row) return false;
+    var input = row.querySelector("input");
+    var colorField = row.querySelector(".color-field");
+    row.classList.add("risque-login-row--artemis-remote", "risque-login-row--artemis-filled");
+    row.classList.remove("risque-login-row--waiting");
+    if (input) {
+      input.readOnly = true;
+      input.classList.remove("risque-login-row--waiting");
+      input.value = String(name || "").trim().toUpperCase();
+    }
+    if (colorField && colorField.dataset.color && colorField.dataset.color !== color) {
+      var oldSw = root.querySelector('.color-swatch[data-color="' + colorField.dataset.color + '"]');
+      if (oldSw) {
+        oldSw.classList.remove("unavailable");
+        oldSw.classList.add("active");
+      }
+    }
+    paintLoginRowColor(root, row, color);
+    return true;
+  }
+
+  function configureArtemisHostLogin(root, promptEl) {
+    var rows = root.querySelectorAll(".player-row");
+    for (var i = 3; i < rows.length; i += 1) {
+      rows[i].style.display = "none";
+    }
+    if (promptEl) {
+      promptEl.textContent =
+        "HOST (Player 1): your name and color. Players 2–3 sign in on their laptops.";
+    }
+    setArtemisRemoteRowWaiting(root, 2);
+    setArtemisRemoteRowWaiting(root, 3);
+  }
+
   function applyPublicLoginFormMirror(gs) {
     if (!gs || !gs.risquePublicLoginFormMirror || !Array.isArray(gs.risquePublicLoginFormMirror.rows)) {
       return;
@@ -1069,6 +1136,21 @@
       return;
     }
 
+    if (window.risqueArtemisHost) {
+      if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.ensureLogin === "function") {
+        window.risqueRuntimeHud.ensureLogin(uiOverlay);
+      }
+      slot.innerHTML =
+        '<div id="risque-login-hud-root" class="risque-login-compact-root risque-artemis-host-login-stub" hidden></div>';
+      document.documentElement.classList.add("risque-artemis-login-active");
+      if (typeof window.risqueArtemisShowLoginPanel === "function") {
+        requestAnimationFrame(function () {
+          window.risqueArtemisShowLoginPanel();
+        });
+      }
+      return;
+    }
+
     slot.innerHTML =
       "<div id=\"risque-login-hud-root\" class=\"risque-login-compact-root\">" +
       "<div class=\"risque-login-compact-welcome\"></div>" +
@@ -1097,6 +1179,10 @@
     if (welcomeTextEl) welcomeTextEl.textContent = welcomeTextContent;
     if (loginPromptEl) loginPromptEl.textContent = loginPromptContent;
 
+    if (!window.risqueDisplayIsPublic && window.risqueArtemisHost) {
+      configureArtemisHostLogin(formRoot, loginPromptEl);
+    }
+
     var initialLoginFormMirror = opts.initialLoginFormMirror;
     var loginMirrorSyncT = null;
     function scheduleLoginMirrorPush() {
@@ -1115,6 +1201,7 @@
       var rows = formRoot.querySelectorAll(".player-row");
       for (var r = 0; r < rows.length; r += 1) {
         var row = rows[r];
+        if (row.classList.contains("risque-login-row--artemis-remote")) continue;
         var input = row.querySelector("input");
         var colorField = row.querySelector(".color-field");
         if (input.value.trim() !== "" && colorField.dataset.color === "") {
@@ -1170,6 +1257,9 @@
       requestAnimationFrame(function () {
         requestAnimationFrame(scheduleLoginMirrorPush);
       });
+      if (window.risqueArtemisHost) {
+        window.risqueArtemisScheduleLoginMirrorPush = scheduleLoginMirrorPush;
+      }
     } else {
       configurePublicLoginHudSpectator(formRoot);
       if (initialLoginFormMirror && Array.isArray(initialLoginFormMirror.rows)) {
@@ -1923,10 +2013,67 @@
     });
   }
 
+  function commitArtemisRoster(profiles, opts) {
+    opts = opts || {};
+    var filled = [];
+    var s;
+    for (s = 1; s <= 3; s += 1) {
+      var p = profiles && (profiles[String(s)] || profiles[s]);
+      if (!p || !p.name || !p.color) {
+        return { ok: false, error: "All 3 players must sign in before starting." };
+      }
+      filled.push({
+        name: String(p.name).trim().toUpperCase(),
+        color: String(p.color).trim().toLowerCase()
+      });
+    }
+    var names = filled.map(function (x) {
+      return x.name;
+    });
+    var colors = filled.map(function (x) {
+      return x.color;
+    });
+    if (new Set(names).size !== names.length) {
+      return { ok: false, error: "Duplicate player names." };
+    }
+    if (new Set(colors).size !== colors.length) {
+      return { ok: false, error: "Each player needs a unique color." };
+    }
+    var artemisRoster = [];
+    for (s = 1; s <= 3; s += 1) {
+      var prof = profiles[String(s)] || profiles[s];
+      artemisRoster.push({
+        slot: s,
+        name: String(prof.name).trim().toUpperCase(),
+        color: String(prof.color).trim().toLowerCase()
+      });
+    }
+    if (window.risqueArtemisHost && artemisRoster[0]) {
+      window.risqueArtemisPlayerName = artemisRoster[0].name;
+    }
+    try {
+      sessionStorage.setItem("risqueArtemisRoster", JSON.stringify(artemisRoster));
+    } catch (eRosStore) {
+      /* ignore */
+    }
+    commitNewGameLoginAfterRosterOk(filled, {
+      legacyNext: opts.legacyNext,
+      redirectDelayMs: opts.redirectDelayMs,
+      skipPersist: opts.skipPersist,
+      onLoginSuccess: opts.onLoginSuccess,
+      onLog: opts.onLog,
+      artemisRoster: artemisRoster
+    });
+    return { ok: true };
+  }
+
   window.risquePhases = window.risquePhases || {};
   window.risquePhases.login = {
     mount: mount,
     applyPublicLoginFormMirror: applyPublicLoginFormMirror,
+    applyArtemisRemoteProfile: applyArtemisRemoteProfile,
+    configureArtemisHostLogin: configureArtemisHostLogin,
+    commitArtemisRoster: commitArtemisRoster,
     buildGameStateFromRows: buildGameStateFromRows,
     normalizeImportedGameState: normalizeImportedGameState,
     validateLoadedGameState: validateLoadedGameState,
