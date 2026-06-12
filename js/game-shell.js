@@ -2459,8 +2459,21 @@
           (window.__risqueArtemisCardplayMountInProgress ||
             (window.__risqueArtemisCardplayControlsLive &&
               document.querySelector("#risque-phase-content .cardplay-compact-root")));
+        var skipHostReinforceMirrorSync =
+          phHostMir === "reinforce" &&
+          (window.__risqueArtemisReinforceMountInProgress ||
+            window.__risqueReinforceInitInProgress ||
+            (window.__risqueArtemisReinforceControlsLive &&
+              document.getElementById("reinforce-btn-skip")));
+        var skipHostReceiveCardMirrorSync =
+          (phHostMir === "receivecard" || phHostMir === "getcard") &&
+          (window.__risqueArtemisReceiveCardMountInProgress ||
+            (window.__risqueArtemisReceiveCardControlsLive &&
+              document.getElementById("receivecard-btn-end")));
         if (
           !skipHostCardplayMirrorSync &&
+          !skipHostReinforceMirrorSync &&
+          !skipHostReceiveCardMirrorSync &&
           phHostMir !== "login" &&
           phHostMir !== "welcome" &&
           phHostMir !== "playerSelect" &&
@@ -13142,8 +13155,14 @@
     }
 
     if (ph === "reinforce") {
+      var rfSkipRemount =
+        window.__risqueArtemisReinforceControlsLive &&
+        document.getElementById("reinforce-btn-skip") &&
+        window.__risqueReinforceInitialized;
       phaseLabelEl.textContent = "Phase: reinforce";
-      appEl.innerHTML = "";
+      if (!rfSkipRemount) {
+        appEl.innerHTML = "";
+      }
       window.gameState = state;
       window.risquePhases.reinforce.mount(stageHost, {
         onLog: function (msg, data) {
@@ -13166,8 +13185,14 @@
     }
 
     if (ph === "receivecard") {
+      var rcSkipRemount =
+        window.__risqueArtemisReceiveCardControlsLive &&
+        document.getElementById("receivecard-btn-end") &&
+        window.__risqueReceiveCardInitialized;
       phaseLabelEl.textContent = "Phase: receive card";
-      appEl.innerHTML = "";
+      if (!rcSkipRemount) {
+        appEl.innerHTML = "";
+      }
       window.gameState = state;
       window.risquePhases.receivecard.mount(stageHost, {
         onLog: function (msg, data) {

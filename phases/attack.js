@@ -5966,6 +5966,9 @@ function goToReinforce() {
     }
     /* Wildcard aerial *uses* are spent; the drawn link stays for reinforce moves until receive-card. */
     delete window.gameState.risqueAerialLinkPending;
+    if (typeof window.risqueResetAttackPhaseMemoryForMount === 'function') {
+      window.risqueResetAttackPhaseMemoryForMount(window.gameState);
+    }
   }
   window.gameState.phase = 'reinforce';
   if (window.risqueArtemisMode) {
@@ -5983,12 +5986,28 @@ function goToReinforce() {
     }
   }
   saveGameState();
-  if (
-    window.risqueArtemisMode &&
-    window.risqueArtemisNetClient &&
-    !window.risqueArtemisHost
-  ) {
-    if (typeof window.risqueArtemisFlushClientStatePush === 'function') {
+  if (window.risqueArtemisMode) {
+    try {
+      document.body.setAttribute('data-risque-phase', 'reinforce');
+    } catch (eRfPh) {
+      /* ignore */
+    }
+    try {
+      var rfUrl = 'game.html?phase=reinforce';
+      if (typeof window.risqueArtemisAppendSessionParams === 'function') {
+        rfUrl = window.risqueArtemisAppendSessionParams(rfUrl);
+      }
+      if (window.history && typeof window.history.replaceState === 'function') {
+        window.history.replaceState(null, '', rfUrl);
+      }
+    } catch (eRfUrl) {
+      /* ignore */
+    }
+    if (
+      window.risqueArtemisNetClient &&
+      !window.risqueArtemisHost &&
+      typeof window.risqueArtemisFlushClientStatePush === 'function'
+    ) {
       window.risqueArtemisFlushClientStatePush(window.gameState);
     }
     if (typeof window.risqueArtemisSyncPortableReinforce === 'function') {
@@ -5996,16 +6015,9 @@ function goToReinforce() {
     }
     return;
   }
-  var reinforceDelay = window.risqueArtemisMode ? 0 : 1000;
   setTimeout(() => {
     navigateGameHtmlPreferSoft('game.html?phase=reinforce');
-    if (
-      window.risqueArtemisMode &&
-      typeof window.risqueArtemisSyncPortableReinforce === 'function'
-    ) {
-      window.risqueArtemisSyncPortableReinforce(window.gameState);
-    }
-  }, reinforceDelay);
+  }, 1000);
 }
 
 function backFromAerialPreview() {

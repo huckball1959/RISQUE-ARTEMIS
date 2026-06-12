@@ -1014,6 +1014,22 @@
         return true;
       }
     }
+    if (ph === "receivecard" || ph === "getcard") {
+      if (
+        typeof window.risqueArtemisReceiveCardControlsPresent === "function" &&
+        window.risqueArtemisReceiveCardControlsPresent()
+      ) {
+        return true;
+      }
+      if (document.querySelector("#risque-phase-content .receivecard-compact-root")) {
+        return true;
+      }
+    }
+    if (ph === "reinforce") {
+      if (document.getElementById("reinforce-btn-skip")) {
+        return true;
+      }
+    }
     if (
       typeof window.risqueArtemisCardplayControlsPresent === "function" &&
       window.risqueArtemisCardplayControlsPresent()
@@ -1869,8 +1885,22 @@
       typeof window.risqueArtemisSyncPortableReinforce === "function"
     ) {
       window.risqueArtemisSyncPortableReinforce(gs);
-    } else if (typeof window.risqueArtemisUnmountPortableReinforce === "function") {
-      window.risqueArtemisUnmountPortableReinforce();
+    } else {
+      if (typeof window.risqueArtemisCancelReinforceMapRouting === "function") {
+        window.risqueArtemisCancelReinforceMapRouting();
+      }
+      if (typeof window.risqueArtemisUnmountPortableReinforce === "function") {
+        window.risqueArtemisUnmountPortableReinforce();
+      }
+    }
+
+    if (
+      (ph === "receivecard" || ph === "getcard") &&
+      typeof window.risqueArtemisSyncPortableReceiveCard === "function"
+    ) {
+      window.risqueArtemisSyncPortableReceiveCard(gs);
+    } else if (typeof window.risqueArtemisUnmountPortableReceiveCard === "function") {
+      window.risqueArtemisUnmountPortableReceiveCard();
     }
 
     if (setupPh && typeof window.risqueArtemisSyncSetupMirror === "function") {
@@ -1879,12 +1909,6 @@
 
     if (typeof window.risqueArtemisSyncMyTurnClass === "function") {
       window.risqueArtemisSyncMyTurnClass(gs);
-    }
-    if (
-      ph === "reinforce" &&
-      typeof window.risqueArtemisEnsureReinforceInteractive === "function"
-    ) {
-      window.risqueArtemisEnsureReinforceInteractive(gs);
     }
 
     if (typeof window.risqueArtemisEndPhaseTransition === "function") {
@@ -2112,6 +2136,124 @@
       }
     };
     tick();
+  };
+
+  var __artemisReinforceMapDelegateWired = false;
+  window.risqueArtemisWireReinforceMapClickDelegate = function () {
+    if (__artemisReinforceMapDelegateWired) return;
+    __artemisReinforceMapDelegateWired = true;
+    document.addEventListener(
+      "click",
+      function (ev) {
+        if (!window.risqueArtemisMode) return;
+        var gs = window.gameState;
+        if (!gs || String(gs.phase || "") !== "reinforce") return;
+        if (typeof window.risqueArtemisIsMyTurn === "function" && !window.risqueArtemisIsMyTurn(gs)) {
+          return;
+        }
+        if (typeof window.risqueArtemisCanLocalPlay === "function" && !window.risqueArtemisCanLocalPlay()) {
+          return;
+        }
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        if (
+          t.closest(
+            "#runtime-hud-root, #risque-artemis-deploy-dock, #prompt, button, input, select, textarea, a, .attack-toolbar-strip"
+          )
+        ) {
+          return;
+        }
+        var hit = t.closest(".territory-circle, .territory-number");
+        if (!hit) return;
+        var label = hit.getAttribute("data-label") || (hit.dataset && hit.dataset.label);
+        if (!label) return;
+        var info = artemisLookupTerritoryOwner(gs, label);
+        if (!info || typeof window.risqueReinforcePhaseTerritoryClick !== "function") return;
+        if (typeof window.risqueArtemisEnsureReinforceInteractive === "function") {
+          window.risqueArtemisEnsureReinforceInteractive(gs);
+        }
+        if (typeof window.risqueReinforcePhaseTerritoryClick === "function") {
+          window.handleTerritoryClick = window.risqueReinforcePhaseTerritoryClick;
+        }
+        try {
+          ev.preventDefault();
+          ev.stopImmediatePropagation();
+          ev.stopPropagation();
+        } catch (eStopRf) {
+          /* ignore */
+        }
+        try {
+          window.risqueReinforcePhaseTerritoryClick(label, info.owner, info.troops, ev);
+        } catch (eRfClick) {
+          /* ignore */
+        }
+      },
+      true
+    );
+  };
+  window.risqueArtemisWireReinforceMapClickDelegate();
+
+  /** Active client reinforce: wire map clicks without remounting or re-rendering the board. */
+  var __artemisReinforceMapRoutedFor = "";
+  window.risqueArtemisEnsureReinforceMapRouting = function (gsOpt) {
+    var gs = gsOpt && typeof gsOpt === "object" ? gsOpt : window.gameState;
+    if (!gs || String(gs.phase || "") !== "reinforce") return;
+    var ownsReinforce =
+      (typeof window.risqueArtemisIsMyTurn === "function" && window.risqueArtemisIsMyTurn(gs)) ||
+      (typeof window.risqueArtemisClientIsActivePlayer === "function" &&
+        window.risqueArtemisClientIsActivePlayer(gs));
+    if (!ownsReinforce) {
+      return;
+    }
+    var routeKey =
+      String(gs.artemisControlSlot || "") +
+      ":" +
+      String(gs.currentPlayer || "").trim().toUpperCase();
+    window.risqueArtemisDeployHandoffPending = 0;
+    window.risqueArtemisDeployPushLocked = false;
+    try {
+      document.body.setAttribute("data-risque-phase", "reinforce");
+    } catch (ePhRf) {
+      /* ignore */
+    }
+    if (typeof window.risqueArtemisWireReinforceMapClickDelegate === "function") {
+      window.risqueArtemisWireReinforceMapClickDelegate();
+    }
+    if (typeof window.risqueReinforcePhaseTerritoryClick === "function") {
+      window.handleTerritoryClick = window.risqueReinforcePhaseTerritoryClick;
+    }
+    if (__artemisReinforceMapRoutedFor === routeKey && window.__risqueReinforceInitialized) {
+      return;
+    }
+    __artemisReinforceMapRoutedFor = routeKey;
+    if (typeof window.risqueArtemisEnsureReinforceInteractive === "function") {
+      window.risqueArtemisEnsureReinforceInteractive(gs);
+    }
+    if (window.risqueArtemisNetClient) {
+      if (typeof window.risqueArtemisEnterClientPlayMode === "function") {
+        window.risqueArtemisEnterClientPlayMode();
+      } else {
+        window.risqueArtemisClientPlaying = true;
+        window.risqueDisplayIsPublic = false;
+        window.risqueDisplayMode = "host";
+        document.documentElement.classList.remove("risque-view-public");
+        document.documentElement.classList.add("risque-view-host");
+        document.body.classList.remove("risque-view-public");
+        document.body.classList.add("risque-view-host");
+      }
+    }
+    if (typeof window.risqueArtemisSyncMyTurnClass === "function") {
+      window.risqueArtemisSyncMyTurnClass(gs);
+    }
+  };
+
+  window.risqueArtemisCancelReinforceMapRouting = function () {
+    __artemisReinforceMapRoutedFor = "";
+  };
+  window.risqueArtemisScheduleReinforceMapRouting = function (gsOpt) {
+    if (typeof window.risqueArtemisEnsureReinforceMapRouting === "function") {
+      window.risqueArtemisEnsureReinforceMapRouting(gsOpt);
+    }
   };
 
   window.risqueArtemisShouldHostMountDeploy = function (gs) {

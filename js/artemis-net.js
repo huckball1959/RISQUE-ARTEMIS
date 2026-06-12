@@ -2183,6 +2183,20 @@
             window.risqueArtemisEnsureHudTogglesVisible();
           }
         }
+        if (ph === "receivecard" || ph === "getcard") {
+          if (typeof window.risqueArtemisCancelReinforceMapRouting === "function") {
+            window.risqueArtemisCancelReinforceMapRouting();
+          }
+          if (typeof window.risqueArtemisReconcileClientPlayMode === "function") {
+            window.risqueArtemisReconcileClientPlayMode(item.state);
+          }
+          if (typeof window.risqueArtemisSyncPortableReceiveCard === "function") {
+            window.risqueArtemisSyncPortableReceiveCard(item.state);
+          }
+          if (typeof window.risqueArtemisEnsureHudTogglesVisible === "function") {
+            window.risqueArtemisEnsureHudTogglesVisible();
+          }
+        }
         if (ph === "income" || ph === "con-income") {
           if (typeof window.risqueArtemisReconcileClientPlayMode === "function") {
             window.risqueArtemisReconcileClientPlayMode(item.state);

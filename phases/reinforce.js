@@ -558,8 +558,7 @@ window.risqueArtemisEnsureReinforceInteractive = function (gsOpt) {
   var gs = gsOpt || window.gameState;
   if (!gs || String(gs.phase || "") !== "reinforce") return;
   abortReinforcePublishGate();
-  if (!window.__risqueReinforceInitialized) {
-    window.__risqueReinforceInitialized = false;
+  if (!window.__risqueReinforceInitialized && !window.__risqueReinforceInitInProgress) {
     if (typeof window.initReinforcePhase === "function") {
       window.initReinforcePhase();
     }
@@ -868,6 +867,9 @@ function reinforceProceedAfterReinforce() {
   }
   var gs = window.gameState;
   if (!gs) return;
+  if (typeof window.risqueReceiveCardRepairEarnFlags === 'function') {
+    window.risqueReceiveCardRepairEarnFlags(gs);
+  }
   var earned = !!(gs.cardEarnedViaAttack || gs.cardEarnedViaCardplay);
   var deckDrawStillOwed = earned && !gs.cardAwardedThisTurn;
 
@@ -892,6 +894,41 @@ function reinforceProceedAfterReinforce() {
     delete gs.risqueTransferPulse;
   }
   reinforceSaveState();
+  if (window.risqueArtemisMode) {
+    if (typeof window.risqueArtemisStampControlSlot === 'function') {
+      window.risqueArtemisStampControlSlot(gs);
+    }
+    if (typeof window.risqueArtemisCancelReinforceMapRouting === 'function') {
+      window.risqueArtemisCancelReinforceMapRouting();
+    }
+    try {
+      document.body.setAttribute('data-risque-phase', 'receivecard');
+    } catch (eRcPh) {
+      /* ignore */
+    }
+    try {
+      var rcUrl = 'game.html?phase=receivecard';
+      if (typeof window.risqueArtemisAppendSessionParams === 'function') {
+        rcUrl = window.risqueArtemisAppendSessionParams(rcUrl);
+      }
+      if (window.history && typeof window.history.replaceState === 'function') {
+        window.history.replaceState(null, '', rcUrl);
+      }
+    } catch (eRcUrl) {
+      /* ignore */
+    }
+    if (typeof window.risqueMirrorPushGameState === 'function') {
+      try {
+        window.risqueMirrorPushGameState();
+      } catch (eMirror) {
+        /* ignore */
+      }
+    }
+    if (typeof window.risqueArtemisSyncPortableReceiveCard === 'function') {
+      window.risqueArtemisSyncPortableReceiveCard(gs);
+    }
+    return;
+  }
   if (typeof window.risqueMirrorPushGameState === "function") {
     try {
       window.risqueMirrorPushGameState();
@@ -1329,11 +1366,17 @@ function handleReinforceTerritoryClick(label, owner, troops) {
   }
 }
 
+window.risqueReinforcePhaseTerritoryClick = handleReinforceTerritoryClick;
+
 function initReinforcePhase() {
   if (window.__risqueReinforceInitialized) return true;
+  if (window.__risqueReinforceInitInProgress) return true;
   if (!window.gameUtils) return false;
 
   function runReinforceInitCore() {
+    if (window.__risqueReinforceInitialized || window.__risqueReinforceInitInProgress) return;
+    window.__risqueReinforceInitInProgress = true;
+    try {
     var gameState = window.gameState;
     if (!gameState) {
       window.gameUtils.showError('Could not load game state for reinforcement.');
@@ -1362,6 +1405,7 @@ function initReinforcePhase() {
     updateReinforcePlayerName();
     bindReinforceCompactHud();
     window.handleTerritoryClick = handleReinforceTerritoryClick;
+    window.__risqueReinforceInitialized = true;
     window.gameUtils.renderTerritories(null, window.gameState);
     window.gameUtils.renderStats(window.gameState);
     if (reinforceWheelHandler) {
@@ -1384,7 +1428,6 @@ function initReinforcePhase() {
     resetReinforceSelection();
     captureReinforcePublicBoardSnapshot();
     reinforceSaveState();
-    window.__risqueReinforceInitialized = true;
     reinforceLog('Reinforcement initialized', { player: window.gameState.currentPlayer });
     if (typeof window.risqueRedrawAerialBridgeOverlay === "function") {
       requestAnimationFrame(function () {
@@ -1396,6 +1439,9 @@ function initReinforcePhase() {
           }
         });
       });
+    }
+    } finally {
+      window.__risqueReinforceInitInProgress = false;
     }
   }
 
@@ -1432,11 +1478,41 @@ window.initReinforcePhase = initReinforcePhase;
 (function () {
   "use strict";
 
+  function reinforceArtemisMountKey(gs) {
+    if (!gs) return "";
+    var up = String(gs.currentPlayer || "").trim().toUpperCase();
+    var ctrl = Number(gs.artemisControlSlot) || 0;
+    return String(ctrl) + ":" + up;
+  }
+
   function mount(stageHost, opts) {
     opts = opts || {};
     var uiOverlay = document.getElementById("ui-overlay");
     if (!uiOverlay || !window.gameUtils) return;
 
+    var gsMount = window.gameState;
+    var mountKey = reinforceArtemisMountKey(gsMount);
+    if (
+      window.__risqueArtemisReinforceMountInProgress &&
+      window.__risqueArtemisReinforceMountKey === mountKey
+    ) {
+      return;
+    }
+    if (
+      document.getElementById("reinforce-btn-skip") &&
+      window.__risqueReinforceInitialized &&
+      window.__risqueArtemisReinforceMountKey === mountKey
+    ) {
+      if (typeof window.risqueArtemisEnsureReinforceInteractive === "function") {
+        window.risqueArtemisEnsureReinforceInteractive(gsMount);
+      }
+      return;
+    }
+
+    window.__risqueArtemisReinforceMountInProgress = true;
+    var prevMountKey = window.__risqueArtemisReinforceMountKey || "";
+    window.__risqueArtemisReinforceMountKey = mountKey;
+    try {
     if (typeof window.risqueRestoreHostMapCanvasFromPhaseArtifacts === "function") {
       window.risqueRestoreHostMapCanvasFromPhaseArtifacts();
     }
@@ -1446,32 +1522,19 @@ window.initReinforcePhase = initReinforcePhase;
       /* ignore */
     }
 
-    /* Paint the board from shell state before HUD slot swap so the map never sits empty while async init ran. */
-    if (typeof window.risqueRepaintHostMapSoon === "function" && window.gameState) {
-      window.risqueRepaintHostMapSoon(window.gameState);
-    } else if (
-      window.gameState &&
-      typeof window.gameUtils.validateGameState === "function" &&
-      window.gameUtils.validateGameState(window.gameState)
-    ) {
-      try {
-        window.gameUtils.initGameView();
-        window.gameUtils.resizeCanvas();
-        window.gameUtils.renderTerritories(null, window.gameState);
-        window.gameUtils.renderStats(window.gameState);
-      } catch (eEarlyPaint) {
-        /* ignore */
-      }
-    }
-
     var stalePrompt = document.getElementById("prompt");
     if (stalePrompt && stalePrompt.parentNode) stalePrompt.parentNode.removeChild(stalePrompt);
     if (typeof window.risqueDismissAttackPrompt === "function") {
       window.risqueDismissAttackPrompt();
     }
 
-    window.__risqueReinforceInitialized = false;
-    window.handleTerritoryClick = window.handleTerritoryClick || null;
+    if (prevMountKey !== mountKey) {
+      window.__risqueReinforceInitialized = false;
+    }
+    window.handleTerritoryClick =
+      typeof handleReinforceTerritoryClick === "function"
+        ? handleReinforceTerritoryClick
+        : window.risqueReinforcePhaseTerritoryClick || null;
 
     uiOverlay.classList.add("visible");
     uiOverlay.classList.remove("fade-out");
@@ -1509,8 +1572,6 @@ window.initReinforcePhase = initReinforcePhase;
           "</div>" +
           "</div>";
       }
-      /* Reinforce UI stays in #risque-phase-content; CSS flex order hoists it above #hud-main-panel
-       * so it is not trapped below the voice + strip stack (below-the-fold / clipped chrome). */
       if (document.body) {
         document.body.setAttribute("data-risque-reinforce-slot-mode", "phase");
       }
@@ -1518,6 +1579,24 @@ window.initReinforcePhase = initReinforcePhase;
       uiOverlay.innerHTML =
         '<div class="text title" id="reinforce-title">Reinforcement</div>' +
         '<div class="text player-name" id="reinforce-player-name"></div>';
+    }
+
+    /* Paint board after controls exist so mirror sync does not remount mid-mount. */
+    if (typeof window.risqueRepaintHostMapSoon === "function" && window.gameState) {
+      window.risqueRepaintHostMapSoon(window.gameState);
+    } else if (
+      window.gameState &&
+      typeof window.gameUtils.validateGameState === "function" &&
+      window.gameUtils.validateGameState(window.gameState)
+    ) {
+      try {
+        window.gameUtils.initGameView();
+        window.gameUtils.resizeCanvas();
+        window.gameUtils.renderTerritories(null, window.gameState);
+        window.gameUtils.renderStats(window.gameState);
+      } catch (eEarlyPaint) {
+        /* ignore */
+      }
     }
 
     if (window.gameState) {
@@ -1551,6 +1630,10 @@ window.initReinforcePhase = initReinforcePhase;
         window.risqueRuntimeHud.syncPosition();
       }
     });
+    } finally {
+      window.__risqueArtemisReinforceMountInProgress = false;
+      window.__risqueArtemisReinforceControlsLive = !!document.getElementById("reinforce-btn-skip");
+    }
   }
 
   window.risquePhases = window.risquePhases || {};

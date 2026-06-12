@@ -278,6 +278,154 @@
 
   setInterval(cardplayClientSnapshot, 8000);
 
+  function receiveCardHandNames(gs) {
+    if (!gs || !gs.players || !gs.currentPlayer) return [];
+    var cp = String(gs.currentPlayer || "");
+    var pl = gs.players.find(function (p) {
+      return p && String(p.name || "") === cp;
+    });
+    if (!pl || !Array.isArray(pl.cards)) return [];
+    return pl.cards.map(function (c) {
+      return typeof c === "string" ? c : c && c.name ? String(c.name) : "";
+    });
+  }
+
+  /** Fired from receiveCardRunDisplay — host or active client. Say "read diagnostics" after receive card. */
+  window.risqueArtemisDiagReceiveCardDisplay = function (opts) {
+    if (!window.risqueArtemisMode) return;
+    opts = opts || {};
+    var snap = opts.snap && typeof opts.snap === "object" ? opts.snap : {};
+    var gs = window.gameState;
+    var player = snap.currentPlayer || (gs && gs.currentPlayer) || "?";
+    var drawn =
+      opts.drawnThisStep != null && String(opts.drawnThisStep).trim() !== ""
+        ? String(opts.drawnThisStep)
+        : snap.drawnThisStep != null && String(snap.drawnThisStep).trim() !== ""
+          ? String(snap.drawnThisStep)
+          : snap.lastCardDrawn != null && String(snap.lastCardDrawn).trim() !== ""
+            ? String(snap.lastCardDrawn)
+            : null;
+    var hand = Array.isArray(opts.handNames) ? opts.handNames : receiveCardHandNames(gs);
+    var ui = {
+      dualStrip: !!opts.uiDualStrip,
+      staging: !!opts.uiStaging,
+      continueBtn: !!opts.uiContinueBtn,
+      compactRoot: !!opts.uiCompactRoot,
+    };
+    var prettyDraw = drawn ? String(drawn).replace(/_/g, " ").toUpperCase() : "";
+    var summary;
+    if (drawn) {
+      summary =
+        String(player).toUpperCase() +
+        " RECEIVE CARD: drew " +
+        prettyDraw +
+        " (hand now " +
+        hand.length +
+        " cards)";
+    } else if (snap.reasonDeckBlocked) {
+      summary =
+        String(player).toUpperCase() +
+        " RECEIVE CARD: no deck draw — " +
+        String(snap.reasonDeckBlocked);
+    } else {
+      summary = String(player).toUpperCase() + " RECEIVE CARD: display ran, no new card drawn";
+    }
+    return sendDiag({
+      kind: drawn ? "receive_card_awarded" : "receive_card_display",
+      summary: summary,
+      detail: {
+        player: player,
+        drawnThisStep: drawn,
+        lastCardDrawn: snap.lastCardDrawn != null ? snap.lastCardDrawn : null,
+        cardAwardedThisTurn: !!snap.cardAwardedThisTurn,
+        cardEarnedViaAttack: !!snap.cardEarnedViaAttack,
+        cardEarnedViaCardplay: !!snap.cardEarnedViaCardplay,
+        reasonDeckBlocked: snap.reasonDeckBlocked || "",
+        deckLength: snap.deckLength,
+        handNames: hand,
+        handCount: hand.length,
+        uiPresent: ui,
+        eligibility: snap,
+      },
+    });
+  };
+
+  window.risqueArtemisDiagReceiveCardContinue = function (opts) {
+    if (!window.risqueArtemisMode) return;
+    opts = opts || {};
+    var gs = window.gameState;
+    var finished = opts.finishedPlayer || (gs && gs.currentPlayer) || "?";
+    var hand = Array.isArray(opts.handNames) ? opts.handNames : receiveCardHandNames(gs);
+    var lastDraw = opts.lastCardDrawn != null ? opts.lastCardDrawn : gs && gs.lastCardDrawn;
+    return sendDiag({
+      kind: "receive_card_continue",
+      summary:
+        "P" +
+        slotLabel() +
+        " CONTINUE after receive card (" +
+        String(finished).toUpperCase() +
+        ", hand " +
+        hand.length +
+        " cards" +
+        (lastDraw ? ", last draw " + String(lastDraw).replace(/_/g, " ").toUpperCase() : "") +
+        ")",
+      detail: {
+        finishedPlayer: finished,
+        lastCardDrawn: lastDraw,
+        handNames: hand,
+        handCount: hand.length,
+        nextPhase: "cardplay",
+      },
+    });
+  };
+
+  var lastReceiveCardSnapshotKey = "";
+  var lastReceiveCardSnapshotAt = 0;
+
+  function receiveCardSnapshot() {
+    if (!window.risqueArtemisMode) return;
+    var gs = window.gameState;
+    if (!gs) return;
+    var ph = String(gs.phase || "");
+    if (ph !== "receivecard" && ph !== "getcard") return;
+    var hand = receiveCardHandNames(gs);
+    var snap = {
+      phase: ph,
+      currentPlayer: String(gs.currentPlayer || ""),
+      lastCardDrawn: gs.lastCardDrawn != null ? gs.lastCardDrawn : null,
+      cardAwardedThisTurn: !!gs.cardAwardedThisTurn,
+      cardEarnedViaAttack: !!gs.cardEarnedViaAttack,
+      cardEarnedViaCardplay: !!gs.cardEarnedViaCardplay,
+      handCount: hand.length,
+      handNames: hand,
+      uiPresent: {
+        dualStrip: !!document.getElementById("receivecard-hand-strip-upper"),
+        staging: !!document.getElementById("receivecard-staging-grid"),
+        continueBtn: !!document.getElementById("receivecard-btn-end"),
+        compactRoot: !!document.querySelector(".receivecard-compact-root"),
+      },
+      clientPlaying: !!window.risqueArtemisClientPlaying,
+      viewPublic: document.documentElement.classList.contains("risque-view-public"),
+    };
+    var snapKey = JSON.stringify(snap);
+    var now = Date.now();
+    if (snapKey === lastReceiveCardSnapshotKey && now - lastReceiveCardSnapshotAt < 12000) return;
+    lastReceiveCardSnapshotKey = snapKey;
+    lastReceiveCardSnapshotAt = now;
+    sendDiag({
+      kind: "receive_card_snapshot",
+      summary:
+        "P" +
+        slotLabel() +
+        " receive-card snapshot " +
+        String(gs.currentPlayer || "?").toUpperCase() +
+        (gs.lastCardDrawn ? " drew " + String(gs.lastCardDrawn).replace(/_/g, " ").toUpperCase() : ""),
+      detail: snap,
+    });
+  }
+
+  setInterval(receiveCardSnapshot, 8000);
+
   /** Log HUD / phase button clicks + whether anything visibly changed (~2.5s). */
   var UI_CLICK_RESPONSE_MS = 2500;
   var UI_CLICK_DEBOUNCE_MS = 350;

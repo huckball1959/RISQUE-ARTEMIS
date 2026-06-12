@@ -2559,8 +2559,27 @@
       const currentPlayer = window.gameState.players.find(p => p.name === window.gameState.currentPlayer);
       const originalCardCount = currentPlayer.cards.length;
       const originalCards = [...currentPlayer.cards];
-      const idsToRemove = selectedCards.map(sc => sc.id);
-      currentPlayer.cards = currentPlayer.cards.filter(card => !idsToRemove.includes(card.id));
+      const remainingAfterBook = currentPlayer.cards.slice();
+      selectedCards.forEach(function (sc) {
+        if (!sc) return;
+        var id = sc.id;
+        var nameNorm = String(sc.card || "")
+          .trim()
+          .toLowerCase();
+        var idx = remainingAfterBook.findIndex(function (card) {
+          return card && card.id === id;
+        });
+        if (idx < 0 && nameNorm) {
+          idx = remainingAfterBook.findIndex(function (card) {
+            var raw = typeof card === "string" ? card : card && card.name;
+            return String(raw || "")
+              .trim()
+              .toLowerCase() === nameNorm;
+          });
+        }
+        if (idx >= 0) remainingAfterBook.splice(idx, 1);
+      });
+      currentPlayer.cards = remainingAfterBook;
       currentPlayer.cardCount = currentPlayer.cards.length;
       if (window.gameUtils && typeof window.gameUtils.risqueDiscardCardNames === "function") {
         window.gameUtils.risqueDiscardCardNames(
@@ -2580,7 +2599,9 @@
           expected: originalCardCount - 3,
           actual: currentPlayer.cards.length,
           originalCards,
-          removedIds: idsToRemove,
+          removed: selectedCards.map(function (sc) {
+            return { name: sc.card, id: sc.id };
+          }),
           remainingCards: currentPlayer.cards
         });
         setCardplayError(

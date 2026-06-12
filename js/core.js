@@ -1181,7 +1181,10 @@ window.gameUtils = {
       gameState.attackingTerritory = null;
       gameState.acquiredTerritory = null;
       gameState.minTroopsToTransfer = 0;
-      gameState.conqueredThisTurn = false;
+      /* Keep conqueredThisTurn when a deck card was earned — reinforce/receive-card repair uses it. */
+      if (!gameState.cardEarnedViaAttack && !gameState.cardEarnedViaCardplay) {
+        gameState.conqueredThisTurn = false;
+      }
       delete gameState.risqueDeferConquerElimination;
       changed = true;
       risqueCoreDebugLog('[Core] Sanitized stale pending_transfer (wrong phase) from save');
@@ -1975,7 +1978,8 @@ window.gameUtils = {
           bodyPhaseAttr === 'attack';
         const isReinforceUi =
           gameState.phase === 'reinforce' ||
-          urlPhase === 'reinforce';
+          urlPhase === 'reinforce' ||
+          bodyPhaseAttr === 'reinforce';
         const useGlobalTerritoryHandler =
           typeof window.handleTerritoryClick === 'function' &&
           (isMockGameMaker || isAttackUi || isReinforceUi);

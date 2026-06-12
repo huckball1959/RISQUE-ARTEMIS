@@ -2,21 +2,23 @@
 
 **Start here** for current project status, lab setup, and where to look in the codebase.
 
-Last updated: **2026-06-09** (m99 — client cardplay active controls fix).
+Last updated: **2026-06-12** (m171 — receive-card auto-diagnostics).
 
 ---
 
 ## Reboot checklist (3 laptops)
 
-1. **Host:** run `scripts/SERVER/START-ARTEMIS.bat` — keep server window open.
-2. **All browsers:** hard refresh **Ctrl+Shift+R** (must show `?v=m99` in URL).
+1. **Host:** run `scripts/SERVER/START-ARTEMIS.bat` — keep server window open (echoes **Build cache: m171**).
+2. **All browsers:** hard refresh **Ctrl+Shift+R** (receive-card diag needs **m171** scripts).
 3. **Clients:** run `JOIN.bat` on laptop 2 and 3 (do not bookmark old URLs).
 4. **Lobby:** Ready ×3 → host Start — do **not** re-Start mid-session if stuck.
-5. **Stuck?** Tell Cursor: **read diagnostics** (`logs/artemis-last-report.json`).
+5. **After receive card:** tell Cursor **read diagnostics** — no console paste needed (`logs/artemis-last-report.json` → **`receiveCard.readout`**).
 
 **Mock harness (default):** `artemisMockPhases=1&artemisMockCardplay=0` — **real cardplay**, **mock income** (+3 troops, CONTINUE). Full real phases: `&artemisMockPhases=0`. Full mock cardplay: add `&artemisMockCardplay=1`.
 
 **Cardplay roulette rig:** `rigCardPlay=2` (Mictor wins) — default in launchers; `rigCardPlay=1` for Guido; `rigCardPlay=random` for fair spin.
+
+**Test save:** `3 players.json` in repo root (round 8, GUIDO/MICTOR/NOOCH — cardplay/income testing).
 
 ---
 
@@ -33,37 +35,34 @@ ARTEMIS reuses the same phase modules and control panel DOM as hot-seat, but gat
 
 ## Where we are now (ARTEMIS)
 
-### Done
+### Done (verified this session or earlier)
 
 | Step | Status | Notes |
 |------|--------|-------|
 | Lobby (Ready ×3 → host Start) | ✅ | `js/artemis-lobby.js` |
 | Per-laptop login (name + color) | ✅ | `js/artemis-login.js`, `phases/login.js` |
-| Welcome (~2.2s, mirrored) | ✅ | `js/artemis-setup-flow.js` — phase `welcome`, Control Voice |
-| First-card roulette (mirrored) | ✅ | Host runs `phases/player-select.js`; clients mirror flash |
-| Deal (mirrored territory pops) | ✅ | Host runs `phases/deal.js`; clients mirror pops |
-| Deploy-order roulette | ✅ | Legacy flow after deal (unchanged) |
-| Setup deploy handoff basics | ✅ | `artemisControlSlot`, CONFIRM → `player_state`, P3 last player |
-| Deploy stale-mirror hardening | ✅ | `artemis-m23-deploy-relinquish` in `js/artemis-net.js` (undocumented in devlog) |
+| Welcome → first-card roulette → deal | ✅ | Mirrored setup chain |
+| Setup deploy handoff (P1→P2→P3) | ✅ | CONFIRM + mirror; blinking/handoff fixes in deploy panel |
+| Real cardplay (active client) | ✅ | m99+ mirror/view-class fixes |
+| **Real income Continue** | ✅ | **m168** — body-mounted green button; user approved |
+| Turn deploy | ✅ | Per-laptop portable panel |
+| Attack | ✅ | m96 portable panel — user confirmed works very well |
+| **Reinforcement** | ✅ | m98 portable panel — **restored tonight** after m169/m170 rollback |
+| Git baseline | ✅ | `main` @ commit **`0be1a7f`** |
 
-### In progress / next
+### Not done / reverted
 
 | Step | Status | Notes |
 |------|--------|-------|
-| Setup deploy handoff | ✅ | P2→P3 CONFIRM chain + `deploy_finish` bus |
-| Card-play order roulette | ✅ | Host runs `playerSelect` `cardPlay`; default rig → Mictor P2 (`rigCardPlay=2`) |
-| **Real cardplay** (active client P2) | ⚠️ | m99 fixes mirror clobber + view-class — **retest 3-laptop smoke** |
-| Mock income | ⚠️ | +3 troops + CONTINUE — keep until real income rebuilt |
-| Turn deploy | ✅ | Host solo validated |
-| Attack | ✅ | Restored m96 — user confirmed works very well |
-| Reinforce | ⚠️ | Host stuck pre-m98; panel rewrite m98 — retest |
-| Real income | ❌ | Still mocked — do not enable until rebuilt |
-| Unified control panel | ⚠️ | Spec in [CONTROL-PANEL.md](CONTROL-PANEL.md); 168px voice lock m95; attack/reinforce use native chrome |
+| Portable receive-card UI | ❌ reverted | m169 broke reinforce; removed — receive card is **control voice only** for now |
+| Real income phase UI | ❌ | Mock income (+3, CONTINUE) still default; real income mount exists but not primary path |
+| m169 / m170 local experiments | ❌ discarded | Never committed; do not re-apply without branch + reinforce regression test |
 
-### Superseded / dev-only
+### Next session (suggested order)
 
-- **`js/artemis-fast.js`** — dev-only skip welcome/deal (`?artemisFastDeploy=1`).
-- **`artemis-skip-cardplay.js`** — removed m77; was auto-bypass to income (replaced by mock CONTINUE flow).
+1. Receive-card portable panel on a **branch** — hand/staging/CONTINUE; must not break reinforce.
+2. Full 3-laptop smoke: attack → reinforce → receive card → cardplay.
+3. Real income rebuild (when mock path is stable enough to replace).
 
 ---
 
@@ -84,6 +83,8 @@ ARTEMIS reuses the same phase modules and control panel DOM as hot-seat, but gat
 **Entry points:** [`index.html`](../index.html) (launcher) or [`game.html`](../game.html) (runtime shell).
 
 Prefer **localhost HTTP** over `file://` (browser security warnings can interfere).
+
+**Portable backup:** `X:\github\RISQUE-ARTEMIS` (robocopy `/MIR` from OneDrive canonical path when asked).
 
 ---
 
@@ -118,6 +119,7 @@ Full step-by-step UX spec: [POST-LOGIN-FLOW.md](POST-LOGIN-FLOW.md).
 | `risqueArtemisUseMockCardplay` / `UseMockIncome` | `js/artemis-mock-phases.js` | Split mock flags (m97); default real cardplay + mock income |
 | `risqueArtemisSyncPortableAttack` | `js/artemis-attack-panel.js` | Attack mount per laptop (m96) |
 | `risqueArtemisSyncPortableReinforce` | `js/artemis-reinforce-panel.js` | Reinforce mount per laptop (m98) |
+| `risqueArtemisSyncPortableIncome` | `js/artemis-income-panel.js` | Income Continue on active laptop (m168 body button) |
 | `risqueArtemisIsMyTurn` | `js/artemis-play.js` | Prefer `artemisControlSlot`, not name fallbacks |
 | `applyHostClientState` | `js/artemis-net.js` | Host applies client edits + mirror |
 
@@ -133,7 +135,7 @@ Full step-by-step UX spec: [POST-LOGIN-FLOW.md](POST-LOGIN-FLOW.md).
 | Setup sequence | `js/artemis-setup-flow.js`, `js/artemis-login.js` |
 | Lobby | `js/artemis-lobby.js` |
 | Turn / identity | `js/artemis-play.js` |
-| Setup deploy UI | `js/artemis-deploy-panel.js`, `phases/deploy.js` |
+| Setup deploy UI | `js/artemis-deploy-panel.js`, `phases/firstdeploy.js`, `phases/deploy.js` |
 | Mock harness | `js/artemis-mock-phases.js`, `js/artemis-cardplay-panel.js`, `js/artemis-income-panel.js` |
 | Turn deploy UI | `js/artemis-turn-deploy-panel.js` |
 | Attack / reinforce | `js/artemis-attack-panel.js`, `js/artemis-reinforce-panel.js` |
@@ -146,19 +148,19 @@ Full step-by-step UX spec: [POST-LOGIN-FLOW.md](POST-LOGIN-FLOW.md).
 
 ## Cache busting
 
-ARTEMIS scripts in `game.html` use `?v=artemis-mNN-…` query params. **Bump the token** when changing `js/artemis-*.js`, `phases/deploy.js`, or ARTEMIS HUD CSS so all three laptops pick up changes.
+ARTEMIS scripts in `game.html` use `?v=artemis-mNN-…` query params. **Bump the token** when changing `js/artemis-*.js`, phase modules, or ARTEMIS HUD CSS so all three laptops pick up changes.
 
-Current tokens (as of 2026-06-09): launcher **`?v=m99`**; scripts **`artemis-m99-client-cardplay-fix-2026-06-09`** (see `game.html`).
+**Current (2026-06-07):** launcher **`m168`** (`launchers/profiles.json`); most scripts **`artemis-m168-income-mini-btn-2026-06-09`**; reinforce panel still **`artemis-m99-client-cardplay-fix-2026-06-09`**; `phases/reinforce.js` **`artemis-m71-reinforce-clicks-2026-06-08`** — see `game.html`.
 
 ---
 
-## Latest diagnostics snapshot (2026-06-09)
+## Latest session snapshot (2026-06-07)
 
-**Last user session (host solo, pre-m98):** Setup deploy ✅ → real cardplay (SKIP twice to income) → mock income → turn deploy ✅ → attack ✅ → reinforce stuck (addressed m98). BOOK/CONFIRM untested (no cards in hand).
+**Shipped in repo:** Full ARTEMIS stack + income Continue fix (`0be1a7f`).
 
-**Next test:** 3-laptop cardplay smoke — Mictor P2 active (`rigCardPlay=2`); spectators Guido + Nooch.
+**Tonight:** Attempted receive-card portable panel (m169) → reinforcement regression. Attempted m170 fix → worse. **Rolled back** to `0be1a7f`; user confirmed reinforcement good again.
 
-**Benign (historical):** `player_state_dropped_stale` P2 after deploy finish.
+**Receive card today:** Active player sees control voice only; no hand/staging animation.
 
 **Roster:** GUIDO P1, MICTOR P2, NOOCH P3.
 
@@ -166,12 +168,12 @@ Current tokens (as of 2026-06-09): launcher **`?v=m99`**; scripts **`artemis-m99
 
 ## Test protocol (current)
 
-1. Hard refresh all three laptops (`?v=m99`).
+1. Hard refresh all three laptops (**m168**).
 2. Lobby → Ready → Start.
 3. Each laptop logs in (Guido / Mictor / Nooch + colors).
-4. **Expect:** Welcome → first-card roulette → deal → setup deploy → card-play order roulette.
-5. **Cardplay smoke (m98):** Mictor wins roulette → real cardplay on P2 only; one SKIP → mock income; spectators see **CARD PLAY-MICTOR**.
-6. Optional full path: mock income CONTINUE → turn deploy → attack → reinforce (retest reinforce after m98).
+4. Full setup chain → enter turn loop.
+5. On active laptop each phase: confirm controls (cardplay SKIP, income Continue, deploy CONFIRM, attack toolbar, **reinforce SKIP**).
+6. After reinforce: receive card (voice only) → cardplay.
 7. Record failures or say **read diagnostics**.
 
 ---
@@ -186,7 +188,7 @@ Single-machine `game.html` runtime is canonical (legacy HTML phase pages removed
 | M2 — Stabilize cardplay → receivecard | ⚠️ In progress |
 | M3 — Full turn loop in shell | 🔜 Pending |
 
-Recent single-machine fixes (attack log format, save sanitizer, load-game regression): [HANDOFF.md](HANDOFF.md).
+Recent single-machine fixes: [HANDOFF.md](HANDOFF.md).
 
 ---
 

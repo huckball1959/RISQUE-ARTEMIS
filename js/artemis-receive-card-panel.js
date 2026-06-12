@@ -1,11 +1,12 @@
 /**
- * ARTEMIS — reinforce controls on the active laptop only (mirrors attack-panel m96 pattern).
+ * ARTEMIS — receive-card hand/staging UI on the active laptop only (reinforce-panel pattern).
+ * Does not call risqueArtemisUnmountPortableReinforce — syncFromState handles phase exit.
  */
 (function () {
   "use strict";
   if (!window.risqueArtemisMode) return;
 
-  var reinforceMountedFor = "";
+  var receiveCardMountedFor = "";
   var spectatorHintKey = "";
 
   function normName(n) {
@@ -31,23 +32,24 @@
     return typeof window.risqueArtemisIsMyTurn === "function" && window.risqueArtemisIsMyTurn(gs);
   }
 
-  function reinforceControlsPresent() {
+  function receiveCardControlsPresent() {
     var slot = document.getElementById("risque-phase-content");
-    return !!(slot && slot.querySelector("#reinforce-btn-skip"));
+    return !!(slot && slot.querySelector("#receivecard-btn-end"));
   }
 
   function stripSetupHudClasses() {
     var hudRoot = document.getElementById("runtime-hud-root");
     if (!hudRoot) return;
     hudRoot.classList.remove("runtime-hud-root--setup");
+    hudRoot.classList.remove("runtime-hud-root--login");
     hudRoot.classList.remove("runtime-hud-root--artemis-cardplay");
     hudRoot.classList.remove("runtime-hud-root--cardplay-panel-only");
     hudRoot.classList.remove("runtime-hud-root--artemis-compact");
   }
 
-  function stampReinforcePhaseChrome(gs) {
+  function stampReceiveCardPhaseChrome(gs) {
     try {
-      document.body.setAttribute("data-risque-phase", "reinforce");
+      document.body.setAttribute("data-risque-phase", "receivecard");
     } catch (ePh) {
       /* ignore */
     }
@@ -93,7 +95,22 @@
     }
   }
 
-  function ensureReinforceSpectatorHud(gs) {
+  function clearReceiveCardControls() {
+    receiveCardMountedFor = "";
+    spectatorHintKey = "";
+    window.__risqueArtemisReceiveCardControlsLive = false;
+    window.__risqueArtemisReceiveCardMountKey = "";
+    var slot = document.getElementById("risque-phase-content");
+    if (!slot) return;
+    if (
+      slot.querySelector(".receivecard-compact-root") ||
+      slot.querySelector(".risque-artemis-receivecard-spectate")
+    ) {
+      slot.innerHTML = "";
+    }
+  }
+
+  function mountSpectatorHint(gs) {
     var uio = document.getElementById("ui-overlay");
     if (!uio || !window.risqueRuntimeHud) return;
     window.gameState = gs;
@@ -102,7 +119,7 @@
       !hudRoot ||
       hudRoot.classList.contains("runtime-hud-root--setup") ||
       hudRoot.classList.contains("runtime-hud-root--login") ||
-      !reinforceControlsPresent()
+      !receiveCardControlsPresent()
     ) {
       if (typeof window.risqueRuntimeHud.ensure === "function") {
         window.risqueRuntimeHud.ensure(uio);
@@ -113,39 +130,12 @@
       window.risqueRuntimeHud.setAttackChromeInteractive(false);
     }
     wireOmniToggles(gs);
-    requestAnimationFrame(function () {
-      if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.syncPosition === "function") {
-        window.risqueRuntimeHud.syncPosition();
-      }
-    });
-  }
-
-  function clearReinforceControls() {
-    reinforceMountedFor = "";
-    spectatorHintKey = "";
-    window.__risqueArtemisReinforceControlsLive = false;
-    window.__risqueArtemisReinforceMountKey = "";
-    var slot = document.getElementById("risque-phase-content");
-    if (!slot) return;
-    if (
-      slot.querySelector(".reinforce-compact-root") ||
-      slot.querySelector(".risque-artemis-reinforce-spectate")
-    ) {
-      slot.innerHTML = "";
-    }
-    if (document.body) {
-      document.body.removeAttribute("data-risque-reinforce-slot-mode");
-    }
-  }
-
-  function mountSpectatorHint(gs) {
-    ensureReinforceSpectatorHud(gs);
     var slot = document.getElementById("risque-phase-content");
     if (!slot) return;
     var name = gs && gs.currentPlayer ? String(gs.currentPlayer) : "?";
     var ctrl = ownerSlot(gs);
     var hintKey = ctrl + ":" + normName(name);
-    if (hintKey === spectatorHintKey && slot.querySelector(".risque-artemis-reinforce-spectate")) {
+    if (hintKey === spectatorHintKey && slot.querySelector(".risque-artemis-receivecard-spectate")) {
       return;
     }
     spectatorHintKey = hintKey;
@@ -157,80 +147,25 @@
         ? window.gameUtils.colorMap[p.color] || "#ffffff"
         : "#ffffff";
     slot.innerHTML =
-      '<div class="risque-artemis-reinforce-spectate risque-artemis-deploy-spectate" role="status">' +
+      '<div class="risque-artemis-receivecard-spectate risque-artemis-deploy-spectate" role="status">' +
       "<p>Waiting for <strong style=\"color:" +
       color +
       '">' +
       name.toUpperCase() +
       "</strong></p>" +
-      "<p>Only their laptop has reinforcement controls for this turn.</p></div>";
+      "<p>Only their laptop shows the receive-card hand for this turn.</p></div>";
     if (
       window.risqueRuntimeHud &&
       typeof window.risqueRuntimeHud.setControlVoiceText === "function"
     ) {
       window.risqueRuntimeHud.setControlVoiceText(
-        "WAITING FOR " + name.toUpperCase() + " — REINFORCEMENT",
+        "WAITING FOR " + name.toUpperCase() + " — RECEIVE CARD",
         ""
       );
     }
   }
 
-  function mountRealReinforce(gs) {
-    if (!gs || !window.risquePhases || !window.risquePhases.reinforce) return;
-    if (window.__risqueArtemisReinforceMountInProgress) return;
-    var up = normName(gs.currentPlayer);
-    var ctrl = ownerSlot(gs);
-    var mountKey = String(ctrl) + ":" + up;
-    if (reinforceMountedFor === mountKey && reinforceControlsPresent()) {
-      stripSetupHudClasses();
-      stampReinforcePhaseChrome(gs);
-      if (typeof window.risqueArtemisEnsureReinforceInteractive === "function") {
-        window.risqueArtemisEnsureReinforceInteractive(gs);
-      }
-      if (typeof window.risqueArtemisEnsureReinforceMapRouting === "function") {
-        window.risqueArtemisEnsureReinforceMapRouting(gs);
-      }
-      return;
-    }
-    reinforceMountedFor = mountKey;
-    stampReinforcePhaseChrome(gs);
-    document.body.classList.add("risque-setup-fullstage");
-    document.documentElement.classList.add("risque-view-host");
-    document.body.classList.add("risque-view-host");
-    document.documentElement.classList.remove("risque-view-public");
-    document.body.classList.remove("risque-view-public");
-    var stageHost = document.getElementById("stage-host") || document.body;
-    if (typeof window.risquePhases.reinforce.mount !== "function") return;
-    window.risquePhases.reinforce.mount(stageHost, {
-      onLog: function (msg) {
-        try {
-          console.info("[ARTEMIS reinforce]", msg);
-        } catch (eLog) {
-          /* ignore */
-        }
-      }
-    });
-    stripSetupHudClasses();
-    if (!reinforceControlsPresent()) {
-      reinforceMountedFor = "";
-      window.risquePhases.reinforce.mount(stageHost, {
-        onLog: function (msg) {
-          try {
-            console.info("[ARTEMIS reinforce retry]", msg);
-          } catch (eLog2) {
-            /* ignore */
-          }
-        }
-      });
-    }
-    if (typeof window.risqueArtemisEnsureReinforceInteractive === "function") {
-      window.risqueArtemisEnsureReinforceInteractive(gs);
-    }
-    wireOmniToggles(gs);
-    window.__risqueArtemisReinforceControlsLive = reinforceControlsPresent();
-  }
-
-  function teardownPortablePhases() {
+  function teardownOtherPortablePhases() {
     if (typeof window.risqueArtemisTeardownMockPhases === "function") {
       window.risqueArtemisTeardownMockPhases();
     }
@@ -246,19 +181,98 @@
     if (typeof window.risqueArtemisUnmountPortableAttack === "function") {
       window.risqueArtemisUnmountPortableAttack();
     }
+    /* Do not unmount reinforce here — syncFromState else branch handles phase exit. */
   }
 
-  window.risqueArtemisSyncPortableReinforce = function (gs) {
+  function mountRealReceiveCard(gs) {
+    if (!gs || !window.risquePhases || !window.risquePhases.receivecard) return;
+    if (window.__risqueArtemisReceiveCardMountInProgress) return;
+    var up = normName(gs.currentPlayer);
+    var ctrl = ownerSlot(gs);
+    var mountKey = String(ctrl) + ":" + up;
+    if (receiveCardMountedFor === mountKey && receiveCardControlsPresent()) {
+      stripSetupHudClasses();
+      stampReceiveCardPhaseChrome(gs);
+      if (typeof window.risqueArtemisEnsureReceiveCardInteractive === "function") {
+        window.risqueArtemisEnsureReceiveCardInteractive(gs);
+      }
+      return;
+    }
+    receiveCardMountedFor = mountKey;
+    stampReceiveCardPhaseChrome(gs);
+    document.body.classList.add("risque-setup-fullstage");
+    document.documentElement.classList.add("risque-view-host");
+    document.body.classList.add("risque-view-host");
+    document.documentElement.classList.remove("risque-view-public");
+    document.body.classList.remove("risque-view-public");
+    var stageHost = document.getElementById("stage-host") || document.body;
+    if (typeof window.risquePhases.receivecard.mount !== "function") return;
+    window.risquePhases.receivecard.mount(stageHost, {
+      onLog: function (msg) {
+        try {
+          console.info("[ARTEMIS receive-card]", msg);
+        } catch (eLog) {
+          /* ignore */
+        }
+      }
+    });
+    stripSetupHudClasses();
+    if (!receiveCardControlsPresent() && !window.__risqueReceiveCardInitialized) {
+      receiveCardMountedFor = "";
+      window.risquePhases.receivecard.mount(stageHost, {
+        onLog: function (msg) {
+          try {
+            console.info("[ARTEMIS receive-card retry]", msg);
+          } catch (eLog2) {
+            /* ignore */
+          }
+        }
+      });
+    }
+    if (typeof window.risqueArtemisEnsureReceiveCardInteractive === "function") {
+      window.risqueArtemisEnsureReceiveCardInteractive(gs);
+    }
+    wireOmniToggles(gs);
+    window.__risqueArtemisReceiveCardControlsLive = receiveCardControlsPresent();
+  }
+
+  window.risqueArtemisReceiveCardControlsPresent = receiveCardControlsPresent;
+
+  window.risqueArtemisEnsureReceiveCardInteractive = function (gsOpt) {
+    var gs = gsOpt || window.gameState;
+    if (!gs || (String(gs.phase || "") !== "receivecard" && String(gs.phase || "") !== "getcard")) return;
+    if (!receiveCardControlsPresent()) return;
+    if (!window.__risqueReceiveCardInitialized && typeof window.initReceiveCardPhase === "function") {
+      window.initReceiveCardPhase();
+    }
+    var btn = document.getElementById("receivecard-btn-end");
+    if (btn && typeof window.receiveCardEndTurn === "function") {
+      btn.onclick = function () {
+        window.receiveCardEndTurn();
+      };
+    }
+    if (typeof window.receiveCardRepaintIfNeeded === "function") {
+      window.receiveCardRepaintIfNeeded(gs);
+    }
+  };
+
+  window.risqueArtemisSyncPortableReceiveCard = function (gs) {
     if (gs && gs.artemisCycleProbe) return;
     var ph = gs ? String(gs.phase || "") : "";
-    if (ph !== "reinforce") {
-      clearReinforceControls();
+    if (ph !== "receivecard" && ph !== "getcard") {
+      clearReceiveCardControls();
       if (window.risqueArtemisNetClient) exitClientPlayMode();
       return;
     }
 
-    teardownPortablePhases();
-    stampReinforcePhaseChrome(gs);
+    teardownOtherPortablePhases();
+    if (typeof window.risqueReceiveCardMergeLivePlayerHand === "function") {
+      gs = window.risqueReceiveCardMergeLivePlayerHand(gs);
+    }
+    if (typeof window.risqueReceiveCardRepairEarnFlags === "function") {
+      window.risqueReceiveCardRepairEarnFlags(gs);
+    }
+    stampReceiveCardPhaseChrome(gs);
 
     if (typeof window.risqueArtemisStampControlSlot === "function") {
       window.risqueArtemisStampControlSlot(gs);
@@ -269,12 +283,15 @@
     if (typeof window.risqueArtemisClearMapPhaseHandoffFlags === "function") {
       window.risqueArtemisClearMapPhaseHandoffFlags(gs);
     }
+    if (typeof window.risqueArtemisCancelReinforceMapRouting === "function") {
+      window.risqueArtemisCancelReinforceMapRouting();
+    }
 
     window.gameState = gs;
     var mine = isMine(gs);
 
     if (!mine) {
-      clearReinforceControls();
+      clearReceiveCardControls();
       if (window.risqueArtemisNetClient) {
         exitClientPlayMode();
       }
@@ -289,14 +306,11 @@
       }
     }
 
-    mountRealReinforce(gs);
-    if (typeof window.risqueArtemisEnsureReinforceMapRouting === "function") {
-      window.risqueArtemisEnsureReinforceMapRouting(gs);
-    }
+    mountRealReceiveCard(gs);
   };
 
-  window.risqueArtemisUnmountPortableReinforce = function () {
-    clearReinforceControls();
+  window.risqueArtemisUnmountPortableReceiveCard = function () {
+    clearReceiveCardControls();
     if (window.risqueArtemisNetClient) exitClientPlayMode();
   };
 })();

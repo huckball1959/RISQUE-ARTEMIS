@@ -285,7 +285,7 @@
     if (t) {
       report = t + "\n\n" + totalLine;
     }
-    var el = document.getElementById("receivecard-compact-message");
+    var el = receiveCardQueryEl("receivecard-compact-message");
     if (el) {
       el.textContent = report;
     }
@@ -309,6 +309,51 @@
    * risqueDebugReceiveCard() ). Also written to gameLogs when receiveCardRunDisplay runs if
    * localStorage risqueDebugReceiveCardVerbose === "1".
    */
+  /**
+   * Mid-chain saves and mirror sync sometimes drop cardEarnedVia* while conqueredThisTurn survives.
+   * Reinforce → receive-card must still award the deck draw after a territory capture.
+   */
+  function receiveCardRepairEarnFlags(gs) {
+    if (!gs) return gs;
+    if (!gs.cardEarnedViaAttack && !gs.cardEarnedViaCardplay) {
+      if (gs.conqueredThisTurn) {
+        gs.cardEarnedViaAttack = true;
+      } else {
+        var acqLine =
+          gs.risqueAttackOutcomeAcquisition != null ? String(gs.risqueAttackOutcomeAcquisition).trim() : "";
+        if (/acquired/i.test(acqLine)) {
+          gs.cardEarnedViaAttack = true;
+          gs.conqueredThisTurn = true;
+        }
+      }
+    }
+    return gs;
+  }
+
+  function receiveCardMergeLivePlayerHand(gs) {
+    if (!gs || !window.gameState || gs === window.gameState) return gs;
+    var live = window.gameState;
+    if (String(live.currentPlayer || "") !== String(gs.currentPlayer || "")) return gs;
+    if (!Array.isArray(live.players) || !Array.isArray(gs.players)) return gs;
+    var livePl = live.players.find(function (p) {
+      return p && p.name === live.currentPlayer;
+    });
+    var gsPl = gs.players.find(function (p) {
+      return p && p.name === gs.currentPlayer;
+    });
+    if (!livePl || !gsPl || !Array.isArray(livePl.cards)) return gs;
+    if (live.cardEarnedViaAttack && !gs.cardEarnedViaAttack) gs.cardEarnedViaAttack = true;
+    if (live.cardEarnedViaCardplay && !gs.cardEarnedViaCardplay) gs.cardEarnedViaCardplay = true;
+    if (live.conqueredThisTurn && !gs.conqueredThisTurn) gs.conqueredThisTurn = true;
+    var liveN = livePl.cards.length;
+    var gsN = Array.isArray(gsPl.cards) ? gsPl.cards.length : 0;
+    if (liveN > 0 && liveN < gsN) {
+      gsPl.cards = livePl.cards.slice();
+      gsPl.cardCount = livePl.cards.length;
+    }
+    return gs;
+  }
+
   function receiveCardEligibilitySnapshot(gs) {
     gs = gs || window.gameState;
     var out = {
@@ -367,10 +412,73 @@
     strip.appendChild(img);
   }
 
+  /** Prefer the live portable panel under #risque-phase-content (never a stale hidden copy). */
+  function receiveCardPhaseRoot() {
+    var slot = document.getElementById("risque-phase-content");
+    if (!slot) return null;
+    return slot.querySelector(".receivecard-compact-root") || slot;
+  }
+
+  function receiveCardQueryEl(id) {
+    if (!id) return null;
+    var root = receiveCardPhaseRoot();
+    if (root && root.querySelector) {
+      var scoped = root.querySelector("#" + id);
+      if (scoped) return scoped;
+    }
+    return document.getElementById(id);
+  }
+
+  function receiveCardUiNeedsRepaint(gs, currentPlayer) {
+    if (!gs || !currentPlayer) return true;
+    var upper = receiveCardQueryEl("receivecard-hand-strip-upper");
+    var staging = receiveCardQueryEl("receivecard-staging-grid");
+    if (!upper || !staging) return true;
+    var nHand = (currentPlayer.cards || []).length;
+    var drawnName = receiveCardCanonicalTerritoryCardName(gs.lastCardDrawn);
+    var stagingExpected = !!(gs.cardAwardedThisTurn && drawnName && nHand >= 1);
+    var upperExpected = stagingExpected ? Math.max(0, nHand - 1) : nHand;
+    var upperImgs = upper.querySelectorAll("img.receivecard-thumb").length;
+    var stagingImgs = staging.querySelectorAll("img.receivecard-thumb").length;
+    if (stagingExpected) {
+      return upperImgs < upperExpected || stagingImgs < 1;
+    }
+    if (nHand > 0 && upperImgs === 0) return true;
+    return false;
+  }
+
+  function receiveCardScheduleDisplayPaint() {
+    requestAnimationFrame(function () {
+      if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.syncPosition === "function") {
+        window.risqueRuntimeHud.syncPosition();
+      }
+      requestAnimationFrame(function () {
+        if (typeof window.receiveCardRunDisplay === "function") {
+          window.receiveCardRunDisplay();
+        }
+        if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.syncPosition === "function") {
+          window.risqueRuntimeHud.syncPosition();
+        }
+      });
+    });
+  }
+
+  function receiveCardRepaintIfNeeded(gsOpt) {
+    var gs = gsOpt || window.gameState;
+    if (!gs || !receiveCardQueryEl("receivecard-btn-end")) return;
+    var currentPlayer = (gs.players || []).find(function (p) {
+      return p && p.name === gs.currentPlayer;
+    });
+    if (!currentPlayer || !receiveCardUiNeedsRepaint(gs, currentPlayer)) return;
+    window.__risqueReceiveCardDisplayCompleted = false;
+    window.__risqueReceiveCardDisplayKey = "";
+    receiveCardScheduleDisplayPaint();
+  }
+
   function receiveCardApplyStagingMergeUi() {
     var gs = window.gameState;
-    var upper = document.getElementById("receivecard-hand-strip-upper");
-    var staging = document.getElementById("receivecard-staging-grid");
+    var upper = receiveCardQueryEl("receivecard-hand-strip-upper");
+    var staging = receiveCardQueryEl("receivecard-staging-grid");
     if (!gs || !gs.players || !upper || !staging) return;
     var currentPlayer = gs.players.find(function (p) {
       return p.name === gs.currentPlayer;
@@ -527,6 +635,29 @@
   }
 
   function receiveCardRunTurnAdvanceAndHandoff() {
+    if (typeof window.risqueArtemisDiagReceiveCardContinue === "function") {
+      try {
+        var gsRc = window.gameState;
+        var plRc =
+          gsRc &&
+          gsRc.players &&
+          gsRc.players.find(function (p) {
+            return p && p.name === gsRc.currentPlayer;
+          });
+        window.risqueArtemisDiagReceiveCardContinue({
+          finishedPlayer: gsRc ? gsRc.currentPlayer : null,
+          lastCardDrawn: gsRc ? gsRc.lastCardDrawn : null,
+          handNames:
+            plRc && plRc.cards
+              ? plRc.cards.map(function (card) {
+                  return typeof card === "string" ? card : card && card.name ? String(card.name) : "";
+                })
+              : [],
+        });
+      } catch (eRcContDiag) {
+        /* ignore */
+      }
+    }
     receiveCardSetContinueSaving(true);
     var advTurn = receiveCardAdvanceTurn();
     if (advTurn === false) {
@@ -821,11 +952,11 @@
   }
 
   function receiveCardRunDisplay() {
-    var upperStrip = document.getElementById("receivecard-hand-strip-upper");
-    var stagingGrid = document.getElementById("receivecard-staging-grid");
-    var stagingWrap = document.getElementById("receivecard-staging-wrap");
-    var legacyHandStrip = document.getElementById("receivecard-hand-strip");
-    var newImg = document.getElementById("receivecard-new-img");
+    var upperStrip = receiveCardQueryEl("receivecard-hand-strip-upper");
+    var stagingGrid = receiveCardQueryEl("receivecard-staging-grid");
+    var stagingWrap = receiveCardQueryEl("receivecard-staging-wrap");
+    var legacyHandStrip = receiveCardQueryEl("receivecard-hand-strip");
+    var newImg = receiveCardQueryEl("receivecard-new-img");
     var useDual = !!(upperStrip && stagingGrid);
     if (!useDual && !legacyHandStrip) return;
     if (!window.gameState || !window.gameState.players) {
@@ -833,12 +964,29 @@
       return;
     }
     var gs = window.gameState;
+    receiveCardMergeLivePlayerHand(gs);
+    receiveCardRepairEarnFlags(gs);
     var currentPlayer = gs.players.find(function (p) {
       return p.name === gs.currentPlayer;
     });
     if (!currentPlayer) {
       receiveCardSetMessage("Current player not found.");
       return;
+    }
+    if (window.__risqueReceiveCardDisplayCompleted && window.__risqueReceiveCardDisplayKey) {
+      var displayKey =
+        String(gs.currentPlayer || "") +
+        ":" +
+        (currentPlayer.cards ? currentPlayer.cards.length : 0) +
+        ":" +
+        (!!gs.cardEarnedViaAttack) +
+        ":" +
+        (!!gs.cardEarnedViaCardplay) +
+        ":" +
+        (!!gs.cardAwardedThisTurn);
+      if (displayKey === window.__risqueReceiveCardDisplayKey && !receiveCardUiNeedsRepaint(gs, currentPlayer)) {
+        return;
+      }
     }
     if (window.risqueDisplayIsPublic) {
       receiveCardSetMessage("");
@@ -884,6 +1032,12 @@
         gs.cardAwardedThisTurn = true;
         drawnThisStep = null;
       }
+    } else if (gs.cardAwardedThisTurn && gs.lastCardDrawn && !conquestElimReview) {
+      var priorDraw = receiveCardCanonicalTerritoryCardName(gs.lastCardDrawn);
+      if (priorDraw) {
+        drawnThisStep = { name: priorDraw, id: null };
+        receiveCardSetMessage("New card: " + priorDraw.replace(/_/g, " ").toUpperCase());
+      }
     } else {
       receiveCardSetMessage(
         "You did not earn a new deck card this turn (capture at least one territory to earn one)."
@@ -895,9 +1049,11 @@
 
     var nHand = currentPlayer.cards.length;
     var lastCard = nHand > 0 ? currentPlayer.cards[nHand - 1] : null;
-    var lastName = lastCard ? (typeof lastCard === "string" ? lastCard : lastCard.name) : "";
-    var stagingShowsNewDraw =
-      !!drawnThisStep && lastName === drawnThisStep.name && nHand >= 1;
+    var lastName = lastCard
+      ? receiveCardCanonicalTerritoryCardName(typeof lastCard === "string" ? lastCard : lastCard.name)
+      : "";
+    var drawnCanon = drawnThisStep ? receiveCardCanonicalTerritoryCardName(drawnThisStep.name) : "";
+    var stagingShowsNewDraw = !!drawnThisStep && lastName === drawnCanon && drawnCanon && nHand >= 1;
     var conquestStartIdx = Math.max(0, currentPlayer.cards.length - transferredCount);
 
     if (useDual) {
@@ -1111,6 +1267,23 @@
     var snap = receiveCardEligibilitySnapshot(gs);
     snap.drawnThisStep = drawnThisStep ? drawnThisStep.name : null;
     receiveCardLog("receiveCardRunDisplay", snap);
+    if (typeof window.risqueArtemisDiagReceiveCardDisplay === "function") {
+      try {
+        window.risqueArtemisDiagReceiveCardDisplay({
+          snap: snap,
+          drawnThisStep: drawnThisStep ? drawnThisStep.name : null,
+          handNames: currentPlayer.cards.map(function (card) {
+            return typeof card === "string" ? card : card && card.name ? String(card.name) : "";
+          }),
+          uiDualStrip: !!document.getElementById("receivecard-hand-strip-upper"),
+          uiStaging: !!document.getElementById("receivecard-staging-grid"),
+          uiContinueBtn: !!document.getElementById("receivecard-btn-end"),
+          uiCompactRoot: !!document.querySelector(".receivecard-compact-root"),
+        });
+      } catch (eRcDiag) {
+        /* ignore */
+      }
+    }
     try {
       if (localStorage.getItem("risqueDebugReceiveCardVerbose") === "1") {
         console.info("[ReceiveCard] eligibility snapshot", snap);
@@ -1119,6 +1292,17 @@
       /* ignore */
     }
     refreshReceiveCardPublicSpectatorMirror();
+    window.__risqueReceiveCardDisplayCompleted = true;
+    window.__risqueReceiveCardDisplayKey =
+      String(gs.currentPlayer || "") +
+      ":" +
+      (currentPlayer.cards ? currentPlayer.cards.length : 0) +
+      ":" +
+      (!!gs.cardEarnedViaAttack) +
+      ":" +
+      (!!gs.cardEarnedViaCardplay) +
+      ":" +
+      (!!gs.cardAwardedThisTurn);
   }
 
   /**
@@ -1289,7 +1473,10 @@
     if (typeof gs.cardAwardedThisTurn === "undefined") gs.cardAwardedThisTurn = false;
     if (typeof gs.cardEarnedViaAttack === "undefined") gs.cardEarnedViaAttack = false;
     if (typeof gs.cardEarnedViaCardplay === "undefined") gs.cardEarnedViaCardplay = false;
-    gs.lastCardDrawn = null;
+    receiveCardRepairEarnFlags(gs);
+    if (!gs.cardAwardedThisTurn) {
+      gs.lastCardDrawn = null;
+    }
     gs.players.forEach(function (player) {
       if (!player.cards || !Array.isArray(player.cards)) {
         player.cards = [];
@@ -1327,7 +1514,7 @@
       if (window.gameUtils.showError) window.gameUtils.showError("Invalid game state for receive card.");
       return;
     }
-    var endBtn = document.getElementById("receivecard-btn-end");
+    var endBtn = receiveCardQueryEl("receivecard-btn-end");
     if (!endBtn) return;
 
     endBtn.onclick = function () {
@@ -1341,7 +1528,7 @@
       /* ignore */
     }
 
-    receiveCardRunDisplay();
+    receiveCardScheduleDisplayPaint();
 
     if (window.risqueRuntimeHud && window.gameState) {
       window.risqueRuntimeHud.updateTurnBannerFromState(window.gameState);
@@ -1359,7 +1546,11 @@
 
   window.initReceiveCardPhase = initReceiveCardPhase;
   window.receiveCardRunDisplay = receiveCardRunDisplay;
+  window.receiveCardRepaintIfNeeded = receiveCardRepaintIfNeeded;
+  window.receiveCardEndTurn = receiveCardEndTurn;
   window.risqueReceiveCardPrepareLoadedState = receiveCardPrepareLoadedState;
+  window.risqueReceiveCardRepairEarnFlags = receiveCardRepairEarnFlags;
+  window.risqueReceiveCardMergeLivePlayerHand = receiveCardMergeLivePlayerHand;
   window.risqueApplyConquestEliminationContinueMutations = risqueApplyConquestEliminationContinueMutations;
   window.risqueReceiveCardAdvanceTurn = receiveCardAdvanceTurn;
   window.risqueDebugReceiveCard = receiveCardEligibilitySnapshot;
@@ -1368,11 +1559,44 @@
 (function () {
   "use strict";
 
+  function receiveCardArtemisMountKey(gs) {
+    if (!gs) return "";
+    var up = String(gs.currentPlayer || "").trim().toUpperCase();
+    var ctrl = Number(gs.artemisControlSlot) || 0;
+    return String(ctrl) + ":" + up;
+  }
+
   function mount(stageHost, opts) {
     opts = opts || {};
     var uiOverlay = document.getElementById("ui-overlay");
     if (!uiOverlay || !window.gameUtils) return;
 
+    var gsMount = window.gameState;
+    var mountKey = receiveCardArtemisMountKey(gsMount);
+    if (
+      window.__risqueArtemisReceiveCardMountInProgress &&
+      window.__risqueArtemisReceiveCardMountKey === mountKey
+    ) {
+      return;
+    }
+    if (
+      document.getElementById("receivecard-btn-end") &&
+      window.__risqueReceiveCardInitialized &&
+      window.__risqueArtemisReceiveCardMountKey === mountKey
+    ) {
+      if (typeof window.risqueArtemisEnsureReceiveCardInteractive === "function") {
+        window.risqueArtemisEnsureReceiveCardInteractive(gsMount);
+      }
+      if (typeof window.receiveCardRepaintIfNeeded === "function") {
+        window.receiveCardRepaintIfNeeded(gsMount);
+      }
+      return;
+    }
+
+    window.__risqueArtemisReceiveCardMountInProgress = true;
+    var prevMountKey = window.__risqueArtemisReceiveCardMountKey || "";
+    window.__risqueArtemisReceiveCardMountKey = mountKey;
+    try {
     if (typeof window.risqueRestoreHostMapCanvasFromPhaseArtifacts === "function") {
       window.risqueRestoreHostMapCanvasFromPhaseArtifacts();
     }
@@ -1399,6 +1623,12 @@
     }
 
     window.__risqueReceiveCardInitialized = false;
+    window.__risqueReceiveCardDisplayCompleted = false;
+    window.__risqueReceiveCardDisplayKey = "";
+    if (prevMountKey !== mountKey) {
+      window.__risqueReceiveCardStagingMergeNeeded = false;
+      window.__risqueReceiveCardStagingMerged = false;
+    }
     /* Full page unload cleared this; same-document nav does not — unblock Continue on later visits. */
     try {
       window.__risqueReceiveCardEndTurnBusy = false;
@@ -1411,8 +1641,6 @@
       /* ignore */
     }
     window.__risqueReceiveCardStagingTimer = null;
-    window.__risqueReceiveCardStagingMergeNeeded = false;
-    window.__risqueReceiveCardStagingMerged = false;
 
     uiOverlay.classList.add("visible");
     uiOverlay.classList.remove("fade-out");
@@ -1521,6 +1749,10 @@
           window.gameUtils.renderStats(window.gameState);
         }
       });
+    }
+    } finally {
+      window.__risqueArtemisReceiveCardMountInProgress = false;
+      window.__risqueArtemisReceiveCardControlsLive = !!document.getElementById("receivecard-btn-end");
     }
   }
 

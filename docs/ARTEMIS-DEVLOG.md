@@ -23,7 +23,7 @@ Living record for **network multiplayer** (3 Windows laptops). Future agents: re
 
 - **Server:** Node in `artemis-server/` (port **5700**).
 - **Launch:** `scripts/SERVER/START-ARTEMIS.bat` (host), `scripts/LAPTOP 2/JOIN.bat`, `scripts/LAPTOP 3/JOIN.bat`.
-- **Cache bust:** Launcher uses `?v=m99`; ARTEMIS scripts in `game.html` use `?v=artemis-m99-client-cardplay-fix-2026-06-09` — bump when changing mock harness, panels, or sync code.
+- **Cache bust:** Launcher uses `?v=m168` (`launchers/profiles.json`); ARTEMIS scripts in `game.html` use `?v=artemis-m168-income-mini-btn-2026-06-09` — bump when changing mock harness, panels, or sync code. `START-ARTEMIS.bat` echoes **m168**.
 
 Unless specified otherwise, **all network development assumes this 3-laptop layout**.
 
@@ -89,6 +89,77 @@ Implementation today: `phases/runtime-hud.js` + `game.css` (`.runtime-hud-root`,
 ---
 
 ## Log entries
+
+### 2026-06-12 — Receive-card auto-diagnostics (m171)
+
+**Goal:** Verify deck draw without console — Cursor reads `logs/artemis-last-report.json`.
+
+**Implemented**
+
+| Piece | File | Behavior |
+|-------|------|----------|
+| Display/award event | `js/artemis-diagnostics.js` | `receive_card_awarded` or `receive_card_display` when `receiveCardRunDisplay` runs — summary e.g. `GUIDO RECEIVE CARD: drew AFGHANISTAN (hand now 4 cards)` |
+| Continue event | same | `receive_card_continue` on CONTINUE with hand list + `lastCardDrawn` |
+| Periodic snapshot | same | `receive_card_snapshot` every ~8s while `phase=receivecard` (host + clients) |
+| Wire-in | `phases/receivecard.js` | Calls diag helpers after display + before turn advance |
+| Report section | `artemis-server/artemis-diag.js` | Top-level **`receiveCard`** block: `readout`, `drawnCard`, `handAfter`, `uiPresent` |
+
+**User protocol:** Hard refresh **m171** → play through to receive card → tell Cursor **read diagnostics**.
+
+**Cache bust:** launcher **m171**; `artemis-diagnostics.js` + `receivecard.js` **m171-receive-card-diag**.
+
+---
+
+### 2026-06-07 — End of session: rollback m169/m170; m168 baseline restored
+
+**Context:** Income Continue was working and approved (m168). An uncommitted receive-card portable panel (m169) regressed reinforcement — SKIP and map controls dead. A follow-up reinforce fix (m170) made it worse (no controls at all).
+
+**Action taken**
+
+| Step | Detail |
+|------|--------|
+| Rollback | `git restore` all modified files to commit **`0be1a7f`** on `main` |
+| Removed | `js/artemis-receive-card-panel.js` (uncommitted m169 artifact) |
+| User verify | Reinforcement controls working again after hard refresh |
+
+**Current baseline (do not re-apply m169/m170 without a branch)**
+
+| Area | Status |
+|------|--------|
+| Income Continue | ✅ Body-mounted green button survives HUD remounts (`js/artemis-income-panel.js`, m165–m168) |
+| Reinforcement | ✅ Portable panel (`js/artemis-reinforce-panel.js`, m98 pattern) — **retest after any receive-card work** |
+| Receive card | ⚠️ Control voice only — no portable hand/staging UI |
+| Git | `main` @ **`0be1a7f`** — “Add ARTEMIS multi-laptop flow and reliable income continue control.” |
+
+**Lessons (m169/m170 — do not repeat)**
+
+1. Do **not** call `risqueArtemisUnmountPortableReinforce()` from receive-card teardown during live reinforce sync.
+2. Do **not** use `softNavigateReinforce()` on every mirror tick when `#reinforce-btn-skip` is missing — mount in place like income panel.
+3. Add reinforce to `risqueArtemisShouldKeepPhaseSlotContent` / `runtime-hud` keep list before shipping receive-card UI.
+4. Ship receive-card panel on an **isolated branch**; one phase at a time.
+
+**Next session (suggested):** Re-introduce receive-card hand/staging on a branch; retest full loop attack → reinforce → receive card → cardplay on all three laptops before merge.
+
+**Cache bust:** launcher **`m168`**; scripts **`artemis-m168-income-mini-btn-2026-06-09`**.
+
+---
+
+### 2026-06-07 — Income Continue fix (m165–m168) — committed `0be1a7f`
+
+**Symptoms:** Moving the income Continue button into `#risque-phase-content` broke clicks — same failure mode as earlier HUD slot moves (income panel cleared on mirror refresh).
+
+**Fix**
+
+| Piece | File | Behavior |
+|-------|------|----------|
+| Body-mounted button | `js/artemis-income-panel.js` | `#risque-artemis-income-god-btn` on `document.body`; positioned over income slot via `syncIncomeGodButtonPosition()` |
+| Click delegation | same | Document-level capture listener — survives HUD remounts |
+| Advance handler | `phases/income.js` | `risqueArtemisLeaveRealIncomeToDeploy()` |
+| Styling | `game.css` | Compact green/black button (~half prior size; user approved m168) |
+
+**Cache bust:** `artemis-m168-income-mini-btn-2026-06-09`.
+
+---
 
 ### 2026-06-09 — Client cardplay active controls (m99)
 

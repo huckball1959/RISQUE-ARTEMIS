@@ -220,16 +220,58 @@ function createArtemisDiag(gameRoot) {
     };
   }
 
+  function buildReceiveCardSection() {
+    const awarded = findLast("receive_card_awarded");
+    const display = findLast("receive_card_display");
+    const cont = findLast("receive_card_continue");
+    const snapEv = findLast("receive_card_snapshot");
+    const ev = awarded || display;
+    if (!ev && !cont && !snapEv) {
+      return {
+        status: "none",
+        readout: "No receive-card events this session yet.",
+      };
+    }
+    const detail = ev && ev.detail ? ev.detail : snapEv && snapEv.detail ? snapEv.detail : {};
+    const drawn =
+      detail.drawnThisStep ||
+      detail.lastCardDrawn ||
+      (snapEv && snapEv.detail && snapEv.detail.lastCardDrawn) ||
+      null;
+    const hand =
+      (cont && cont.detail && cont.detail.handNames) ||
+      detail.handNames ||
+      (snapEv && snapEv.detail && snapEv.detail.handNames) ||
+      [];
+    let status = "unknown";
+    if (drawn) status = "card_drawn";
+    else if (ev) status = "display_no_draw";
+    else if (cont) status = "continued_only";
+    return {
+      status,
+      readout: ev ? String(ev.summary || "") : cont ? String(cont.summary || "") : String(snapEv.summary || ""),
+      drawnCard: drawn || null,
+      handAfter: Array.isArray(hand) ? hand : [],
+      handCount: Array.isArray(hand) ? hand.length : 0,
+      uiPresent: detail.uiPresent || (snapEv && snapEv.detail ? snapEv.detail.uiPresent : null),
+      lastDisplayOrAward: ev || null,
+      lastContinue: cont || null,
+      lastSnapshot: snapEv || null,
+    };
+  }
+
   function buildReport(sessionSnap) {
     sessionSnap = sessionSnap || {};
     const verdict = computeVerdict();
+    const receiveCard = buildReceiveCardSection();
     return {
       generatedAt: new Date().toISOString(),
       reportPath: reportPath,
       jsonlPath: jsonlPath,
       forCursor:
-        "Tell Cursor: read logs/artemis-last-report.json — no copy/paste needed.",
+        "Tell Cursor: read logs/artemis-last-report.json — no copy/paste needed. Check receiveCard.readout for who drew what.",
       verdict,
+      receiveCard,
       eventCount: events.length,
       recentEvents: events.slice(-60),
       session: sessionSnap,
