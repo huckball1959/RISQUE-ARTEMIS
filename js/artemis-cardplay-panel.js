@@ -325,8 +325,12 @@
     if (rh) {
       rh.classList.remove("runtime-hud-root--host-cardplay-recap");
       rh.classList.remove("runtime-hud-root--public-cardplay-recap");
-      rh.classList.remove("runtime-hud-root--cardplay-panel-only");
-      rh.classList.remove("runtime-hud-root--artemis-cardplay");
+      var slot = document.getElementById("risque-phase-content");
+      var cardplayLive = !!(slot && slot.querySelector(".cardplay-compact-root"));
+      if (!cardplayLive) {
+        rh.classList.remove("runtime-hud-root--cardplay-panel-only");
+        rh.classList.remove("runtime-hud-root--artemis-cardplay");
+      }
     }
   }
 
@@ -678,6 +682,15 @@
           window.risqueRuntimeHud.syncPosition();
         } catch (eSync2) {
           /* ignore */
+        }
+        if (window.risqueArtemisHost && !window.risqueArtemisNetClient && artemisCardplayCompactLive()) {
+          requestAnimationFrame(function () {
+            try {
+              window.risqueRuntimeHud.syncPosition();
+            } catch (eSyncHostCp) {
+              /* ignore */
+            }
+          });
         }
       });
     }

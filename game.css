@@ -1721,21 +1721,31 @@ html.risque-view-public .risque-public-ghost-replay-save {
 }
 
 /* ARTEMIS host: book intro + shelf need #hud-main-panel visible (panel-only rule hides it otherwise). */
-html.risque-artemis-host.risque-view-host body[data-risque-phase="cardplay"]:has(#control-voice .risque-public-book-voice)
-  #hud-main-panel,
-html.risque-artemis-host.risque-view-host body[data-risque-phase="cardplay"]:has(
-    #control-voice.ucp-control-voice--public-book-processing
+html.risque-artemis-host.risque-view-host
+  body[data-risque-phase="cardplay"]:has(#control-voice .risque-public-book-voice):not(
+    :has(#risque-phase-content > .cardplay-compact-root)
   )
   #hud-main-panel,
-html.risque-artemis-host.risque-view-host body[data-risque-phase="cardplay"]:has(#risque-public-cardplay-recap-overlay)
-  #hud-main-panel,
-html.risque-artemis-host.risque-view-host body[data-risque-phase="con-cardplay"]:has(#control-voice .risque-public-book-voice)
-  #hud-main-panel,
-html.risque-artemis-host.risque-view-host body[data-risque-phase="con-cardplay"]:has(
+html.risque-artemis-host.risque-view-host
+  body[data-risque-phase="cardplay"]:has(
     #control-voice.ucp-control-voice--public-book-processing
+  ):not(:has(#risque-phase-content > .cardplay-compact-root))
+  #hud-main-panel,
+html.risque-artemis-host.risque-view-host
+  body[data-risque-phase="cardplay"]:has(#risque-public-cardplay-recap-overlay)
+  #hud-main-panel,
+html.risque-artemis-host.risque-view-host
+  body[data-risque-phase="con-cardplay"]:has(#control-voice .risque-public-book-voice):not(
+    :has(#risque-phase-content > .cardplay-compact-root)
   )
   #hud-main-panel,
-html.risque-artemis-host.risque-view-host body[data-risque-phase="con-cardplay"]:has(#risque-public-cardplay-recap-overlay)
+html.risque-artemis-host.risque-view-host
+  body[data-risque-phase="con-cardplay"]:has(
+    #control-voice.ucp-control-voice--public-book-processing
+  ):not(:has(#risque-phase-content > .cardplay-compact-root))
+  #hud-main-panel,
+html.risque-artemis-host.risque-view-host
+  body[data-risque-phase="con-cardplay"]:has(#risque-public-cardplay-recap-overlay)
   #hud-main-panel {
   display: flex !important;
   flex-direction: column !important;
@@ -12185,6 +12195,61 @@ html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="con-ca
   flex: 1 1 auto !important;
   min-height: 0 !important;
   margin-top: 0 !important;
+}
+
+/*
+ * Host active player — interactive cardplay after recap/book voice:
+ * voice stays compact; hand + staging panes fill the HUD column (matches client laptops).
+ */
+html.risque-artemis-host.risque-artemis-my-turn.risque-view-host
+  body[data-risque-phase="cardplay"]:has(#risque-phase-content > .cardplay-compact-root)
+  #runtime-hud-root.runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only:not(
+    .runtime-hud-root--host-cardplay-recap
+  )
+  #risque-phase-content,
+html.risque-artemis-host.risque-artemis-my-turn.risque-view-host
+  body[data-risque-phase="con-cardplay"]:has(#risque-phase-content > .cardplay-compact-root)
+  #runtime-hud-root.runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only:not(
+    .runtime-hud-root--host-cardplay-recap
+  )
+  #risque-phase-content {
+  flex: 1 1 auto !important;
+  min-height: min(420px, 48vh) !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+html.risque-artemis-host.risque-artemis-my-turn.risque-view-host
+  body[data-risque-phase="cardplay"]:has(#risque-phase-content > .cardplay-compact-root)
+  #runtime-hud-root.runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only:not(
+    .runtime-hud-root--host-cardplay-recap
+  )
+  #risque-phase-content
+  > .cardplay-compact-root,
+html.risque-artemis-host.risque-artemis-my-turn.risque-view-host
+  body[data-risque-phase="con-cardplay"]:has(#risque-phase-content > .cardplay-compact-root)
+  #runtime-hud-root.runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only:not(
+    .runtime-hud-root--host-cardplay-recap
+  )
+  #risque-phase-content
+  > .cardplay-compact-root {
+  flex: 1 1 auto !important;
+  min-height: min(400px, 46vh) !important;
+  height: auto !important;
+}
+
+html.risque-artemis-host.risque-artemis-my-turn
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only:not(.runtime-hud-root--host-cardplay-recap)
+  .cardplay-hand-staging-split {
+  flex: 1 1 auto !important;
+  min-height: min(360px, 42vh) !important;
+}
+
+html.risque-artemis-host.risque-artemis-my-turn
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only:not(.runtime-hud-root--host-cardplay-recap)
+  .cardplay-staging-wrap--artemis-dual {
+  flex: 1 1 0 !important;
+  min-height: min(180px, 22vh) !important;
 }
 
 html.risque-artemis-host .runtime-hud-root--artemis-cardplay .cardplay-panel-confirm-row,

@@ -8,7 +8,7 @@
       "role": "host",
       "slot": 1,
       "params": {
-        "v": "m176",
+        "v": "m177",
         "artemisMockPhases": "1",
         "artemisMockCardplay": "0",
         "rigCardPlay": "2",
@@ -24,7 +24,7 @@
       "slot": 2,
       "name": "MICTOR",
       "params": {
-        "v": "m176",
+        "v": "m177",
         "artemisMockPhases": "1",
         "artemisMockCardplay": "0",
         "rigCardPlay": "2"
@@ -37,7 +37,7 @@
       "slot": 3,
       "name": "NOOCH",
       "params": {
-        "v": "m176",
+        "v": "m177",
         "artemisMockPhases": "1",
         "artemisMockCardplay": "0",
         "rigCardPlay": "2"
