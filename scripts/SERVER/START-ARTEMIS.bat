@@ -70,9 +70,9 @@ echo.
 echo   Host IP: !ARTEMIS_LAN_IP!
 echo   ^(saved into LAPTOP 2 and LAPTOP 3 folders automatically^)
 echo.
-echo   SEQUENTIAL SETUP ^(use this launcher, NOT START-ARTEMIS-PRESET^)
+echo   Setup rig: appears on welcome blank after START ^(not on load^)
 echo   Login -^> welcome -^> first-card -^> deal -^> setup deploy -^> cardplay ...
-echo   Build cache: m177 ^(hard-refresh all laptops after code changes: Ctrl+Shift+R^)
+echo   Build cache: m233 ^(hard-refresh all laptops after code changes: Ctrl+Shift+R^)
 echo   Auto-diagnostics: logs\artemis-last-report.json
 echo   TURN PROBE: scripts\SERVER\START-PROBE.bat
 echo   CYCLE PROBE: scripts\SERVER\START-CYCLE-PROBE.bat

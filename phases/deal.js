@@ -187,9 +187,30 @@
       if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.setControlVoiceText === "function") {
         window.risqueRuntimeHud.setControlVoiceText("DEAL COMPLETE — NEXT: DEPLOY ORDER", "");
       }
-      setTimeout(function () {
+      function goDeployOrderSelect() {
         navigateGameHtmlPreferSoft("game.html?phase=playerSelect&selectKind=deployOrder");
-      }, 3000);
+      }
+      if (
+        window.risqueArtemisMode &&
+        window.risqueArtemisHost &&
+        typeof window.risqueArtemisBeatHostHoldStep === "function"
+      ) {
+        if (typeof window.risqueFlushMirrorPush === "function") {
+          window.risqueFlushMirrorPush();
+        } else if (typeof window.risqueMirrorPushGameState === "function") {
+          window.risqueMirrorPushGameState();
+        }
+        window.risqueArtemisBeatHostHoldStep({
+          beatId: "deal_complete",
+          label: "Deal complete",
+          expectPhase: "deal",
+          minDisplayMs: 3000,
+          pushMirror: true,
+          timeoutMs: 12000,
+        }).then(goDeployOrderSelect);
+      } else {
+        setTimeout(goDeployOrderSelect, 3000);
+      }
     }
 
     function assignTerritory() {
@@ -256,10 +277,31 @@
     }
 
     logLines("Starting deal animation (" + territories.length + " territories)", logFn);
-    requestAnimationFrame(function () {
-      window.gameUtils.resizeCanvas();
-      setTimeout(assignTerritory, 500);
-    });
+
+    function startDealAnimation() {
+      requestAnimationFrame(function () {
+        window.gameUtils.resizeCanvas();
+        setTimeout(assignTerritory, 500);
+      });
+    }
+
+    if (
+      window.risqueArtemisMode &&
+      window.risqueArtemisHost &&
+      typeof window.risqueArtemisBeatHostHoldStep === "function"
+    ) {
+      window.risqueArtemisBeatHostHoldStep({
+        beatId: "deal",
+        label: "Deal cards",
+        expectPhase: "deal",
+        minDisplayMs: 1500,
+        pushMirror: true,
+        timeoutMs: 12000,
+      }).then(startDealAnimation);
+      return;
+    }
+
+    startDealAnimation();
   }
 
   window.risquePhases = window.risquePhases || {};

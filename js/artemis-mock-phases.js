@@ -312,7 +312,7 @@
     var blanket = readBlanketMockPhases();
     if (blanket === false) return false;
     if (blanket === true) return true;
-    return true;
+    return false;
   };
 
   window.risqueArtemisUseMockIncome = function () {
@@ -323,7 +323,7 @@
     var blanket = readBlanketMockPhases();
     if (blanket === false) return false;
     if (blanket === true) return true;
-    return true;
+    return false;
   };
 
   window.risqueArtemisUseMockPhases = function () {

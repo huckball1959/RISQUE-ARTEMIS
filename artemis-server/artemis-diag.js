@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 const DIAG_MAX = 400;
+const CONSOLE_DIAG_MAX = 200;
 
 /**
  * @param {string} gameRoot
@@ -14,6 +15,8 @@ function createArtemisDiag(gameRoot) {
   const reportPath = path.join(diagDir, "artemis-last-report.json");
   /** @type {object[]} */
   const events = [];
+  /** @type {object[]} */
+  const consoleEvents = [];
 
   function ensureDir() {
     try {
@@ -31,6 +34,10 @@ function createArtemisDiag(gameRoot) {
     };
     events.push(row);
     while (events.length > DIAG_MAX) events.shift();
+    if (row.kind === "browser_console") {
+      consoleEvents.push(row);
+      while (consoleEvents.length > CONSOLE_DIAG_MAX) consoleEvents.shift();
+    }
     ensureDir();
     try {
       fs.appendFileSync(jsonlPath, JSON.stringify(row) + "\n");
@@ -54,6 +61,36 @@ function createArtemisDiag(gameRoot) {
   }
 
   function computeVerdict() {
+    const cpLag = findLast("cardplay_order_lag");
+    const cpReject = findLast("cardplay_order_mirror_reject");
+    if (cpReject && Number(cpReject.slot) === 3) {
+      return {
+        status: "failed",
+        code: "cardplay_order_p3_mirror_reject",
+        summary: String(cpReject.summary || "P3 rejected playerSelect mirror during cardplay-order roulette"),
+        slot: 3,
+        detail: cpReject.detail || null,
+      };
+    }
+    if (cpLag && Number(cpLag.slot) === 3) {
+      return {
+        status: "failed",
+        code: "cardplay_order_p3_lag",
+        summary: String(cpLag.summary || "P3 lagging during cardplay-order handoff"),
+        slot: 3,
+        detail: cpLag.detail || null,
+      };
+    }
+    const syncLag = findLast("sync_barrier_timeout") || findLast("sync_barrier_lag");
+    if (syncLag) {
+      return {
+        status: "failed",
+        code: String(syncLag.kind || "sync_lag"),
+        summary: String(syncLag.summary || "Laptop sync barrier failed"),
+        laggers: syncLag.laggers,
+      };
+    }
+
     const stuck = findLast("handoff_stuck");
     if (stuck) {
       return {
@@ -260,19 +297,239 @@ function createArtemisDiag(gameRoot) {
     };
   }
 
+  function buildConsoleSection() {
+    if (!consoleEvents.length) {
+      return {
+        status: "none",
+        readout: "No browser console batches yet (all laptops forward console after lobby start).",
+        bySlot: {},
+        recentLines: [],
+      };
+    }
+    /** @type {Record<string, object[]>} */
+    const bySlot = {};
+    /** @type {object[]} */
+    const recentLines = [];
+    for (let i = 0; i < consoleEvents.length; i += 1) {
+      const ev = consoleEvents[i];
+      const slotKey = String(Number(ev.slot) || 0);
+      if (!bySlot[slotKey]) bySlot[slotKey] = [];
+      const lines = ev.detail && Array.isArray(ev.detail.lines) ? ev.detail.lines : [];
+      for (let j = 0; j < lines.length; j += 1) {
+        const line = lines[j];
+        if (!line || !line.text) continue;
+        const row = {
+          t: line.t || ev.t,
+          iso: ev.iso,
+          level: line.level || "log",
+          text: String(line.text),
+          role: ev.role || "",
+          slot: Number(ev.slot) || 0,
+          clientId: ev.clientId || "",
+        };
+        bySlot[slotKey].push(row);
+        recentLines.push(row);
+      }
+    }
+    Object.keys(bySlot).forEach(function (sk) {
+      bySlot[sk] = bySlot[sk].slice(-50);
+    });
+    recentLines.sort(function (a, b) {
+      return (Number(a.t) || 0) - (Number(b.t) || 0);
+    });
+    const tail = recentLines.slice(-80);
+    const slots = Object.keys(bySlot)
+      .filter(function (sk) {
+        return sk !== "0";
+      })
+      .sort();
+    let readout =
+      "Console from " +
+      (slots.length ? slots.map(function (s) { return "P" + s; }).join(", ") : "unknown slots") +
+      " (" +
+      tail.length +
+      " recent lines).";
+    const errLine = tail.filter(function (r) {
+      return r.level === "error";
+    }).slice(-1)[0];
+    if (errLine) {
+      readout += " Last error P" + errLine.slot + ": " + errLine.text.slice(0, 120);
+    }
+    return {
+      status: "ok",
+      readout,
+      bySlot,
+      recentLines: tail,
+      batchCount: consoleEvents.length,
+    };
+  }
+
+  function buildCardplayOrderSection() {
+    const winner = findLast("cardplay_order_winner");
+    const lagEvents = events.filter(function (e) {
+      return (
+        e &&
+        (e.kind === "cardplay_order_lag" ||
+          e.kind === "cardplay_order_mirror_reject" ||
+          e.kind === "cardplay_order_probe_end")
+      );
+    });
+    const rejects = events.filter(function (e) {
+      return e && e.kind === "cardplay_order_mirror_reject";
+    });
+    const probes = events.filter(function (e) {
+      return e && (e.kind === "cardplay_order_probe" || e.kind === "cardplay_order_lag");
+    });
+    /** @type {Record<string, object>} */
+    const bySlot = {};
+    [1, 2, 3].forEach(function (slot) {
+      const slotProbes = probes.filter(function (e) {
+        return Number(e.slot) === slot;
+      });
+      const slotRejects = rejects.filter(function (e) {
+        return Number(e.slot) === slot;
+      });
+      const lastProbe = slotProbes.length ? slotProbes[slotProbes.length - 1] : null;
+      const lastLag = slotProbes.filter(function (e) {
+        return e.kind === "cardplay_order_lag";
+      }).slice(-1)[0];
+      const detail = lastProbe && lastProbe.detail ? lastProbe.detail : {};
+      bySlot[String(slot)] = {
+        lastProbe: lastProbe,
+        lastLag: lastLag || null,
+        rejectCount: slotRejects.length,
+        livePhase: detail.gamePhase || "",
+        urlPhase: detail.urlPhase || "",
+        lagging: !!lastLag || slotRejects.length > 0,
+      };
+    });
+    const p3 = bySlot["3"] || {};
+    let status = "none";
+    if (winner || lagEvents.length) {
+      status = p3.lagging || (bySlot["3"] && bySlot["3"].rejectCount > 0) ? "p3_lagging" : "ok";
+      if (rejects.some(function (e) { return Number(e.slot) === 3; })) {
+        status = "p3_lagging";
+      }
+      if (findLast("cardplay_order_lag") && Number(findLast("cardplay_order_lag").slot) === 3) {
+        status = "p3_lagging";
+      }
+    }
+    let readout = "No cardplay-order roulette yet.";
+    if (winner) {
+      readout =
+        "Winner: " +
+        String((winner.detail && winner.detail.winner) || winner.summary || "?") +
+        (winner.detail && winner.detail.rigSlot
+          ? " (rig slot " + winner.detail.rigSlot + ")"
+          : "");
+    }
+    if (p3.rejectCount > 0) {
+      readout += " · P3 rejected playerSelect mirror ×" + p3.rejectCount;
+    }
+    if (p3.lastLag) {
+      readout +=
+        " · P3 lag live=" +
+        String((p3.lastLag.detail && p3.lastLag.detail.gamePhase) || "?") +
+        " url=" +
+        String((p3.lastLag.detail && p3.lastLag.detail.urlPhase) || "?");
+    }
+    Object.keys(bySlot).forEach(function (sk) {
+      const row = bySlot[sk];
+      if (!row.lastProbe && !row.rejectCount) return;
+      readout +=
+        " · P" +
+        sk +
+        " " +
+        (row.livePhase || "?") +
+        "/" +
+        (row.urlPhase || "?") +
+        (row.lagging ? " LAG" : "");
+    });
+    return {
+      status,
+      readout,
+      winner: winner || null,
+      bySlot,
+      rejectCount: rejects.length,
+      probeCount: probes.length,
+      recentLag: lagEvents.slice(-12),
+      recentRejects: rejects.slice(-12),
+    };
+  }
+
+  function buildSyncSection(sessionSnap) {
+    sessionSnap = sessionSnap || {};
+    const sync = sessionSnap.sync || {};
+    const heartbeats = sync.heartbeats || {};
+    const hostSeq = Number(sync.hostSeq) || 0;
+    const rows = [];
+    [1, 2, 3].forEach(function (slot) {
+      const hb = heartbeats[String(slot)] || heartbeats[slot];
+      if (!hb) {
+        rows.push({ slot: slot, status: "missing" });
+        return;
+      }
+      rows.push({
+        slot: slot,
+        name: hb.name || "",
+        gamePhase: hb.gamePhase || "",
+        urlPhase: hb.urlPhase || "",
+        lastAppliedSeq: hb.lastAppliedSeq,
+        seqGap: hb.seqGap != null ? hb.seqGap : Math.max(0, hostSeq - (Number(hb.lastAppliedSeq) || 0)),
+        ageMs: hb.ageMs,
+        status:
+          hb.missing || (hb.seqGap != null && hb.seqGap > 2)
+            ? "lagging"
+            : hb.ageMs != null && hb.ageMs > 5000
+              ? "stale"
+              : "ok",
+      });
+    });
+    return {
+      hostSeq,
+      activeBarrier: sync.activeBarrier || null,
+      laggers: sync.laggers || [],
+      laptops: rows,
+      readout:
+        rows
+          .map(function (r) {
+            if (r.status === "missing") return "P" + r.slot + ": no heartbeat";
+            return (
+              "P" +
+              r.slot +
+              " " +
+              (r.gamePhase || "?") +
+              " seq-" +
+              (r.seqGap != null ? r.seqGap : "?") +
+              " (" +
+              r.status +
+              ")"
+            );
+          })
+          .join(" · "),
+    };
+  }
+
   function buildReport(sessionSnap) {
     sessionSnap = sessionSnap || {};
     const verdict = computeVerdict();
     const receiveCard = buildReceiveCardSection();
+    const cardplayOrder = buildCardplayOrderSection();
+    const browserConsole = buildConsoleSection();
+    const sync = buildSyncSection(sessionSnap);
     return {
       generatedAt: new Date().toISOString(),
       reportPath: reportPath,
       jsonlPath: jsonlPath,
       forCursor:
-        "Tell Cursor: read logs/artemis-last-report.json — no copy/paste needed. Check receiveCard.readout for who drew what.",
+        "Tell Cursor: read logs/artemis-last-report.json — no copy/paste needed. Check cardplayOrder.readout for P3 lag at cardplay-order roulette; receiveCard.readout for who drew what; browserConsole.recentLines for all-laptop console; sync.readout for laptop lag.",
       verdict,
+      sync,
+      cardplayOrder,
       receiveCard,
+      browserConsole,
       eventCount: events.length,
+      consoleEventCount: consoleEvents.length,
       recentEvents: events.slice(-60),
       session: sessionSnap,
     };
@@ -284,6 +541,7 @@ function createArtemisDiag(gameRoot) {
 
   function resetSession() {
     events.length = 0;
+    consoleEvents.length = 0;
     ensureDir();
     try {
       fs.writeFileSync(

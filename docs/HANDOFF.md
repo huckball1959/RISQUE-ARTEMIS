@@ -1,9 +1,13 @@
 # RISQUE Handoff Notes
 
+> **ARTEMIS (3-laptop network):** Use **[SESSION_NOTES.md](SESSION_NOTES.md)** and **[ARTEMIS-DEVLOG.md](ARTEMIS-DEVLOG.md)** — not this file. Latest: **m221** (2026-06-07), uncommitted, retest after reboot.
+
 ## Current Status
 
 Project is running with runtime phases in `game.html` and phase modules under `phases/`.
 Recent focus areas were attack/reinforce/cardplay stability, UI cleanup, and save-state corruption recovery.
+
+**Legacy single-machine notes below.** Network multiplayer handoff is in `docs/SESSION_NOTES.md`.
 
 ## Key Recent Fixes
 

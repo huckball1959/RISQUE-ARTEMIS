@@ -207,6 +207,11 @@
     if (ui.artemisRoster && Array.isArray(ui.artemisRoster)) {
       gs.artemisRoster = ui.artemisRoster;
     }
+    try {
+      delete gs.risqueArtemisRigSetup;
+    } catch (eRigClrGs) {
+      /* ignore */
+    }
     copyHostPreflightReplaySaveFlagIntoNewGame(gs);
     if (typeof window.risqueReplayClearTapeSidecar === "function") {
       window.risqueReplayClearTapeSidecar();

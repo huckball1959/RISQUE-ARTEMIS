@@ -208,18 +208,33 @@
     var wantCount = Number(player.cardCount) || 0;
     if (
       !wantCount &&
-      typeof window.risquePublicSpectatorHandCountFromGs === "function"
+      typeof window.risquePublicSpectatorHandCountFromGs === "function" &&
+      normName(gs.currentPlayer) === leadName
     ) {
       wantCount = Math.max(0, Number(window.risquePublicSpectatorHandCountFromGs(gs)) || 0);
     }
     if (!wantCount && gs.risquePublicCardplaySpectatorHandCount != null) {
-      wantCount = Math.max(0, Number(gs.risquePublicCardplaySpectatorHandCount) || 0);
+      var mirName = normName(gs.risquePublicCardplaySpectatorPlayer);
+      if (mirName && mirName === leadName) {
+        wantCount = Math.max(0, Number(gs.risquePublicCardplaySpectatorHandCount) || 0);
+      }
+    }
+    if (wantCount < haveCards) {
+      player.cards = player.cards.slice(0, wantCount);
+      player.cardCount = player.cards.length;
+      haveCards = player.cards.length;
     }
     if (haveCards >= wantCount && wantCount > 0) {
       player.cardCount = haveCards;
       return gs;
     }
-    if (wantCount <= 0 && haveCards <= 0) return gs;
+    if (wantCount <= 0) {
+      if (haveCards > 0) {
+        player.cards = [];
+        player.cardCount = 0;
+      }
+      return gs;
+    }
 
     if (window.risqueArtemisNetClient && !window.risqueArtemisHost) {
       var mine =

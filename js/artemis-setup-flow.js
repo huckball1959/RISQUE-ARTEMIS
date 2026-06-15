@@ -8,8 +8,7 @@
 
   if (!window.risqueArtemisMode) return;
 
-  var WELCOME_MS = 2200;
-  var welcomeTimer = null;
+  var WELCOME_MS = 3000;
 
   function appendSession(url) {
     if (typeof window.risqueArtemisAppendSessionParams === "function") {
@@ -82,6 +81,18 @@
     }
   }
 
+  function advanceToFirstCardSelect(gs) {
+    var live = window.gameState || gs;
+    live.phase = "playerSelect";
+    live.selectionPhase = "firstCard";
+    live.risquePublicUiSelectKind = "firstCard";
+    persistAndMirror(live);
+    if (typeof window.risqueArtemisSetupMilestone === "function") {
+      window.risqueArtemisSetupMilestone("M2-firstCard-roulette-start", live.currentPlayer);
+    }
+    goFirstCardSelect();
+  }
+
   /**
    * Host only — called from artemis-login after roster commit.
    */
@@ -93,10 +104,6 @@
       return false;
     }
     if (!window.risqueArtemisHost || !gs) return false;
-    if (welcomeTimer) {
-      clearTimeout(welcomeTimer);
-      welcomeTimer = null;
-    }
 
     clearPresetArtifacts(gs);
 
@@ -127,21 +134,48 @@
     showWelcomeChrome(gs);
 
     if (typeof window.risqueArtemisSetupMilestone === "function") {
-      window.risqueArtemisSetupMilestone("M1-welcome", "first-card roulette in " + WELCOME_MS + "ms");
+      window.risqueArtemisSetupMilestone("M1-welcome", "awaiting rig pick");
     }
 
-    welcomeTimer = setTimeout(function () {
-      welcomeTimer = null;
-      var live = window.gameState || gs;
-      live.phase = "playerSelect";
-      live.selectionPhase = "firstCard";
-      live.risquePublicUiSelectKind = "firstCard";
-      persistAndMirror(live);
+    function runWelcomeBeatThenFirstCard() {
       if (typeof window.risqueArtemisSetupMilestone === "function") {
-        window.risqueArtemisSetupMilestone("M2-firstCard-roulette-start", live.currentPlayer);
+        window.risqueArtemisSetupMilestone("M1-welcome", "beat sync " + WELCOME_MS + "ms");
       }
-      goFirstCardSelect();
-    }, WELCOME_MS);
+      var advanced = false;
+      function afterWelcomeBeat() {
+        if (advanced) return;
+        advanced = true;
+        advanceToFirstCardSelect(gs);
+      }
+      var safetyTimer = setTimeout(afterWelcomeBeat, WELCOME_MS + 4000);
+      if (typeof window.risqueArtemisBeatHostHoldStep === "function") {
+        window.risqueArtemisBeatHostHoldStep({
+          beatId: "welcome",
+          label: "Welcome",
+          expectPhase: "welcome",
+          minDisplayMs: WELCOME_MS,
+          pushMirror: false,
+          timeoutMs: WELCOME_MS + 8000,
+        })
+          .then(function () {
+            clearTimeout(safetyTimer);
+            afterWelcomeBeat();
+          })
+          .catch(function () {
+            clearTimeout(safetyTimer);
+            afterWelcomeBeat();
+          });
+      } else {
+        clearTimeout(safetyTimer);
+        setTimeout(afterWelcomeBeat, WELCOME_MS);
+      }
+    }
+
+    if (typeof window.risqueArtemisShowRigPickerAfterStart === "function") {
+      window.risqueArtemisShowRigPickerAfterStart(runWelcomeBeatThenFirstCard);
+    } else {
+      runWelcomeBeatThenFirstCard();
+    }
 
     return true;
   };
@@ -210,56 +244,130 @@
     }
     if (!window.risqueArtemisHost || !gs) return false;
 
-    clearPresetArtifacts(gs);
-    delete gs.risquePublicPlayerSelectFlash;
-    if (String(gs.phase || "") === "cardplay" || String(gs.phase || "") === "con-cardplay") {
+    function proceedLoad() {
+      clearPresetArtifacts(gs);
+      delete gs.risquePublicPlayerSelectFlash;
+      if (String(gs.phase || "") === "cardplay" || String(gs.phase || "") === "con-cardplay") {
+        try {
+          delete gs.selectionPhase;
+          delete gs.risquePublicUiSelectKind;
+        } catch (eSelClr) {
+          /* ignore */
+        }
+      }
       try {
-        delete gs.selectionPhase;
-        delete gs.risquePublicUiSelectKind;
-      } catch (eSelClr) {
+        var staleSlot = document.getElementById("risque-phase-content");
+        if (staleSlot) staleSlot.innerHTML = "";
+      } catch (eStale) {
         /* ignore */
       }
-    }
-    try {
-      var staleSlot = document.getElementById("risque-phase-content");
-      if (staleSlot) staleSlot.innerHTML = "";
-    } catch (eStale) {
-      /* ignore */
-    }
 
-    persistAndMirror(gs);
-    if (typeof window.risqueArtemisSetupMilestone === "function") {
-      window.risqueArtemisSetupMilestone(
-        "M0-load-ok",
-        String(gs.phase || "?") + " · " + String(gs.currentPlayer || "?")
-      );
-    }
+      persistAndMirror(gs);
+      if (typeof window.risqueArtemisSetupMilestone === "function") {
+        window.risqueArtemisSetupMilestone(
+          "M0-load-ok",
+          String(gs.phase || "?") + " · " + String(gs.currentPlayer || "?")
+        );
+      }
 
-    window.risqueArtemisFastBootGameStarted = true;
-    if (typeof window.risqueArtemisStopHostParkedRefresh === "function") {
-      window.risqueArtemisStopHostParkedRefresh();
-    }
-    if (typeof window.risqueArtemisLobbyHide === "function") {
-      window.risqueArtemisLobbyHide();
-    }
+      window.risqueArtemisFastBootGameStarted = true;
+      if (typeof window.risqueArtemisStopHostParkedRefresh === "function") {
+        window.risqueArtemisStopHostParkedRefresh();
+      }
+      if (typeof window.risqueArtemisLobbyHide === "function") {
+        window.risqueArtemisLobbyHide();
+      }
 
-    var url = buildLoadedGameNavigateUrl(gs);
-    /* Login screen soft-nav skips map/HUD boot — full reload matches Grace rollback (reliable). */
-    if (stillOnArtemisLoginScreen()) {
-      if (typeof window.risqueArtemisHideLoginPanel === "function") {
-        window.risqueArtemisHideLoginPanel();
+      var url = buildLoadedGameNavigateUrl(gs);
+      if (stillOnArtemisLoginScreen()) {
+        if (typeof window.risqueArtemisHideLoginPanel === "function") {
+          window.risqueArtemisHideLoginPanel();
+        }
+        navigateLoadedGameUrl(url);
+        return true;
+      }
+      if (typeof window.risqueNavigateGameHtmlSoft === "function" && window.risqueNavigateGameHtmlSoft(url)) {
+        return true;
       }
       navigateLoadedGameUrl(url);
       return true;
     }
-    if (typeof window.risqueNavigateGameHtmlSoft === "function" && window.risqueNavigateGameHtmlSoft(url)) {
+
+    if (typeof window.risqueArtemisBeatHostGateBeforeLoad === "function") {
+      window.risqueArtemisBeatHostGateBeforeLoad().then(proceedLoad);
       return true;
     }
-    navigateLoadedGameUrl(url);
-    return true;
+    return proceedLoad();
   };
 
   /** Clients (and host): ensure setup HUD when mirror reports welcome / early setup. */
+  function canonicalPlayerSelectKind(raw) {
+    var sk = String(raw || "").trim();
+    if (!sk) return "";
+    var low = sk.toLowerCase();
+    if (low === "cardplay") return "cardPlay";
+    if (low === "deployorder") return "deployOrder";
+    if (low === "firstcard") return "firstCard";
+    return sk;
+  }
+
+  function playerSelectMirrorLightSync(gs) {
+    window.gameState = gs;
+    if (typeof window.risqueHostReplaceShellGameState === "function") {
+      window.risqueHostReplaceShellGameState(gs);
+    }
+    document.body.classList.add("risque-setup-fullstage");
+    var sk = canonicalPlayerSelectKind(gs.risquePublicUiSelectKind || gs.selectionPhase);
+    var hudKey = "ps-mirror:" + sk;
+    if (window.__risquePsMirrorHudKey !== hudKey) {
+      window.__risquePsMirrorHudKey = hudKey;
+      if (
+        window.risqueArtemisNetClient &&
+        !window.risqueArtemisHost &&
+        typeof window.risqueArtemisEnsureOmniClientHud === "function"
+      ) {
+        window.risqueArtemisEnsureOmniClientHud(gs);
+      }
+      if (typeof window.risqueWireArtemisHudTogglesOnce === "function") {
+        window.risqueWireArtemisHudTogglesOnce();
+      }
+      if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.syncPosition === "function") {
+        try {
+          window.risqueRuntimeHud.syncPosition();
+        } catch (eSync) {
+          /* ignore */
+        }
+      }
+    }
+    if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
+      window.risquePublicApplyVoiceAndLogMirror(gs);
+    }
+  }
+
+  function clientPlayerSelectMirrorUsesLightSyncOnly() {
+    return !!(window.risqueArtemisMode && window.risqueArtemisNetClient && !window.risqueArtemisHost);
+  }
+
+  function playerSelectMirrorAlreadyLive(gs) {
+    if (window.__risquePlayerSelectMountGuard) return true;
+    var mirSk = canonicalPlayerSelectKind(gs.risquePublicUiSelectKind || gs.selectionPhase);
+    var liveGs = window.gameState;
+    if (liveGs && String(liveGs.phase || "") === "playerSelect") {
+      var liveSk = canonicalPlayerSelectKind(
+        liveGs.risquePublicUiSelectKind || liveGs.selectionPhase
+      );
+      if (mirSk && liveSk && mirSk === liveSk) return true;
+    }
+    try {
+      var u = new URL(window.location.href);
+      if (String(u.searchParams.get("phase") || "") !== "playerSelect") return false;
+      var urlSk = canonicalPlayerSelectKind(u.searchParams.get("selectKind"));
+      return !!(urlSk && mirSk && urlSk === mirSk);
+    } catch (eUrl) {
+      return false;
+    }
+  }
+
   window.risqueArtemisSyncSetupMirror = function (gs) {
     if (!gs || !window.risqueArtemisMode) return;
     var ph = String(gs.phase || "");
@@ -281,6 +389,33 @@
             window.risqueWireArtemisHudTogglesOnce();
           }
         });
+      }
+      if (ph === "playerSelect") {
+        if (clientPlayerSelectMirrorUsesLightSyncOnly() || playerSelectMirrorAlreadyLive(gs)) {
+          playerSelectMirrorLightSync(gs);
+        } else if (typeof window.risqueRefreshSetupStageChrome === "function") {
+          var sk = String(gs.risquePublicUiSelectKind || gs.selectionPhase || "");
+          var banner =
+            sk === "firstCard"
+              ? "FIRST CARD"
+              : sk === "deployOrder"
+                ? "DEPLOY ORDER"
+                : "SELECTING PLAYER ONE";
+          var chromeOpts =
+            window.risqueArtemisNetClient && !window.risqueArtemisHost ? { skipMap: true } : null;
+          window.risqueRefreshSetupStageChrome(
+            banner,
+            function () {
+              if (typeof window.risqueWireArtemisHudTogglesOnce === "function") {
+                window.risqueWireArtemisHudTogglesOnce();
+              }
+              if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
+                window.risquePublicApplyVoiceAndLogMirror(gs);
+              }
+            },
+            chromeOpts
+          );
+        }
       }
     }
   };

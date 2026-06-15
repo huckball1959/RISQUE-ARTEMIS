@@ -97,7 +97,7 @@
         return normName(hit.name) === normName(gs.currentPlayer);
       }
     }
-    return normName(gs.currentPlayer) === playerUp(gs);
+    return activePlayerSlot(gs) === local;
   }
 
   function playerUp(gs) {
@@ -155,6 +155,198 @@
     if (gs.artemisRoster && Array.isArray(gs.artemisRoster) && gs.artemisRoster.length) return;
     var r = storedRoster();
     if (r && r.length) gs.artemisRoster = r;
+  };
+
+  function isSetupDeployRoute(gs) {
+    if (!gs || String(gs.phase || "") !== "deploy") return false;
+    var route = String(gs.risqueMirrorDeployRoute || "");
+    if (route === "setup" || route === "deploy1") return true;
+    try {
+      var rk = localStorage.getItem("risqueMirrorDeployRoute");
+      if (rk === "setup" || rk === "deploy1") return true;
+    } catch (eRk) {
+      /* ignore */
+    }
+    return isSetupDeploy(gs);
+  }
+
+  window.risqueArtemisClearSetupDeployWinnerLock = function (gs) {
+    if (!gs) return;
+    try {
+      delete gs.risqueArtemisSetupDeployWinner;
+      delete gs.risqueArtemisSetupDeploySlot;
+    } catch (eClr) {
+      /* ignore */
+    }
+  };
+
+  function postRouletteSwapDisabled() {
+    if (typeof window.risqueArtemisRigSetupUsesRandom === "function") {
+      return window.risqueArtemisRigSetupUsesRandom();
+    }
+    if (window.risqueArtemisRigSetupRandom) return true;
+    try {
+      if (sessionStorage.getItem("risqueArtemisRigSetupRandom") === "1") return true;
+      return new URL(window.location.href).searchParams.get("rigSetup") === "random";
+    } catch (eUrl) {
+      return false;
+    }
+  }
+
+  function postRouletteSwapSlot() {
+    if (postRouletteSwapDisabled()) return 0;
+    if (typeof window.risqueArtemisResolveRigSwapSlot === "function") {
+      return window.risqueArtemisResolveRigSwapSlot();
+    }
+    if (typeof window.risqueArtemisRigSetupSlot === "number") {
+      var rigStored = Number(window.risqueArtemisRigSetupSlot);
+      if (rigStored >= 1 && rigStored <= 3) return rigStored;
+    }
+    try {
+      var ssRig = sessionStorage.getItem("risqueArtemisRigSetupSlot");
+      if (ssRig === "1" || ssRig === "2" || ssRig === "3") return parseInt(ssRig, 10);
+    } catch (eSsRig) {
+      /* ignore */
+    }
+    try {
+      var q = new URL(window.location.href).searchParams.get("rigSetup");
+      if (q === "1" || q === "2" || q === "3") return parseInt(q, 10);
+    } catch (eQ) {
+      /* ignore */
+    }
+    if (typeof window.RISQUE_POST_ROULETTE_SWAP_SLOT === "number") {
+      var w = Number(window.RISQUE_POST_ROULETTE_SWAP_SLOT);
+      if (w >= 1 && w <= 3) return w;
+    }
+    return 0;
+  }
+
+  function playerObjectForArtemisSlot(gs, slot) {
+    if (!gs || !slot || slot < 1 || !Array.isArray(gs.players) || !gs.players.length) return null;
+    bindIdentityFromRoster(gs);
+    if (Array.isArray(gs.artemisRoster)) {
+      var rh = gs.artemisRoster.find(function (r) {
+        return Number(r.slot) === slot;
+      });
+      if (rh && rh.name) {
+        var want = normName(rh.name);
+        var byRos = gs.players.find(function (p) {
+          return normName(p && p.name) === want;
+        });
+        if (byRos) return byRos;
+      }
+    }
+    var byOrd = gs.players.find(function (p) {
+      return Number(p.playerOrder) === slot;
+    });
+    if (byOrd) return byOrd;
+    var fall = { 1: "GUIDO", 2: "MICTOR", 3: "NOOCH" }[slot];
+    if (fall) {
+      var byNm = gs.players.find(function (p) {
+        return normName(p && p.name) === fall;
+      });
+      if (byNm) return byNm;
+    }
+    return gs.players[slot - 1] || null;
+  }
+
+  window.risqueArtemisForcePostRouletteWinner = function (gs, selectKind, playersOpt) {
+    if (!gs || !window.risqueArtemisMode || !window.risqueArtemisHost) return null;
+    if (postRouletteSwapDisabled()) return null;
+    if (
+      String(gs.phase || "") === "deploy" &&
+      (Number(gs.risqueArtemisControlSeq) || 0) > 1
+    ) {
+      return null;
+    }
+    var slot = postRouletteSwapSlot();
+    if (!(slot >= 1)) return null;
+    var players = playersOpt || gs.players;
+    var forced =
+      typeof window.risqueArtemisPlayerForSwapSlot === "function"
+        ? window.risqueArtemisPlayerForSwapSlot(players, gs, slot)
+        : playerObjectForArtemisSlot(gs, slot);
+    if (!forced || !forced.name) return null;
+    var prev = gs.currentPlayer;
+    gs.currentPlayer = String(forced.name);
+    if (Array.isArray(players) && players.length) {
+      gs.turnOrder = [forced.name].concat(
+        players
+          .filter(function (p) {
+            return p && p.name !== forced.name;
+          })
+          .map(function (p) {
+            return p.name;
+          })
+      );
+    }
+    gs.artemisControlSlot = slot;
+    if (String(selectKind || "") === "deployOrder" || String(gs.phase || "") === "deploy") {
+      gs.risqueMirrorDeployRoute = "setup";
+      gs.risqueArtemisSetupDeployWinner = normName(forced.name);
+      gs.risqueArtemisSetupDeploySlot = slot;
+      gs.risqueArtemisControlSeq = Math.max(Number(gs.risqueArtemisControlSeq) || 0, 1);
+    }
+    if (prev && normName(prev) !== normName(forced.name)) {
+      try {
+        console.info(
+          "[ARTEMIS] force post-roulette winner " + prev + " → " + forced.name + " (slot " + slot + ")"
+        );
+      } catch (eFLog) {
+        /* ignore */
+      }
+    }
+    return forced;
+  };
+
+  if (
+    typeof window.RISQUE_POST_ROULETTE_SWAP_SLOT === "number" &&
+    window.RISQUE_POST_ROULETTE_SWAP_SLOT >= 1 &&
+    window.RISQUE_POST_ROULETTE_SWAP_SLOT <= 3
+  ) {
+    /* keep rig from host picker / URL */
+  } else if (typeof window.risqueArtemisResolveRigSwapSlot === "function") {
+    var bootSlot = window.risqueArtemisResolveRigSwapSlot();
+    if (bootSlot >= 1 && bootSlot <= 3) {
+      window.RISQUE_POST_ROULETTE_SWAP_SLOT = bootSlot;
+    }
+  }
+
+  window.risqueArtemisHostHasSetupDeployWinnerLock = function (gs) {
+    gs = gs || window.gameState;
+    if (!gs || !window.risqueArtemisMode) return false;
+    if (postRouletteSwapDisabled()) return false;
+    if ((Number(gs.risqueArtemisControlSeq) || 0) > 1) return false;
+    if (!isSetupDeployRoute(gs)) return false;
+    return true;
+  };
+
+  window.risqueArtemisApplySetupDeployWinnerLock = function (gs) {
+    if (!window.risqueArtemisHostHasSetupDeployWinnerLock(gs)) {
+      return false;
+    }
+    bindIdentityFromRoster(gs);
+    var winner = normName(gs.risqueArtemisSetupDeployWinner);
+    var slot = Number(gs.risqueArtemisSetupDeploySlot) || postRouletteSwapSlot();
+    if (!winner) {
+      return !!window.risqueArtemisForcePostRouletteWinner(gs, "deployOrder");
+    }
+    var resolvedPlayer = null;
+    if (slot >= 1 && slot <= 3) {
+      resolvedPlayer = playerObjectForArtemisSlot(gs, slot);
+    }
+    if (!resolvedPlayer && Array.isArray(gs.players)) {
+      resolvedPlayer = gs.players.find(function (p) {
+        return p && normName(p.name) === winner;
+      });
+    }
+    gs.currentPlayer = resolvedPlayer && resolvedPlayer.name ? resolvedPlayer.name : winner;
+    if (slot >= 1 && slot <= 3) {
+      gs.artemisControlSlot = slot;
+    } else if (typeof window.risqueArtemisForceControlSlotFromCurrentPlayer === "function") {
+      window.risqueArtemisForceControlSlotFromCurrentPlayer(gs);
+    }
+    return true;
   };
 
   window.risqueArtemisForceControlSlotFromCurrentPlayer = function (gs) {
@@ -221,6 +413,15 @@
   /** Host stamps mirrored state so clients know which laptop gets CONTROL (probe-style). */
   window.risqueArtemisStampControlSlot = function (gs) {
     if (!gs) return;
+    if (
+      typeof window.risqueArtemisHostHasSetupDeployWinnerLock === "function" &&
+      window.risqueArtemisHostHasSetupDeployWinnerLock(gs)
+    ) {
+      if (typeof window.risqueArtemisApplySetupDeployWinnerLock === "function") {
+        window.risqueArtemisApplySetupDeployWinnerLock(gs);
+      }
+      return;
+    }
     if (typeof window.risqueArtemisForceControlSlotFromCurrentPlayer === "function") {
       var forced = window.risqueArtemisForceControlSlotFromCurrentPlayer(gs);
       if (forced >= 1) return;
@@ -232,10 +433,30 @@
     }
   };
 
-  /** Prefer currentPlayer roster slot when artemisControlSlot is stale after a prior handoff. */
+  /** Prefer locked deploy slot over stale currentPlayer during setup deploy. */
   window.risqueArtemisResolveOwnerSlot = function (gs) {
     if (!gs) return 0;
+    if (
+      typeof window.risqueArtemisHostHasSetupDeployWinnerLock === "function" &&
+      window.risqueArtemisHostHasSetupDeployWinnerLock(gs) &&
+      typeof window.risqueArtemisApplySetupDeployWinnerLock === "function"
+    ) {
+      window.risqueArtemisApplySetupDeployWinnerLock(gs);
+    }
     bindIdentityFromRoster(gs);
+    if (
+      typeof window.risqueArtemisHostHasSetupDeployWinnerLock === "function" &&
+      window.risqueArtemisHostHasSetupDeployWinnerLock(gs)
+    ) {
+      var lockSlot =
+        Number(gs.risqueArtemisSetupDeploySlot) ||
+        Number(gs.artemisControlSlot) ||
+        postRouletteSwapSlot();
+      if (lockSlot >= 1 && lockSlot <= 3) {
+        gs.artemisControlSlot = lockSlot;
+        return lockSlot;
+      }
+    }
     var fromPlayer = activePlayerSlot(gs);
     var ctrl = Number(gs.artemisControlSlot) || 0;
     if (fromPlayer >= 1 && ctrl >= 1 && fromPlayer !== ctrl) {
@@ -252,7 +473,16 @@
     if (route !== "turn" && route !== "deploy2") {
       try {
         var rk = localStorage.getItem("risqueMirrorDeployRoute");
-        if (rk !== "turn" && rk !== "deploy2") return;
+        if (rk !== "turn" && rk !== "deploy2") {
+          if (
+            typeof window.risqueArtemisIsSetupDeploy === "function" &&
+            !window.risqueArtemisIsSetupDeploy(gs)
+          ) {
+            /* Income → deploy: stale setup route/localStorage must not block handoff clear. */
+          } else {
+            return;
+          }
+        }
       } catch (eRk) {
         return;
       }
@@ -260,7 +490,69 @@
     window.risqueArtemisDeployHandoffPending = 0;
     window.risqueArtemisDeployPushLocked = false;
     window.risqueArtemisDeployRelinquishedSeq = 0;
+    try {
+      delete window.risqueArtemisDeployHandoffPlayer;
+    } catch (eClrHp) {
+      /* ignore */
+    }
   }
+
+  /** Keep income→deploy on the turn-deploy path (not first-setup deploy). */
+  function artemisEnsureTurnDeployRoute(gs, prevPhaseOpt) {
+    if (!gs || String(gs.phase || "") !== "deploy") return false;
+    var route = String(gs.risqueMirrorDeployRoute || "");
+    if (route === "turn" || route === "deploy2") return true;
+    try {
+      var rkPrefer = localStorage.getItem("risqueMirrorDeployRoute");
+      if (
+        (rkPrefer === "turn" || rkPrefer === "deploy2") &&
+        route !== "turn" &&
+        route !== "deploy2"
+      ) {
+        gs.risqueMirrorDeployRoute = rkPrefer;
+        artemisClearStaleDeployHandoffFlagsForTurnDeploy(gs);
+        return true;
+      }
+    } catch (eRkPref) {
+      /* ignore */
+    }
+    var prevPh = prevPhaseOpt != null ? String(prevPhaseOpt || "") : "";
+    if (!prevPh && window.gameState) {
+      prevPh = String(window.gameState.phase || "");
+    }
+    var fromIncome = prevPh === "income" || prevPh === "con-income";
+    if ((route === "setup" || route === "deploy1") && !fromIncome) {
+      if (
+        typeof window.risqueArtemisIsSetupDeploy === "function" &&
+        window.risqueArtemisIsSetupDeploy(gs)
+      ) {
+        return false;
+      }
+    }
+    var notSetup =
+      typeof window.risqueArtemisIsSetupDeploy === "function" &&
+      !window.risqueArtemisIsSetupDeploy(gs);
+    if (!fromIncome && !notSetup) {
+      try {
+        var rk = localStorage.getItem("risqueMirrorDeployRoute");
+        if (rk === "turn" || rk === "deploy2") {
+          gs.risqueMirrorDeployRoute = rk;
+          return true;
+        }
+      } catch (eRk) {
+        /* ignore */
+      }
+      return false;
+    }
+    gs.risqueMirrorDeployRoute = "turn";
+    if (typeof window.risqueSetMirrorDeployRoute === "function") {
+      window.risqueSetMirrorDeployRoute("turn");
+    }
+    artemisClearStaleDeployHandoffFlagsForTurnDeploy(gs);
+    return true;
+  }
+
+  window.risqueArtemisEnsureTurnDeployRoute = artemisEnsureTurnDeployRoute;
 
   window.risqueArtemisClearTurnDeployHandoffFlags = function (gs) {
     artemisClearStaleDeployHandoffFlagsForTurnDeploy(gs);
@@ -304,23 +596,51 @@
           typeof window.risqueArtemisIsSetupDeploy === "function" &&
           window.risqueArtemisIsSetupDeploy(gs)
         ) {
+          if (typeof window.risqueArtemisApplySetupDeployWinnerLock === "function") {
+            window.risqueArtemisApplySetupDeployWinnerLock(gs);
+          }
           if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
             window.risqueArtemisResolveOwnerSlot(gs);
           }
           var hostLocal = myLocalSlot();
-          var hostActive = activePlayerSlot(gs);
+          var hostActive = Number(gs.artemisControlSlot) || activePlayerSlot(gs);
           if (hostLocal >= 1 && hostActive === hostLocal) {
             window.risqueArtemisDeployHandoffPending = 0;
             window.risqueArtemisDeployPushLocked = false;
             return true;
           }
         }
+        var deployRouteHost = String(gs.risqueMirrorDeployRoute || "");
+        if (deployRouteHost !== "turn" && deployRouteHost !== "deploy2") {
+          try {
+            var rkDh = localStorage.getItem("risqueMirrorDeployRoute");
+            if (rkDh === "turn" || rkDh === "deploy2") deployRouteHost = rkDh;
+          } catch (eRkDh) {
+            /* ignore */
+          }
+        }
+        if (deployRouteHost === "turn" || deployRouteHost === "deploy2") {
+          if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
+            window.risqueArtemisResolveOwnerSlot(gs);
+          }
+          var hostLocalTurn = myLocalSlot();
+          var hostActiveTurn = Number(gs.artemisControlSlot) || activePlayerSlot(gs);
+          if (hostLocalTurn >= 1 && hostActiveTurn === hostLocalTurn) {
+            window.risqueArtemisDeployHandoffPending = 0;
+            window.risqueArtemisDeployPushLocked = false;
+            return true;
+          }
+          return false;
+        }
       }
       if (
         phHost === "cardplay" ||
         phHost === "con-cardplay" ||
         phHost === "income" ||
-        phHost === "con-income"
+        phHost === "con-income" ||
+        phHost === "attack" ||
+        phHost === "reinforce" ||
+        phHost === "receivecard"
       ) {
         if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
           window.risqueArtemisResolveOwnerSlot(gs);
@@ -333,6 +653,7 @@
         if (artemisLocalSlotOwnsCurrentPlayer(gs, hostLocalCp)) {
           return true;
         }
+        return false;
       }
     }
 
@@ -373,18 +694,20 @@
             window.risqueArtemisStampControlSlot(gs);
           }
           if (typeof window.risqueSetMirrorDeployRoute === "function") {
-            var routeNm = String(gs.risqueMirrorDeployRoute || "");
-            if (routeNm !== "turn" && routeNm !== "deploy2") {
-              try {
-                var rkNm = localStorage.getItem("risqueMirrorDeployRoute");
-                if (rkNm === "turn" || rkNm === "deploy2") routeNm = rkNm;
-              } catch (eRkNm) {
-                /* ignore */
+            if (!artemisEnsureTurnDeployRoute(gs)) {
+              var routeNm = String(gs.risqueMirrorDeployRoute || "");
+              if (routeNm !== "turn" && routeNm !== "deploy2") {
+                try {
+                  var rkNm = localStorage.getItem("risqueMirrorDeployRoute");
+                  if (rkNm === "turn" || rkNm === "deploy2") routeNm = rkNm;
+                } catch (eRkNm) {
+                  /* ignore */
+                }
               }
-            }
-            if (routeNm !== "turn" && routeNm !== "deploy2") {
-              window.risqueSetMirrorDeployRoute("setup");
-              gs.risqueMirrorDeployRoute = "setup";
+              if (routeNm !== "turn" && routeNm !== "deploy2") {
+                window.risqueSetMirrorDeployRoute("setup");
+                gs.risqueMirrorDeployRoute = "setup";
+              }
             }
           }
           window.risqueArtemisDeployHandoffPending = 0;
@@ -435,7 +758,7 @@
           }
         }
         if (deployRoute === "turn" || deployRoute === "deploy2") {
-          return true;
+          return artemisLocalSlotOwnsCurrentPlayer(gs, local);
         }
       }
       var roster =
@@ -448,7 +771,7 @@
           return normName(hit.name) === normName(gs.currentPlayer);
         }
       }
-      return normName(gs.currentPlayer) === playerUp(gs);
+      return activePlayerSlot(gs) === local;
     }
     return activePlayerSlot(gs) === local;
   };
@@ -462,12 +785,37 @@
         typeof window.risqueArtemisIsSetupDeploy === "function" &&
         window.risqueArtemisIsSetupDeploy(gs)
       ) {
-        if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
+        if (typeof window.risqueArtemisApplySetupDeployWinnerLock === "function") {
+          window.risqueArtemisApplySetupDeployWinnerLock(gs);
+        } else if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
           window.risqueArtemisResolveOwnerSlot(gs);
         }
         var hostLocal = myLocalSlot();
-        var hostActive = activePlayerSlot(gs);
+        var hostActive = Number(gs.artemisControlSlot) || activePlayerSlot(gs);
         if (hostLocal >= 1 && hostActive === hostLocal) {
+          window.risqueArtemisDeployHandoffPending = 0;
+          window.risqueArtemisDeployPushLocked = false;
+          return true;
+        }
+      }
+      var deployRouteHostPlay = String(gs.risqueMirrorDeployRoute || "");
+      if (deployRouteHostPlay !== "turn" && deployRouteHostPlay !== "deploy2") {
+        try {
+          var rkHostPlay = localStorage.getItem("risqueMirrorDeployRoute");
+          if (rkHostPlay === "turn" || rkHostPlay === "deploy2") deployRouteHostPlay = rkHostPlay;
+        } catch (eRkHostPlay) {
+          /* ignore */
+        }
+      }
+      if (deployRouteHostPlay === "turn" || deployRouteHostPlay === "deploy2") {
+        if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
+          window.risqueArtemisResolveOwnerSlot(gs);
+        } else if (typeof window.risqueArtemisStampControlSlot === "function") {
+          window.risqueArtemisStampControlSlot(gs);
+        }
+        var hostLocalTurnPlay = myLocalSlot();
+        var hostActiveTurnPlay = Number(gs.artemisControlSlot) || activePlayerSlot(gs);
+        if (hostLocalTurnPlay >= 1 && hostActiveTurnPlay === hostLocalTurnPlay) {
           window.risqueArtemisDeployHandoffPending = 0;
           window.risqueArtemisDeployPushLocked = false;
           return true;
@@ -502,6 +850,7 @@
         ) {
           window.risqueArtemisDeployHandoffPending = 0;
           window.risqueArtemisDeployPushLocked = false;
+          window.risqueArtemisDeployRelinquishedSeq = 0;
         }
       } else if (
         phPlay === "attack" ||
@@ -515,15 +864,29 @@
     }
     if (window.risqueArtemisDeployPushLocked || window.risqueArtemisDeployHandoffPending) {
       var phLock = gs ? String(gs.phase || "") : "";
-      if (
-        phLock === "deploy" &&
-        (ownsByTurn || ownsByName) &&
-        typeof window.risqueArtemisIsSetupDeploy === "function" &&
-        window.risqueArtemisIsSetupDeploy(gs)
-      ) {
-        window.risqueArtemisDeployHandoffPending = 0;
-        window.risqueArtemisDeployPushLocked = false;
-        return true;
+      if (phLock === "deploy" && (ownsByTurn || ownsByName)) {
+        var routeLock = String(gs.risqueMirrorDeployRoute || "");
+        if (routeLock !== "turn" && routeLock !== "deploy2") {
+          try {
+            var rkLock = localStorage.getItem("risqueMirrorDeployRoute");
+            if (rkLock === "turn" || rkLock === "deploy2") routeLock = rkLock;
+          } catch (eRkLock) {
+            /* ignore */
+          }
+        }
+        var turnDeployLock =
+          routeLock === "turn" ||
+          routeLock === "deploy2" ||
+          artemisEnsureTurnDeployRoute(gs);
+        if (
+          turnDeployLock ||
+          (typeof window.risqueArtemisIsSetupDeploy === "function" &&
+            window.risqueArtemisIsSetupDeploy(gs))
+        ) {
+          window.risqueArtemisDeployHandoffPending = 0;
+          window.risqueArtemisDeployPushLocked = false;
+          return true;
+        }
       }
       if (phLock !== "attack" && phLock !== "reinforce" && phLock !== "receivecard") {
         return false;
@@ -542,12 +905,19 @@
 
   /** Active laptop is mid-deploy — ignore host mirror that would rewind wheel/bulk placements. */
   window.risqueArtemisClientHasActiveDeploySession = function () {
-    if (!window.risqueArtemisNetClient || !window.risqueArtemisClientPlaying) return false;
     if (window.risqueArtemisDeployHandoffPending || window.risqueArtemisDeployPushLocked) {
       return false;
     }
     var gs = window.gameState;
     if (!gs || String(gs.phase || "") !== "deploy") return false;
+    var mine =
+      typeof window.risqueArtemisIsMyTurn === "function" && window.risqueArtemisIsMyTurn(gs);
+    if (!mine) return false;
+    if (window.risqueArtemisNetClient) {
+      if (!window.risqueArtemisClientPlaying) return false;
+    } else if (!window.risqueArtemisHost) {
+      return false;
+    }
     var isSetup =
       typeof window.risqueArtemisIsSetupDeploy === "function" && window.risqueArtemisIsSetupDeploy(gs);
     if (isSetup) {
@@ -848,7 +1218,14 @@
     var gs = gsOpt && typeof gsOpt === "object" ? gsOpt : window.gameState;
     if (!gs) return false;
     var ph = String(gs.phase || "");
-    if (ph !== "cardplay" && ph !== "con-cardplay" && ph !== "income" && ph !== "con-income" && ph !== "attack") {
+    if (
+      ph !== "cardplay" &&
+      ph !== "con-cardplay" &&
+      ph !== "income" &&
+      ph !== "con-income" &&
+      ph !== "attack" &&
+      ph !== "deploy"
+    ) {
       return false;
     }
     if (
@@ -897,7 +1274,12 @@
       document.body.classList.add("risque-view-host");
     }
     if (typeof window.risqueArtemisDiag === "function") {
-      var healKind = ph === "income" || ph === "con-income" ? "income_play_mode_heal" : "cardplay_play_mode_heal";
+      var healKind =
+        ph === "deploy"
+          ? "deploy_play_mode_heal"
+          : ph === "income" || ph === "con-income"
+            ? "income_play_mode_heal"
+            : "cardplay_play_mode_heal";
       window.risqueArtemisDiag(healKind, "P" + myLocalSlot() + " forced client play mode", {
         currentPlayer: gs.currentPlayer,
         controlSlot: gs.artemisControlSlot,
@@ -1118,6 +1500,13 @@
     if (ph === "income" || ph === "con-income") {
       if (mine) {
         if (
+          !gs.risquePublicIncomeBreakdown &&
+          typeof window.risqueArtemisEnsureIncomeInteractive === "function"
+        ) {
+          window.risqueArtemisEnsureIncomeInteractive(gs);
+          gs = window.gameState || gs;
+        }
+        if (
           gs.risquePublicIncomeBreakdown &&
           typeof window.risqueHostApplyIncomeBreakdownVoice === "function"
         ) {
@@ -1126,11 +1515,23 @@
           window.risqueRuntimeHud.setControlVoiceText(nameU + " — INCOME", "");
         }
       } else {
-        window.risqueRuntimeHud.setControlVoiceText("WAITING FOR " + nameU + " — INCOME", "");
+        if (
+          gs.risquePublicIncomeBreakdown &&
+          typeof window.risqueHostApplyIncomeBreakdownVoice === "function"
+        ) {
+          window.risqueHostApplyIncomeBreakdownVoice(gs);
+        } else if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
+          window.risquePublicApplyVoiceAndLogMirror(gs);
+        } else {
+          window.risqueRuntimeHud.setControlVoiceText("WAITING FOR " + nameU + " — INCOME", "");
+        }
       }
       return;
     }
     if (ph === "deploy") {
+      if (typeof window.risqueArtemisClearIncomeVoiceDom === "function") {
+        window.risqueArtemisClearIncomeVoiceDom();
+      }
       var setupDep =
         typeof window.risqueArtemisIsSetupDeploy === "function" &&
         window.risqueArtemisIsSetupDeploy(gs);
@@ -1155,6 +1556,17 @@
           String(gs.risquePublicDeployBanner || "").trim() ||
           "WAITING FOR " + nameU + " TO DEPLOY";
         window.risqueRuntimeHud.setControlVoiceText(waitDep, "");
+      }
+      return;
+    }
+    if (ph === "attack" || ph === "reinforce") {
+      if (typeof window.risqueArtemisClearIncomeVoiceDom === "function") {
+        window.risqueArtemisClearIncomeVoiceDom();
+      }
+      if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
+        window.risquePublicApplyVoiceAndLogMirror(gs);
+      } else if (!mine) {
+        window.risqueRuntimeHud.setControlVoiceText("WAITING FOR " + nameU + " — " + artemisHudBannerForPhase(ph, gs), "");
       }
       return;
     }
@@ -1256,14 +1668,41 @@
   window.risqueArtemisEnsureOmniClientHud = function (gs) {
     if (!window.risqueArtemisMode || !gs) return;
     var ph = String(gs.phase || "");
-    if (ph === "login" || ph === "welcome") return;
+    if (ph === "login") return;
+    if (ph === "welcome") {
+      artemisStampOmniHudDocumentClasses(gs);
+      var uioWelcome = document.getElementById("ui-overlay");
+      if (uioWelcome && window.risqueRuntimeHud) {
+        var welcomeBanner = artemisHudBannerForPhase(ph, gs) || "WELCOME";
+        if (typeof window.risqueRuntimeHud.ensureSetupUnifiedHud === "function") {
+          window.risqueRuntimeHud.ensureSetupUnifiedHud(uioWelcome, welcomeBanner, { force: true });
+        } else if (typeof window.risqueRuntimeHud.ensureSetupHud === "function") {
+          window.risqueRuntimeHud.ensureSetupHud(uioWelcome, welcomeBanner);
+        }
+      }
+      var hudRootWelcome = document.getElementById("runtime-hud-root");
+      if (hudRootWelcome) {
+        hudRootWelcome.classList.add("runtime-hud-root--artemis-compact");
+        hudRootWelcome.classList.remove("runtime-hud-root--login");
+        if (!hudRootWelcome.classList.contains("runtime-hud-root--setup")) {
+          hudRootWelcome.classList.add("runtime-hud-root--setup");
+        }
+      }
+      if (typeof window.risqueArtemisEnsureHudTogglesVisible === "function") {
+        window.risqueArtemisEnsureHudTogglesVisible();
+      }
+      if (typeof window.risqueWireArtemisHudTogglesOnce === "function") {
+        window.risqueWireArtemisHudTogglesOnce();
+      }
+      return;
+    }
     artemisStampOmniHudDocumentClasses(gs);
     var hostAttackSpectator =
       window.risqueArtemisHost &&
       ph === "attack" &&
       typeof window.risqueArtemisIsMyTurn === "function" &&
       !window.risqueArtemisIsMyTurn(gs);
-    if (artemisUsesAttackHudLayout(ph) && !hostAttackSpectator) {
+    if (artemisUsesAttackHudLayout(ph) || hostAttackSpectator) {
       if (typeof window.risqueWireArtemisHudTogglesOnce === "function") {
         window.risqueWireArtemisHudTogglesOnce();
       }
@@ -1377,6 +1816,13 @@
     if (typeof window.risqueArtemisSyncMyTurnClass === "function") {
       window.risqueArtemisSyncMyTurnClass(gs);
     }
+    if (
+      String(gs.phase || "") === "deploy" &&
+      typeof window.risqueArtemisEnsureTurnDeployInteractive === "function" &&
+      !window.__risqueArtemisTurnDeployInteractiveDepth
+    ) {
+      window.risqueArtemisEnsureTurnDeployInteractive(gs);
+    }
     return true;
   };
 
@@ -1406,11 +1852,33 @@
     };
   };
 
+  window.risqueArtemisForwardPhaseRank = function (ph) {
+    var p = String(ph || "");
+    if (p === "cardplay" || p === "con-cardplay") return 10;
+    if (p === "income" || p === "con-income") return 20;
+    if (p === "deploy" || p === "con-deploy" || p === "deploy1") return 30;
+    if (p === "attack") return 40;
+    if (p === "reinforce") return 50;
+    if (p === "receivecard" || p === "getcard") return 60;
+    return 0;
+  };
+
   window.risqueArtemisShouldIgnoreStalePhaseSync = function (gs) {
     if (!window.risqueArtemisMode || !gs) return false;
     var localPh = window.gameState ? String(window.gameState.phase || "") : "";
     var incomingPh = String(gs.phase || "");
     if (!localPh || !incomingPh || localPh === incomingPh) return false;
+    var localRank =
+      typeof window.risqueArtemisForwardPhaseRank === "function"
+        ? window.risqueArtemisForwardPhaseRank(localPh)
+        : 0;
+    var incomingRank =
+      typeof window.risqueArtemisForwardPhaseRank === "function"
+        ? window.risqueArtemisForwardPhaseRank(incomingPh)
+        : 0;
+    if (localRank > 0 && incomingRank > localRank) {
+      return false;
+    }
     if (
       window.risqueArtemisNetClient &&
       !window.risqueArtemisHost &&
@@ -1422,8 +1890,16 @@
     if (
       window.risqueArtemisNetClient &&
       !window.risqueArtemisHost &&
-      localPh === "deploy" &&
-      (incomingPh === "income" || incomingPh === "con-income")
+      localPh === "income" &&
+      incomingPh === "playerSelect"
+    ) {
+      return true;
+    }
+    if (
+      window.risqueArtemisNetClient &&
+      !window.risqueArtemisHost &&
+      (localPh === "cardplay" || localPh === "con-cardplay") &&
+      incomingPh === "playerSelect"
     ) {
       return true;
     }
@@ -1444,7 +1920,21 @@
 
   window.risqueArtemisEndPhaseTransition = function (gs) {
     if (!window.risqueArtemisPhaseTransition || !gs) return;
-    if (String(gs.phase || "") === window.risqueArtemisPhaseTransition.target) {
+    var ph = String(gs.phase || "");
+    var target = String(window.risqueArtemisPhaseTransition.target || "");
+    if (ph === target) {
+      delete window.risqueArtemisPhaseTransition;
+      return;
+    }
+    var phRank =
+      typeof window.risqueArtemisForwardPhaseRank === "function"
+        ? window.risqueArtemisForwardPhaseRank(ph)
+        : 0;
+    var targetRank =
+      typeof window.risqueArtemisForwardPhaseRank === "function"
+        ? window.risqueArtemisForwardPhaseRank(target)
+        : 0;
+    if (phRank > 0 && targetRank > 0 && phRank >= targetRank) {
       delete window.risqueArtemisPhaseTransition;
     }
   };
@@ -1570,6 +2060,9 @@
     }
     var mineCp = artemisClientIsActivePlayer(gs);
     if (mineCp) {
+      if (typeof window.risqueArtemisSanitizeCardplaySpectatorHandMirror === "function") {
+        window.risqueArtemisSanitizeCardplaySpectatorHandMirror(gs);
+      }
       if (typeof window.risqueArtemisEnsureClientCardplayHand === "function") {
         window.risqueArtemisEnsureClientCardplayHand(gs);
       }
@@ -1589,6 +2082,10 @@
     if (!window.risqueArtemisNetClient || window.risqueArtemisHost || !gs) return;
     if (String(gs.phase || "") !== "deploy") return;
 
+    if (typeof window.risqueArtemisClearSetupPlayerSelectArtifacts === "function") {
+      window.risqueArtemisClearSetupPlayerSelectArtifacts(gs);
+    }
+
     if (
       typeof window.risqueArtemisIsSetupDeploy === "function" &&
       window.risqueArtemisIsSetupDeploy(gs)
@@ -1596,6 +2093,11 @@
       gs.risqueMirrorDeployRoute = "setup";
       if (typeof window.risqueSetMirrorDeployRoute === "function") {
         window.risqueSetMirrorDeployRoute("setup");
+      }
+    } else if (String(gs.risqueMirrorDeployRoute || "") !== "turn") {
+      gs.risqueMirrorDeployRoute = "turn";
+      if (typeof window.risqueSetMirrorDeployRoute === "function") {
+        window.risqueSetMirrorDeployRoute("turn");
       }
     }
 
@@ -1643,6 +2145,7 @@
       window.risqueArtemisEnsureClientActivePlay(gs);
     }
   }
+  window.risqueArtemisPrepareDeployChrome = artemisClientPrepareDeployChrome;
 
   function cycleProbeContextActive(gs) {
     if (gs && gs.artemisCycleProbe) return true;
@@ -1667,11 +2170,42 @@
     if (window.__risqueArtemisSyncFromStateDepth) return;
     window.__risqueArtemisSyncFromStateDepth = true;
     try {
+    var prevPhSync = window.gameState ? String(window.gameState.phase || "") : "";
+    var phIncoming = String(gs.phase || "");
+    if (
+      prevPhSync === "deploy" &&
+      phIncoming !== "deploy" &&
+      window.gameState &&
+      typeof window.risqueArtemisIsSetupDeploy === "function" &&
+      window.risqueArtemisIsSetupDeploy(window.gameState)
+    ) {
+      window.risqueArtemisDeployHandoffPending = 0;
+      window.risqueArtemisDeployPushLocked = false;
+      window.risqueArtemisDeployRelinquishedSeq = 0;
+      if (typeof window.risqueArtemisUnmountPortableDeploy === "function") {
+        window.risqueArtemisUnmountPortableDeploy();
+      }
+      if (typeof window.risqueArtemisUnmountPortableTurnDeploy === "function") {
+        window.risqueArtemisUnmountPortableTurnDeploy();
+      }
+    }
     if (
       typeof window.risqueArtemisShouldIgnoreStalePhaseSync === "function" &&
       window.risqueArtemisShouldIgnoreStalePhaseSync(gs)
     ) {
       return;
+    }
+    if (
+      window.risqueArtemisNetClient &&
+      window.gameState &&
+      String(gs.phase || "") === "deploy" &&
+      String(window.gameState.phase || "") !== "deploy"
+    ) {
+      var staleInSeq = Number(gs.risqueArtemisControlSeq) || 0;
+      var staleLiveSeq = Number(window.gameState.risqueArtemisControlSeq) || 0;
+      if (staleLiveSeq > 0 && (staleInSeq === 0 || staleLiveSeq > staleInSeq)) {
+        return;
+      }
     }
     if (typeof window.risqueArtemisEnsureRosterOnState === "function") {
       window.risqueArtemisEnsureRosterOnState(gs);
@@ -1722,6 +2256,11 @@
     }
 
     if (ph === "deploy") {
+      var prevPhForDeploy =
+        window.gameState && window.gameState !== gs
+          ? String(window.gameState.phase || "")
+          : "";
+      artemisEnsureTurnDeployRoute(gs, prevPhForDeploy);
       artemisClientPrepareDeployChrome(gs);
       if (typeof window.risqueArtemisTeardownMockPhases === "function") {
         window.risqueArtemisTeardownMockPhases();
@@ -1729,8 +2268,7 @@
       if (
         typeof window.risqueArtemisIsSetupDeploy === "function" &&
         window.risqueArtemisIsSetupDeploy(gs) &&
-        typeof window.risqueArtemisEnsureSetupDeployInteractive === "function" &&
-        !(window.risqueArtemisHost && !window.risqueArtemisNetClient)
+        typeof window.risqueArtemisEnsureSetupDeployInteractive === "function"
       ) {
         window.risqueArtemisEnsureSetupDeployInteractive(gs);
       }
@@ -1775,6 +2313,19 @@
     if (ph === "cardplay") {
       window.risqueArtemisDeployHandoffPending = 0;
       window.risqueArtemisDeployPushLocked = false;
+      window.risqueArtemisDeployRelinquishedSeq = 0;
+      window.risqueArtemisAwaitSetupDeployFinish = false;
+      try {
+        delete window.risqueArtemisDeployHandoffPlayer;
+      } catch (eClrCpHand) {
+        /* ignore */
+      }
+      if (typeof window.risqueArtemisResetClientDeployMount === "function") {
+        window.risqueArtemisResetClientDeployMount();
+      }
+      if (typeof window.risqueArtemisClearSetupPlayerSelectArtifacts === "function") {
+        window.risqueArtemisClearSetupPlayerSelectArtifacts(gs);
+      }
       artemisClientPrepareCardplayChrome(gs);
       if (typeof window.risqueArtemisStampControlSlot === "function") {
         window.risqueArtemisStampControlSlot(gs);
@@ -1795,6 +2346,9 @@
       }
       if (typeof window.risqueArtemisReconcileClientPlayMode === "function") {
         window.risqueArtemisReconcileClientPlayMode(gs);
+      }
+      if (typeof window.risqueArtemisSanitizeCardplaySpectatorHandMirror === "function") {
+        window.risqueArtemisSanitizeCardplaySpectatorHandMirror(gs);
       }
       if (typeof window.risqueArtemisEnsureClientCardplayHand === "function") {
         window.risqueArtemisEnsureClientCardplayHand(gs);
@@ -1933,7 +2487,42 @@
     if (!window.risqueArtemisMode) return true;
     if (!window.risqueArtemisHost) return false;
     gs = gs || window.gameState;
-    if (!gs || String(gs.phase || "") !== "attack") return true;
+    if (!gs || String(gs.phase || "") !== "attack") return false;
+    return window.risqueArtemisIsMyTurn(gs);
+  };
+
+  /** ARTEMIS: only the active attacker's laptop may enable roll/blitz/campaign chrome. */
+  window.risqueArtemisShouldAttackChromeBeInteractive = function (gs) {
+    if (!window.risqueArtemisMode) return true;
+    gs = gs || window.gameState;
+    if (!gs || String(gs.phase || "") !== "attack") {
+      if (window.risqueArtemisHost && !window.risqueArtemisNetClient) return false;
+      return true;
+    }
+    if (
+      window.risqueArtemisHost &&
+      !window.risqueArtemisNetClient &&
+      typeof window.risqueArtemisShouldHostMountAttack === "function" &&
+      !window.risqueArtemisShouldHostMountAttack(gs)
+    ) {
+      return false;
+    }
+    if (
+      window.risqueArtemisNetClient &&
+      !window.risqueArtemisHost &&
+      typeof window.risqueArtemisIsMyTurn === "function" &&
+      !window.risqueArtemisIsMyTurn(gs)
+    ) {
+      return false;
+    }
+    return true;
+  };
+
+  window.risqueArtemisShouldHostMountReinforce = function (gs) {
+    if (!window.risqueArtemisMode) return true;
+    if (!window.risqueArtemisHost) return false;
+    gs = gs || window.gameState;
+    if (!gs || String(gs.phase || "") !== "reinforce") return true;
     return window.risqueArtemisIsMyTurn(gs);
   };
 
@@ -1973,6 +2562,26 @@
     return null;
   }
 
+  function artemisResolveMapTerritoryLabel(target) {
+    if (window.gameUtils && typeof window.gameUtils.resolveTerritoryLabelFromMapTarget === "function") {
+      return window.gameUtils.resolveTerritoryLabelFromMapTarget(target);
+    }
+    if (!target || !target.closest) return null;
+    var hit = target.closest(".territory-hit, .territory-circle, .territory-number, .territory-mgm-hit");
+    if (!hit) return null;
+    return hit.getAttribute("data-label") || (hit.dataset && hit.dataset.label) || null;
+  }
+
+  function artemisMapClickBlocked(target) {
+    return !!(
+      target &&
+      target.closest &&
+      target.closest(
+        "#runtime-hud-root, #risque-artemis-deploy-dock, #prompt, button, input, select, textarea, a, .attack-toolbar-strip"
+      )
+    );
+  }
+
   var __artemisAttackMapDelegateWired = false;
   window.risqueArtemisWireAttackMapClickDelegate = function () {
     if (__artemisAttackMapDelegateWired) return;
@@ -1991,16 +2600,8 @@
         }
         var t = ev.target;
         if (!t || !t.closest) return;
-        if (
-          t.closest(
-            "#runtime-hud-root, #risque-artemis-deploy-dock, #prompt, button, input, select, textarea, a, .attack-toolbar-strip"
-          )
-        ) {
-          return;
-        }
-        var hit = t.closest(".territory-circle, .territory-number");
-        if (!hit) return;
-        var label = hit.getAttribute("data-label") || (hit.dataset && hit.dataset.label);
+        if (artemisMapClickBlocked(t)) return;
+        var label = artemisResolveMapTerritoryLabel(t);
         if (!label) return;
         var info = artemisLookupTerritoryOwner(gs, label);
         if (!info || typeof window.risqueAttackPhaseTerritoryClick !== "function") return;
@@ -2156,16 +2757,8 @@
         }
         var t = ev.target;
         if (!t || !t.closest) return;
-        if (
-          t.closest(
-            "#runtime-hud-root, #risque-artemis-deploy-dock, #prompt, button, input, select, textarea, a, .attack-toolbar-strip"
-          )
-        ) {
-          return;
-        }
-        var hit = t.closest(".territory-circle, .territory-number");
-        if (!hit) return;
-        var label = hit.getAttribute("data-label") || (hit.dataset && hit.dataset.label);
+        if (artemisMapClickBlocked(t)) return;
+        var label = artemisResolveMapTerritoryLabel(t);
         if (!label) return;
         var info = artemisLookupTerritoryOwner(gs, label);
         if (!info || typeof window.risqueReinforcePhaseTerritoryClick !== "function") return;
@@ -2192,6 +2785,54 @@
     );
   };
   window.risqueArtemisWireReinforceMapClickDelegate();
+
+  var __artemisDeployMapDelegateWired = false;
+  window.risqueArtemisWireDeployMapClickDelegate = function () {
+    if (__artemisDeployMapDelegateWired) return;
+    __artemisDeployMapDelegateWired = true;
+    document.addEventListener(
+      "click",
+      function (ev) {
+        if (!window.risqueArtemisMode) return;
+        var gs = window.gameState;
+        if (!gs || String(gs.phase || "") !== "deploy") return;
+        if (typeof window.risqueArtemisIsMyTurn === "function" && !window.risqueArtemisIsMyTurn(gs)) {
+          return;
+        }
+        if (typeof window.risqueArtemisCanLocalPlay === "function" && !window.risqueArtemisCanLocalPlay()) {
+          return;
+        }
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        if (artemisMapClickBlocked(t)) return;
+        var label = artemisResolveMapTerritoryLabel(t);
+        if (!label) return;
+        var circle = document.querySelector('.territory-circle[data-label="' + label + '"]');
+        if (!circle || !window.gameUtils || typeof window.gameUtils.handleTerritoryClick !== "function") {
+          return;
+        }
+        var coords =
+          window.gameUtils.territories && window.gameUtils.territories[label]
+            ? window.gameUtils.territories[label]
+            : null;
+        var baseR = coords && coords.r != null ? coords.r : 30;
+        try {
+          ev.preventDefault();
+          ev.stopImmediatePropagation();
+          ev.stopPropagation();
+        } catch (eStopDep) {
+          /* ignore */
+        }
+        try {
+          window.gameUtils.handleTerritoryClick(label, circle, baseR, gs);
+        } catch (eDepClick) {
+          /* ignore */
+        }
+      },
+      true
+    );
+  };
+  window.risqueArtemisWireDeployMapClickDelegate();
 
   /** Active client reinforce: wire map clicks without remounting or re-rendering the board. */
   var __artemisReinforceMapRoutedFor = "";
@@ -2261,6 +2902,41 @@
     if (!window.risqueArtemisHost) return false;
     gs = gs || window.gameState;
     if (!gs || String(gs.phase || "") !== "deploy") return true;
+    if (typeof window.risqueArtemisEnsureTurnDeployRoute === "function") {
+      window.risqueArtemisEnsureTurnDeployRoute(gs);
+    }
+    var routeMount = String(gs.risqueMirrorDeployRoute || "");
+    if (routeMount !== "turn" && routeMount !== "deploy2") {
+      try {
+        var rkMount = localStorage.getItem("risqueMirrorDeployRoute");
+        if (rkMount === "turn" || rkMount === "deploy2") routeMount = rkMount;
+      } catch (eRkMount) {
+        /* ignore */
+      }
+    }
+    if (
+      routeMount === "turn" ||
+      routeMount === "deploy2" ||
+      (gs.setupComplete === true && Number(gs.round) >= 1)
+    ) {
+      if (typeof window.risqueArtemisClearTurnDeployHandoffFlags === "function") {
+        window.risqueArtemisClearTurnDeployHandoffFlags(gs);
+      }
+      if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
+        window.risqueArtemisResolveOwnerSlot(gs);
+      }
+      return window.risqueArtemisIsMyTurn(gs);
+    }
+    if (
+      typeof window.risqueArtemisForcePostRouletteWinner === "function" &&
+      typeof window.risqueArtemisIsSetupDeploy === "function" &&
+      window.risqueArtemisIsSetupDeploy(gs)
+    ) {
+      window.risqueArtemisForcePostRouletteWinner(gs, "deployOrder");
+    }
+    if (typeof window.risqueArtemisApplySetupDeployWinnerLock === "function") {
+      window.risqueArtemisApplySetupDeployWinnerLock(gs);
+    }
     if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
       window.risqueArtemisResolveOwnerSlot(gs);
     }
@@ -2312,9 +2988,22 @@
     return false;
   }
 
+  function artemisIncomeStatePushBlocked(state) {
+    var ph = state ? String(state.phase || "") : "";
+    if (ph !== "income" && ph !== "con-income") return false;
+    var localPh = window.gameState ? String(window.gameState.phase || "") : "";
+    if (localPh === "deploy" || localPh === "con-deploy") return true;
+    var tr = window.risqueArtemisPhaseTransition;
+    if (tr && String(tr.target || "") === "deploy" && Date.now() - (Number(tr.at) || 0) < 15000) {
+      return true;
+    }
+    return false;
+  }
+
   function artemisPushClientStateImmediate(state) {
     if (typeof window.risqueArtemisSend !== "function" || !state) return;
     if (artemisClientStatePushBlocked(state)) return;
+    if (artemisIncomeStatePushBlocked(state)) return;
     var push = artemisCloneStateForPush(state);
     window.risqueArtemisSend({
       type: "player_state",
@@ -2341,6 +3030,14 @@
     }, wait);
   };
 
+  window.risqueArtemisCancelClientStatePush = function () {
+    if (__artemisClientPushTimer) {
+      clearTimeout(__artemisClientPushTimer);
+      __artemisClientPushTimer = null;
+    }
+    __artemisClientPushPending = null;
+  };
+
   window.risqueArtemisFlushClientStatePush = function (stateOpt) {
     if (__artemisClientPushTimer) {
       clearTimeout(__artemisClientPushTimer);
@@ -2357,12 +3054,26 @@
   window.risqueArtemisOnClientStatePush = function (state) {
     if (typeof window.risqueArtemisSend !== "function" || !state) return;
     if (artemisClientStatePushBlocked(state)) return;
+    if (artemisIncomeStatePushBlocked(state)) return;
     var ph = String(state.phase || "");
     var localPh = window.gameState ? String(window.gameState.phase || "") : "";
     if (
       ph === "deploy" &&
       (localPh === "income" || localPh === "con-income" || localPh === "deploy")
     ) {
+      artemisPushClientStateImmediate(state);
+      return;
+    }
+    if (
+      (ph === "income" || ph === "con-income") &&
+      state &&
+      state.risquePublicIncomeBreakdown &&
+      typeof state.risquePublicIncomeBreakdown.total !== "undefined"
+    ) {
+      artemisPushClientStateImmediate(state);
+      return;
+    }
+    if (ph === "attack" || ph === "reinforce") {
       artemisPushClientStateImmediate(state);
       return;
     }

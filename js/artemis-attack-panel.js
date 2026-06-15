@@ -42,7 +42,13 @@
 
   function refreshActiveAttackClient(gs) {
     stripSetupHudClasses();
-    if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.setAttackChromeInteractive === "function") {
+    if (
+      window.risqueRuntimeHud &&
+      typeof window.risqueRuntimeHud.setAttackChromeInteractive === "function" &&
+      (!window.risqueArtemisMode ||
+        typeof window.risqueArtemisShouldAttackChromeBeInteractive !== "function" ||
+        window.risqueArtemisShouldAttackChromeBeInteractive(gs))
+    ) {
       window.risqueRuntimeHud.setAttackChromeInteractive(true);
     }
     wireOmniToggles(gs);
@@ -99,34 +105,144 @@
     }
   }
 
+  function ensureHostAttackSpectatorChrome(gs) {
+    if (!window.risqueArtemisHost || window.risqueArtemisNetClient || !gs) return;
+    var uio = document.getElementById("ui-overlay");
+    if (!uio || !window.risqueRuntimeHud) return;
+    stripSetupHudClasses();
+    var hudRoot = document.getElementById("runtime-hud-root");
+    if (
+      !hudRoot ||
+      hudRoot.classList.contains("runtime-hud-root--setup") ||
+      hudRoot.classList.contains("runtime-hud-root--login") ||
+      !document.getElementById("attacker-dice-text-0")
+    ) {
+      if (typeof window.risqueRuntimeHud.ensure === "function") {
+        window.risqueRuntimeHud.ensure(uio);
+      }
+    }
+    stripSetupHudClasses();
+    hudRoot = document.getElementById("runtime-hud-root");
+    if (hudRoot) {
+      hudRoot.classList.remove("runtime-hud-root--artemis-compact");
+    }
+    try {
+      document.body.setAttribute("data-risque-phase", "attack");
+    } catch (ePh) {
+      /* ignore */
+    }
+  }
+
+  function stripHostAttackMapInteraction(gs) {
+    if (typeof window.risqueArtemisCancelAttackMapRouting === "function") {
+      window.risqueArtemisCancelAttackMapRouting();
+    }
+    if (typeof window.risqueTeardownAttackPhaseControlListeners === "function") {
+      window.risqueTeardownAttackPhaseControlListeners();
+    }
+    window.handleTerritoryClick = function () {};
+    if (window.gameUtils && gs) {
+      try {
+        if (typeof window.gameUtils.renderTerritories === "function") {
+          window.gameUtils.renderTerritories(null, gs);
+        }
+      } catch (eClrMap) {
+        /* ignore */
+      }
+    }
+  }
+
+  function setHostAttackSpectatorBodyClass(on) {
+    try {
+      if (on) {
+        document.body.classList.add("risque-artemis-attack-spectator");
+        document.body.setAttribute("data-risque-show-public-dice", "1");
+      } else {
+        document.body.classList.remove("risque-artemis-attack-spectator");
+        document.body.removeAttribute("data-risque-show-public-dice");
+      }
+    } catch (eCls) {
+      /* ignore */
+    }
+  }
+
+  /** Host TV: strip wired attack controls — initAttackPhase listeners must not stay live on Guido. */
+  window.risqueArtemisReassertHostAttackSpectator = function (gsOpt) {
+    if (!window.risqueArtemisHost || window.risqueArtemisNetClient) return;
+    var gs = gsOpt && typeof gsOpt === "object" ? gsOpt : window.gameState;
+    if (!gs || String(gs.phase || "") !== "attack") {
+      setHostAttackSpectatorBodyClass(false);
+      return;
+    }
+    if (
+      typeof window.risqueArtemisShouldAttackChromeBeInteractive === "function" &&
+      window.risqueArtemisShouldAttackChromeBeInteractive(gs)
+    ) {
+      setHostAttackSpectatorBodyClass(false);
+      return;
+    }
+    window.gameState = gs;
+    setHostAttackSpectatorBodyClass(true);
+    stripHostAttackMapInteraction(gs);
+    if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.setAttackChromeInteractive === "function") {
+      window.risqueRuntimeHud.setAttackChromeInteractive(false);
+    }
+    var chrome = document.getElementById("hud-attack-chrome");
+    if (chrome) {
+      var buttons = chrome.querySelectorAll("button");
+      for (var bi = 0; bi < buttons.length; bi += 1) {
+        buttons[bi].disabled = true;
+      }
+      var cond = document.getElementById("cond-threshold");
+      if (cond) cond.disabled = true;
+    }
+  };
+
+  function paintHostAttackSpectatorMap(gs) {
+    if (!gs || !window.gameUtils) return;
+    try {
+      if (typeof window.gameUtils.renderAll === "function") {
+        window.gameUtils.renderAll(gs, null, {});
+      } else if (typeof window.gameUtils.renderTerritories === "function") {
+        window.gameUtils.renderTerritories(null, gs, {});
+      }
+    } catch (eMap) {
+      /* ignore */
+    }
+    try {
+      window.gameUtils.renderStats(gs);
+    } catch (eStats) {
+      /* ignore */
+    }
+  }
+
+  /** Host (Guido) spectating a client attack: dice row + map + voice from attack_live / player_state. */
+  window.risqueArtemisApplyHostAttackSpectator = function (gs) {
+    if (!window.risqueArtemisHost || window.risqueArtemisNetClient || !gs) return;
+    if (String(gs.phase || "") !== "attack") return;
+    if (
+      typeof window.risqueArtemisShouldHostMountAttack === "function" &&
+      window.risqueArtemisShouldHostMountAttack(gs)
+    ) {
+      return;
+    }
+    window.gameState = gs;
+    ensureHostAttackSpectatorChrome(gs);
+    window.risqueArtemisReassertHostAttackSpectator(gs);
+    ensureAttackSpectatorHud(gs);
+    paintHostAttackSpectatorMap(gs);
+    if (typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
+      window.risquePublicApplyDiceAndBattleReadout(gs);
+    }
+    if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
+      window.risquePublicApplyVoiceAndLogMirror(gs);
+    }
+  };
+
   function ensureAttackSpectatorHud(gs) {
     var uio = document.getElementById("ui-overlay");
     if (!uio || !window.risqueRuntimeHud) return;
     window.gameState = gs;
-    if (
-      window.risqueArtemisHost &&
-      typeof window.risqueArtemisShouldHostMountAttack === "function" &&
-      !window.risqueArtemisShouldHostMountAttack(gs)
-    ) {
-      if (typeof window.risqueArtemisEnsureOmniClientHud === "function") {
-        window.risqueArtemisEnsureOmniClientHud(gs);
-      }
-      var atkChrome = document.getElementById("hud-attack-chrome");
-      if (atkChrome) {
-        atkChrome.setAttribute("hidden", "");
-        atkChrome.setAttribute("aria-hidden", "true");
-      }
-      if (typeof window.risqueRuntimeHud.setAttackChromeInteractive === "function") {
-        window.risqueRuntimeHud.setAttackChromeInteractive(false);
-      }
-      wireOmniToggles(gs);
-      requestAnimationFrame(function () {
-        if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.syncPosition === "function") {
-          window.risqueRuntimeHud.syncPosition();
-        }
-      });
-      return;
-    }
     var hudRoot = document.getElementById("runtime-hud-root");
     if (
       !hudRoot ||
@@ -139,10 +255,24 @@
       }
     }
     stripSetupHudClasses();
+    var atkChrome = document.getElementById("hud-attack-chrome");
+    if (atkChrome) {
+      atkChrome.removeAttribute("hidden");
+      atkChrome.setAttribute("aria-hidden", "false");
+    }
     if (typeof window.risqueRuntimeHud.setAttackChromeInteractive === "function") {
       window.risqueRuntimeHud.setAttackChromeInteractive(false);
     }
     wireOmniToggles(gs);
+    if (typeof window.risqueRuntimeHud.updateTurnBannerFromState === "function") {
+      window.risqueRuntimeHud.updateTurnBannerFromState(gs);
+    }
+    if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
+      window.risquePublicApplyVoiceAndLogMirror(gs);
+    }
+    if (typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
+      window.risquePublicApplyDiceAndBattleReadout(gs);
+    }
     requestAnimationFrame(function () {
       if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.syncPosition === "function") {
         window.risqueRuntimeHud.syncPosition();
@@ -215,6 +345,13 @@
     var gs = gsOpt && typeof gsOpt === "object" ? gsOpt : window.gameState;
     if (!gs || String(gs.phase || "") !== "attack") return;
     if (!isMine(gs)) return;
+    if (
+      window.risqueArtemisHost &&
+      typeof window.risqueArtemisShouldHostMountAttack === "function" &&
+      !window.risqueArtemisShouldHostMountAttack(gs)
+    ) {
+      return;
+    }
     window.gameState = gs;
     if (window.risqueArtemisNetClient) {
       enterClientPlayMode();
@@ -290,6 +427,7 @@
     }
 
     if (mine) {
+      setHostAttackSpectatorBodyClass(false);
       if (window.risqueArtemisNetClient) {
         enterClientPlayMode();
         if (typeof window.risqueArtemisEnsureClientActivePlay === "function") {
@@ -314,7 +452,16 @@
     if (window.risqueArtemisNetClient) {
       exitClientPlayMode();
     }
-    if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.setAttackChromeInteractive === "function") {
+    if (window.risqueArtemisHost && !window.risqueArtemisNetClient) {
+      ensureHostAttackSpectatorChrome(gs);
+      paintHostAttackSpectatorMap(gs);
+    }
+    if (typeof window.risqueArtemisReassertHostAttackSpectator === "function") {
+      window.risqueArtemisReassertHostAttackSpectator(gs);
+    } else if (
+      window.risqueRuntimeHud &&
+      typeof window.risqueRuntimeHud.setAttackChromeInteractive === "function"
+    ) {
       window.risqueRuntimeHud.setAttackChromeInteractive(false);
     }
     ensureAttackSpectatorHud(gs);

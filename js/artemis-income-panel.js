@@ -276,6 +276,13 @@
     if (!rh.classList.contains("runtime-hud-root--setup")) {
       rh.classList.add("runtime-hud-root--setup");
     }
+    if (!rh.classList.contains("runtime-hud-root--artemis-compact")) {
+      rh.classList.add("runtime-hud-root--artemis-compact");
+    }
+    var cv = document.getElementById("control-voice");
+    if (cv) {
+      cv.classList.add("ucp-control-voice");
+    }
   }
 
   window.risqueArtemisStripCardplayHudClassesForIncome = stripCardplayHudClassesForIncome;
@@ -286,6 +293,10 @@
     document.body.classList.add("risque-view-host");
     document.documentElement.classList.remove("risque-view-public");
     document.body.classList.remove("risque-view-public");
+    var ph = window.gameState ? String(window.gameState.phase || "") : "";
+    if (ph === "income" || ph === "con-income") {
+      document.body.setAttribute("data-risque-phase", ph);
+    }
   }
 
   function clearIncomeControls() {
@@ -309,18 +320,19 @@
     }
   }
 
+  var INCOME_DEPLOY_NEXT = "game.html?phase=deploy&kind=turn";
+
   function resolveIncomeLegacyNext() {
-    var legacyNext = "game.html?phase=deploy&kind=turn";
-    try {
-      var q = new URL(window.location.href).searchParams;
-      if (q.get("legacyNext")) legacyNext = q.get("legacyNext");
-    } catch (eQ) {
-      /* ignore */
+    if (typeof window.risqueSanitizeIncomeDeployNext === "function") {
+      var raw = null;
+      try {
+        raw = new URL(window.location.href).searchParams.get("legacyNext");
+      } catch (eQ) {
+        raw = null;
+      }
+      return window.risqueSanitizeIncomeDeployNext(raw);
     }
-    if (typeof legacyNext === "string" && legacyNext.indexOf("deploy2.html") !== -1) {
-      legacyNext = "game.html?phase=deploy&kind=turn";
-    }
-    return legacyNext;
+    return INCOME_DEPLOY_NEXT;
   }
 
   function resolveIncomeTotal(gs, currentPlayer) {
@@ -424,12 +436,26 @@
     if (!canAdvanceIncome(gs)) return false;
 
     var up = String(gs.currentPlayer || "");
+    var upNorm = up.trim().toUpperCase();
     var currentPlayer = (gs.players || []).find(function (p) {
-      return p && String(p.name || "") === up;
+      return p && String(p.name || "").trim().toUpperCase() === upNorm;
     });
     if (!currentPlayer) return false;
 
     incomeLeaveInFlight = true;
+    if (typeof window.risqueArtemisCancelClientStatePush === "function") {
+      window.risqueArtemisCancelClientStatePush();
+    }
+    if (typeof window.risqueTeardownArtemisSetupDeploy === "function") {
+      window.risqueTeardownArtemisSetupDeploy(true);
+    }
+    if (typeof window.risqueArtemisUnmountPortableDeploy === "function") {
+      window.risqueArtemisUnmountPortableDeploy();
+    }
+    if (typeof window.risqueArtemisClearSetupDeployWinnerLock === "function") {
+      window.risqueArtemisClearSetupDeployWinnerLock(gs);
+    }
+    window.risqueDeploy1Active = false;
     var total = resolveIncomeTotal(gs, currentPlayer);
     var btn = document.getElementById(INCOME_GOD_BTN_ID);
     if (!btn) btn = document.querySelector("#risque-phase-content .income-button");
@@ -484,6 +510,7 @@
     currentPlayer.bookValue = 0;
     gs.phase = "deploy";
     gs.risqueMirrorDeployRoute = "turn";
+    gs.risqueArtemisControlSeq = Math.max(Number(gs.risqueArtemisControlSeq) || 0, 0) + 1;
     if (typeof window.risqueSetMirrorDeployRoute === "function") {
       window.risqueSetMirrorDeployRoute("turn");
     }
@@ -500,6 +527,11 @@
     } catch (eLs) {
       /* ignore */
     }
+    if (typeof window.risqueHostReplaceShellGameState === "function") {
+      window.risqueHostReplaceShellGameState(gs);
+    } else if (typeof window.risquePersistGameStateForNavigation === "function") {
+      window.risquePersistGameStateForNavigation(gs);
+    }
     if (typeof window.risquePersistHostGameState === "function") {
       window.risquePersistHostGameState(gs);
     }
@@ -515,59 +547,115 @@
       });
     }
 
-    var dest = resolveIncomeLegacyNext();
-    var navOk = false;
-    try {
-      navOk =
-        typeof window.risqueNavigateGameHtmlSoft === "function" &&
-        window.risqueNavigateGameHtmlSoft(dest);
-    } catch (eNav) {
-      navOk = false;
-    }
-    if (!navOk) {
+    function finishIncomeDeployNavigation() {
+      var dest = INCOME_DEPLOY_NEXT;
+      var navOk = false;
       try {
-        if (window.risqueNavigateWithFade) {
-          window.risqueNavigateWithFade(dest);
-          navOk = true;
-        } else {
-          window.location.href = dest;
-          navOk = true;
-        }
-      } catch (eHref) {
+        navOk =
+          typeof window.risqueNavigateGameHtmlSoft === "function" &&
+          window.risqueNavigateGameHtmlSoft(dest);
+      } catch (eNav) {
         navOk = false;
+      }
+      if (!navOk) {
+        try {
+          if (window.risqueNavigateWithFade) {
+            window.risqueNavigateWithFade(dest);
+            navOk = true;
+          } else {
+            window.location.href = dest;
+            navOk = true;
+          }
+        } catch (eHref) {
+          navOk = false;
+        }
+      }
+
+      hideIncomeGodButton();
+
+      if (navOk) {
+        if (typeof window.risqueHostReplaceShellGameState === "function") {
+          window.risqueHostReplaceShellGameState(gs);
+        }
+        window.gameState = gs;
+        try {
+          localStorage.setItem("gameState", JSON.stringify(gs));
+        } catch (eNavLs) {
+          /* ignore */
+        }
+      }
+
+      if (typeof window.risqueArtemisSyncFromState === "function") {
+        window.risqueArtemisSyncFromState(gs);
+      } else if (typeof window.risqueArtemisEnsureIncomeInteractive === "function") {
+        window.risqueArtemisEnsureIncomeInteractive(gs);
+      }
+      if (typeof window.risqueArtemisEnsureClientActivePlay === "function") {
+        window.risqueArtemisEnsureClientActivePlay(gs);
+      }
+      if (typeof window.risqueArtemisEnsureTurnDeployInteractive === "function") {
+        window.risqueArtemisEnsureTurnDeployInteractive(gs);
+      }
+      if (typeof window.risqueArtemisEndPhaseTransition === "function") {
+        window.risqueArtemisEndPhaseTransition(gs);
+      }
+      if (typeof window.risqueFlushMirrorPush === "function") {
+        window.risqueFlushMirrorPush();
+      } else if (typeof window.risqueMirrorPushGameState === "function") {
+        window.risqueMirrorPushGameState();
+      }
+      if (!navOk) {
+        try {
+          if (typeof window.risqueHostReplaceShellGameState === "function") {
+            window.risqueHostReplaceShellGameState(gs);
+          }
+          if (typeof window.risqueNavigateGameHtmlSoft === "function") {
+            navOk = window.risqueNavigateGameHtmlSoft(INCOME_DEPLOY_NEXT);
+          }
+        } catch (eSoftDep) {
+          /* ignore */
+        }
+      }
+      if (navOk && String((window.gameState && window.gameState.phase) || gs.phase || "") === "deploy") {
+        incomeLeaveInFlight = false;
+      } else {
+        setTimeout(function () {
+          incomeLeaveInFlight = false;
+        }, 1500);
       }
     }
 
-    hideIncomeGodButton();
+    if (
+      window.risqueArtemisMode &&
+      window.risqueArtemisHost &&
+      typeof window.risqueArtemisSyncGatePushAndWait === "function"
+    ) {
+      if (
+        window.risqueRuntimeHud &&
+        typeof window.risqueRuntimeHud.setControlVoiceText === "function"
+      ) {
+        window.risqueRuntimeHud.setControlVoiceText(
+          "SYNCING DEPLOYMENT WITH ALL LAPTOPS…",
+          "",
+          { force: true }
+        );
+      }
+      window.risqueArtemisSyncGatePushAndWait({
+        label: "income→deploy",
+        expectPhase: "deploy",
+        timeoutMs: 8000
+      }).then(function () {
+        finishIncomeDeployNavigation();
+      });
+      return true;
+    }
 
-    if (typeof window.risqueArtemisSyncFromState === "function") {
-      window.risqueArtemisSyncFromState(gs);
-    } else if (typeof window.risqueArtemisEnsureIncomeInteractive === "function") {
-      window.risqueArtemisEnsureIncomeInteractive(gs);
-    }
-    if (typeof window.risqueArtemisEndPhaseTransition === "function") {
-      window.risqueArtemisEndPhaseTransition(gs);
-    }
     if (typeof window.risqueFlushMirrorPush === "function") {
       window.risqueFlushMirrorPush();
     } else if (typeof window.risqueMirrorPushGameState === "function") {
       window.risqueMirrorPushGameState();
     }
-    if (!navOk) {
-      try {
-        if (typeof window.risqueHostReplaceShellGameState === "function") {
-          window.risqueHostReplaceShellGameState(gs);
-        }
-        if (typeof window.risqueNavigateGameHtmlSoft === "function") {
-          window.risqueNavigateGameHtmlSoft("game.html?phase=deploy&kind=turn");
-        }
-      } catch (eSoftDep) {
-        /* ignore */
-      }
-    }
-    setTimeout(function () {
-      incomeLeaveInFlight = false;
-    }, 3000);
+    finishIncomeDeployNavigation();
     return true;
   };
 
@@ -615,6 +703,13 @@
       name.toUpperCase() +
       "</strong></p>" +
       "<p>Only their laptop has income controls for this turn.</p></div>";
+    if (
+      gs.risquePublicIncomeBreakdown &&
+      typeof window.risqueHostApplyIncomeBreakdownVoice === "function"
+    ) {
+      window.risqueHostApplyIncomeBreakdownVoice(gs);
+      return;
+    }
     if (typeof window.risqueArtemisSyncPhaseControlVoice === "function") {
       window.risqueArtemisSyncPhaseControlVoice(gs);
     } else if (
@@ -631,7 +726,11 @@
   function incomeAlreadyStable(gs) {
     if (!gs) return false;
     var mountKey = incomeOwnerMountKey(gs);
-    return incomeMountedFor === mountKey && incomeControlsPresent();
+    return (
+      incomeMountedFor === mountKey &&
+      incomeControlsPresent() &&
+      incomeBreakdownLooksComplete(gs)
+    );
   }
 
   function mountRealIncome(gs) {
@@ -666,7 +765,8 @@
     var mountKey = String(ctrl) + ":" + up;
     if (
       incomeMountedFor === mountKey &&
-      incomeControlsPresent()
+      incomeControlsPresent() &&
+      incomeBreakdownLooksComplete(gs)
     ) {
       ensureIncomeHostViewClasses();
       wireArtemisIncomeContinueHandler();
@@ -711,7 +811,18 @@
 
   function ensureIncomeBreakdownVoice(gs) {
     if (!gs) return;
+    if (!incomeBreakdownLooksComplete(gs)) {
+      try {
+        window.__risqueIncomeInitKey = "";
+      } catch (eClrInit) {
+        /* ignore */
+      }
+      incomeMountedFor = "";
+      mountRealIncome(gs);
+      gs = window.gameState || gs;
+    }
     if (
+      gs &&
       gs.risquePublicIncomeBreakdown &&
       typeof window.risqueHostApplyIncomeBreakdownVoice === "function"
     ) {
@@ -779,7 +890,14 @@
     }
     var localPh = window.gameState ? String(window.gameState.phase || "") : "";
     if (localPh === "deploy" || localPh === "con-deploy") {
-      return;
+      if (String(gs.phase || "") !== "income" && String(gs.phase || "") !== "con-income") {
+        return;
+      }
+      if (typeof window.risqueArtemisClientReleaseSetupDeployChrome === "function") {
+        window.risqueArtemisClientReleaseSetupDeployChrome(gs);
+      }
+      window.gameState = gs;
+      localPh = String(gs.phase || "");
     }
     var tr = window.risqueArtemisPhaseTransition;
     if (tr && String(tr.target || "") === "deploy") {
@@ -846,7 +964,33 @@
         exitClientPlayMode();
       }
       syncIncomeChrome(gs);
-      mountSpectatorHint(gs);
+      if (
+        gs.risquePublicIncomeBreakdown &&
+        typeof window.risqueHostApplyIncomeBreakdownVoice === "function"
+      ) {
+        ensureIncomeBreakdownVoice(gs);
+      } else {
+        mountSpectatorHint(gs);
+        if (window.risqueArtemisNetClient) {
+          [500, 1200].forEach(function (delayMs) {
+            setTimeout(function () {
+              var g2 = window.gameState;
+              if (
+                !g2 ||
+                (String(g2.phase || "") !== "income" && String(g2.phase || "") !== "con-income")
+              ) {
+                return;
+              }
+              if (
+                incomeBreakdownLooksComplete(g2) &&
+                typeof window.risqueHostApplyIncomeBreakdownVoice === "function"
+              ) {
+                ensureIncomeBreakdownVoice(g2);
+              }
+            }, delayMs);
+          });
+        }
+      }
       hideIncomeGodButton();
       return;
     }

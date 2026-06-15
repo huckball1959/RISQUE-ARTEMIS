@@ -164,7 +164,9 @@
       name.toUpperCase() +
       "</strong></p>" +
       "<p>Only their laptop has reinforcement controls for this turn.</p></div>";
-    if (
+    if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
+      window.risquePublicApplyVoiceAndLogMirror(gs);
+    } else if (
       window.risqueRuntimeHud &&
       typeof window.risqueRuntimeHud.setControlVoiceText === "function"
     ) {
@@ -174,6 +176,57 @@
       );
     }
   }
+
+  function paintHostReinforceSpectatorMap(gs) {
+    if (!gs || !window.gameUtils) return;
+    try {
+      if (typeof window.gameUtils.renderAll === "function") {
+        window.gameUtils.renderAll(gs, null, {});
+      } else if (typeof window.gameUtils.renderTerritories === "function") {
+        window.gameUtils.renderTerritories(null, gs, {});
+      }
+    } catch (eMap) {
+      /* ignore */
+    }
+    try {
+      window.gameUtils.renderStats(gs);
+    } catch (eStats) {
+      /* ignore */
+    }
+  }
+
+  /** Host map + HUD: live reinforce from client player_state (mirrors deploy/attack spectator pattern). */
+  window.risqueArtemisApplyHostReinforceSpectator = function (gs) {
+    if (!window.risqueArtemisHost || window.risqueArtemisNetClient || !gs) return;
+    if (String(gs.phase || "") !== "reinforce") return;
+    if (
+      typeof window.risqueArtemisShouldHostMountReinforce === "function" &&
+      window.risqueArtemisShouldHostMountReinforce(gs)
+    ) {
+      return;
+    }
+    clearReinforceControls();
+    stampReinforcePhaseChrome(gs);
+    window.gameState = gs;
+    if (typeof window.risqueArtemisEnsureOmniClientHud === "function") {
+      window.risqueArtemisEnsureOmniClientHud(gs);
+    }
+    if (typeof window.risqueArtemisEnsureHudTogglesVisible === "function") {
+      window.risqueArtemisEnsureHudTogglesVisible();
+    }
+    paintHostReinforceSpectatorMap(gs);
+    if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.updateTurnBannerFromState === "function") {
+      try {
+        window.risqueRuntimeHud.updateTurnBannerFromState(gs);
+      } catch (eBanner) {
+        /* ignore */
+      }
+    }
+    if (typeof window.risqueSyncMapRoundIndicatorFromState === "function") {
+      window.risqueSyncMapRoundIndicatorFromState(gs);
+    }
+    mountSpectatorHint(gs);
+  };
 
   function mountRealReinforce(gs) {
     if (!gs || !window.risquePhases || !window.risquePhases.reinforce) return;
@@ -272,9 +325,23 @@
 
     window.gameState = gs;
     var mine = isMine(gs);
+    if (
+      mine &&
+      window.risqueArtemisHost &&
+      typeof window.risqueArtemisShouldHostMountReinforce === "function" &&
+      !window.risqueArtemisShouldHostMountReinforce(gs)
+    ) {
+      mine = false;
+    }
 
     if (!mine) {
       clearReinforceControls();
+      if (window.risqueArtemisHost && !window.risqueArtemisNetClient) {
+        if (typeof window.risqueArtemisApplyHostReinforceSpectator === "function") {
+          window.risqueArtemisApplyHostReinforceSpectator(gs);
+        }
+        return;
+      }
       if (window.risqueArtemisNetClient) {
         exitClientPlayMode();
       }

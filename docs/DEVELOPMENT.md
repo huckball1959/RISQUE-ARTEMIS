@@ -2,21 +2,22 @@
 
 **Start here** for current project status, lab setup, and where to look in the codebase.
 
-Last updated: **2026-06-12** (m171 — receive-card auto-diagnostics).
+Last updated: **2026-06-07** (m221 — host mirror + deploy voice; **retest after reboot**).
 
 ---
 
 ## Reboot checklist (3 laptops)
 
-1. **Host:** run `scripts/SERVER/START-ARTEMIS.bat` — keep server window open (echoes **Build cache: m171**).
-2. **All browsers:** hard refresh **Ctrl+Shift+R** (receive-card diag needs **m171** scripts).
-3. **Clients:** run `JOIN.bat` on laptop 2 and 3 (do not bookmark old URLs).
-4. **Lobby:** Ready ×3 → host Start — do **not** re-Start mid-session if stuck.
-5. **After receive card:** tell Cursor **read diagnostics** — no console paste needed (`logs/artemis-last-report.json` → **`receiveCard.readout`**).
+1. **Reboot all 3 machines** if sluggish (clears browser/WebSocket state).
+2. **Host:** run `scripts/SERVER/START-ARTEMIS.bat` — keep server window open (Node **5700**).
+3. **All browsers:** hard refresh **Ctrl+Shift+R** — scripts must be **`artemis-m221-host-mirror-deploy-voice-2026-06-07`** (see `game.html`).
+4. **Clients:** run `JOIN.bat` on laptop 2 and 3 (uses `launchers/profiles.json` via `/join/` — do not bookmark stale URLs).
+5. **Lobby:** Ready ×3 → host Start — do **not** re-Start mid-session if stuck.
+6. **If stuck:** tell Cursor **read diagnostics** — `logs/artemis-last-report.json` (sync, cardplayOrder, receiveCard, browserConsole).
 
-**Mock harness (default):** `artemisMockPhases=1&artemisMockCardplay=0` — **real cardplay**, **mock income** (+3 troops, CONTINUE). Full real phases: `&artemisMockPhases=0`. Full mock cardplay: add `&artemisMockCardplay=1`.
+**Current launcher profile (`profiles.json`):** `artemisMockPhases=0` — **full real phases**; `rigCardPlay=3` (Nooch wins cardplay-order roulette). Change rig in `launchers/profiles.json` only.
 
-**Cardplay roulette rig:** `rigCardPlay=2` (Mictor wins) — default in launchers; `rigCardPlay=1` for Guido; `rigCardPlay=random` for fair spin.
+**Mock harness (when testing stubs):** `artemisMockPhases=1&artemisMockCardplay=0` — real cardplay, mock income. Full mock: `artemisMockCardplay=1`.
 
 **Test save:** `3 players.json` in repo root (round 8, GUIDO/MICTOR/NOOCH — cardplay/income testing).
 
@@ -35,34 +36,45 @@ ARTEMIS reuses the same phase modules and control panel DOM as hot-seat, but gat
 
 ## Where we are now (ARTEMIS)
 
-### Done (verified this session or earlier)
+### Done (verified earlier)
 
 | Step | Status | Notes |
 |------|--------|-------|
 | Lobby (Ready ×3 → host Start) | ✅ | `js/artemis-lobby.js` |
 | Per-laptop login (name + color) | ✅ | `js/artemis-login.js`, `phases/login.js` |
 | Welcome → first-card roulette → deal | ✅ | Mirrored setup chain |
-| Setup deploy handoff (P1→P2→P3) | ✅ | CONFIRM + mirror; blinking/handoff fixes in deploy panel |
+| Setup deploy handoff (P1→P2→P3) | ✅ | m220 handoff recovery; m218 host-owner guard |
 | Real cardplay (active client) | ✅ | m99+ mirror/view-class fixes |
-| **Real income Continue** | ✅ | **m168** — body-mounted green button; user approved |
+| Real income / full real phases | ✅ | `profiles.json` has mock off for normal play |
 | Turn deploy | ✅ | Per-laptop portable panel |
-| Attack | ✅ | m96 portable panel — user confirmed works very well |
-| **Reinforcement** | ✅ | m98 portable panel — **restored tonight** after m169/m170 rollback |
-| Git baseline | ✅ | `main` @ commit **`0be1a7f`** |
+| Attack (active client) | ✅ | m96 portable panel |
+| Reinforcement (active client) | ✅ | m98 portable panel |
+
+### Implemented m221 — **retest after reboot**
+
+| Step | Status | Notes |
+|------|--------|-------|
+| Host mirrors client **attack dice** | 🔜 retest | `risqueArtemisApplyHostAttackSpectator` — Guido was missing Nooch’s rolls |
+| Deploy voice “X troops deployed to …” | 🔜 retest | All laptops via `risqueDeployTroopsDeployedToPhrase` + `deploy_live` |
+| Host mirrors client **reinforce** | 🔜 retest | `risqueArtemisApplyHostReinforceSpectator` |
+| Territory selection voice | 🔜 retest | m217 — all phases; Guido flicker may remain |
 
 ### Not done / reverted
 
 | Step | Status | Notes |
 |------|--------|-------|
-| Portable receive-card UI | ❌ reverted | m169 broke reinforce; removed — receive card is **control voice only** for now |
-| Real income phase UI | ❌ | Mock income (+3, CONTINUE) still default; real income mount exists but not primary path |
-| m169 / m170 local experiments | ❌ discarded | Never committed; do not re-apply without branch + reinforce regression test |
+| Portable receive-card UI | ❌ reverted | m169 broke reinforce — voice only |
+| m219 voice pin + sync skip | ❌ reverted | Caused deploy/cardplay handoff regression |
+| Perfect 3-laptop lockstep | ❌ | `sync_barrier_timeout` common; P3 often lags |
 
 ### Next session (suggested order)
 
-1. Receive-card portable panel on a **branch** — hand/staging/CONTINUE; must not break reinforce.
-2. Full 3-laptop smoke: attack → reinforce → receive card → cardplay.
-3. Real income rebuild (when mock path is stable enough to replace).
+1. **Verify m221** — attack dice on Guido, deploy troop voice, reinforce on Guido (see [SESSION_NOTES.md](SESSION_NOTES.md)).
+2. Guido deploy selection voice persistence — minimal fix only; no sync skips.
+3. Receive-card portable panel on a **branch** if m221 stable.
+4. Commit m217–m221 when user requests.
+
+**Git:** Local m217–m221 changes likely **uncommitted** — run `git status` after reboot.
 
 ---
 

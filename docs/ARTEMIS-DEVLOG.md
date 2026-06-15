@@ -23,7 +23,7 @@ Living record for **network multiplayer** (3 Windows laptops). Future agents: re
 
 - **Server:** Node in `artemis-server/` (port **5700**).
 - **Launch:** `scripts/SERVER/START-ARTEMIS.bat` (host), `scripts/LAPTOP 2/JOIN.bat`, `scripts/LAPTOP 3/JOIN.bat`.
-- **Cache bust:** Launcher uses `?v=m168` (`launchers/profiles.json`); ARTEMIS scripts in `game.html` use `?v=artemis-m168-income-mini-btn-2026-06-09` — bump when changing mock harness, panels, or sync code. `START-ARTEMIS.bat` echoes **m168**.
+- **Cache bust:** Launcher URL uses `?v=m195` (`launchers/profiles.json`); ARTEMIS scripts in `game.html` use `?v=artemis-m221-host-mirror-deploy-voice-2026-06-07` — bump **both** when changing panels or sync code. Hard refresh **Ctrl+Shift+R** on all 3 laptops after JS changes; restart Node server after `server.js` changes.
 
 Unless specified otherwise, **all network development assumes this 3-laptop layout**.
 
@@ -89,6 +89,62 @@ Implementation today: `phases/runtime-hud.js` + `game.css` (`.runtime-hud-root`,
 ---
 
 ## Log entries
+
+### 2026-06-07 — Host mirror + deploy voice + sync handoffs (m217–m221) — **UNTESTED after reboot**
+
+**Context:** 3-laptop lab (Guido P1 host, Mictor P2, Nooch P3). Real phases on (`artemisMockPhases=0` in `launchers/profiles.json`). User reported: Mictor saw Nooch’s attack dice but **Guido (host) did not**; deploy control voice did not say “X troops deployed to {territory}” in real time on all laptops; **Guido did not mirror Nooch’s reinforcement** but Mictor did. Machines slowing — **reboot before next test pass**.
+
+**Implemented (local, uncommitted)**
+
+| Milestone | Files | Behavior |
+|-----------|-------|----------|
+| **m217** Territory selection voice | `js/core.js`, `phases/attack.js`, `phases/reinforce.js`, `phases/runtime-hud.js`, `phases/deploy.js` | `risqueAnnounceTerritorySelection()` — “{Territory} has been selected” on any valid map click |
+| **m218** Host deploy owner not spectator | `js/artemis-deploy-panel.js` | `hostIsActiveDeployOwner()` guard in `ApplyHostDeploySpectator` — Guido no longer torn down while owning setup deploy |
+| **m219** Guido voice pin | *(reverted)* | Pinned selection via sync skip + voice polling — **caused regression** (Mictor stuck on `playerSelect`, blinking, `sync_barrier_timeout`) |
+| **m220** Deploy-order handoff | `js/artemis-net.js`, `js/artemis-deploy-panel.js`, `phases/player-select.js`, `js/game-shell.js` | Client catch-up `playerSelect→deploy`; faster deploy-order barriers; client `RefreshDeploySpectator` calls `SyncPortableDeploy` on their turn |
+| **m221** Host attack/reinforce mirror + deploy voice | `js/artemis-attack-panel.js`, `js/artemis-reinforce-panel.js`, `js/artemis-net.js`, `js/artemis-play.js`, `js/game-shell.js`, `js/core.js`, `js/artemis-deploy-panel.js` | See below |
+
+**m221 detail**
+
+| Piece | Behavior |
+|-------|----------|
+| `risqueDeployTroopsDeployedToPhrase(n, territory)` | e.g. “Two troops have been deployed to Brazil.” — owner + spectator control voice on wheel change |
+| `risqueArtemisApplyHostAttackSpectator(gs)` | Host spectating client attack: upgrade HUD off setup shell, show dice row, paint map, apply `attack_live` / `player_state` dice + voice |
+| `risqueArtemisApplyHostReinforceSpectator(gs)` | Host spectating client reinforce: paint map + mirrored control voice (same pattern as deploy host spectator) |
+| `risqueArtemisShouldHostMountReinforce(gs)` | Host only mounts reinforce controls when `risqueArtemisIsMyTurn` — mirrors attack panel m96 pattern |
+| `applyAttackLiveSpectator` (host) | `risqueHostReplaceShellGameState` + explicit host attack spectator apply |
+| `refreshVisuals` (host) | Prefer live `risqueLastDiceDisplay` from `window.gameState`; prefer full state when host spectates reinforce |
+
+**Live relay paths (server)**
+
+| Message | When | Consumers |
+|---------|------|-----------|
+| `deploy_live` | Client `player_state` during setup deploy | Host + other clients (`relayDeployLiveToSpectators`) |
+| `attack_live` | Client `player_state` during attack with dice/voice | Host + other clients (`relayAttackLiveToSpectators`) |
+| `public_state` | Host mirror push | **Clients only** — host applies via `player_state` + live relays |
+
+**Known issues / do not repeat**
+
+1. **m219-style sync skips** on host during deploy — breaks phase handoff for P2/P3.
+2. **`skipHostReinforceMirrorSync`** in `game-shell.js` — blocks host sync when host incorrectly has reinforce controls mounted; `ShouldHostMountReinforce` should prevent that.
+3. **Perfect lockstep is not guaranteed** — `sync_barrier_timeout` in diagnostics is often benign; P3 (Nooch) frequently lags at deploy/cardplay barriers.
+4. Last diagnostics snapshot (`logs/artemis-last-report.json`): P3 on `receivecard` while P1/P2 on `reinforce` — phase mismatch / lag, not necessarily m221-related.
+
+**Retest protocol (first thing after reboot)**
+
+1. Restart server: `scripts/SERVER/START-ARTEMIS.bat`
+2. Hard refresh all 3 laptops (**Ctrl+Shift+R**)
+3. Full setup → cardplay order (`rigCardPlay=3` → Nooch first) → play until **Nooch attacks**
+   - **Guido + Mictor** must show Nooch’s dice spins and results in real time
+4. During **setup deploy**, spin wheel — all control voices: “Two troops have been deployed to Brazil.” (or similar)
+5. **Nooch reinforces** — Guido map + voice must track like Mictor’s
+6. Say **“read diagnostics”** if stuck — `logs/artemis-last-report.json`
+
+**Cache bust:** `artemis-m221-host-mirror-deploy-voice-2026-06-07` on `game.html` scripts listed above.
+
+**Git:** Changes **not committed** (user preference). Prior baseline still cited as `0be1a7f` in older entries — verify with `git status` / `git log -1` after reboot.
+
+---
 
 ### 2026-06-12 — Receive-card auto-diagnostics (m171)
 

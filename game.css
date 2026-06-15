@@ -102,8 +102,14 @@ html, body {
   cursor: pointer;
   stroke: #000000;
   stroke-width: 2;
-  pointer-events: all;
+  pointer-events: none;
   transition: r 0.2s, stroke-width 0.2s;
+}
+.territory-hit {
+  cursor: pointer;
+  pointer-events: all;
+  fill: transparent;
+  stroke: none;
 }
 /* Deal phase: markers grow from r=0 — needs a committed paint at r=0 (see core.js double rAF). */
 .svg-overlay circle.territory-circle.territory-circle--deal-pop {
@@ -121,12 +127,12 @@ html, body {
   font-size: 21px;
   text-anchor: middle;
   dominant-baseline: central;
-  pointer-events: all;
-  cursor: pointer;
+  pointer-events: none;
+  cursor: default;
 }
 .territory-number text {
-  pointer-events: all;
-  cursor: pointer;
+  pointer-events: none;
+  cursor: default;
 }
 
 /* Private deploy: +N satellite at ~2 o'clock — net troops added this session (see core.js renderTerritories) */
@@ -1666,6 +1672,34 @@ html.risque-view-public .risque-public-ghost-replay-save {
  */
 .hud-attack-chrome.hud-chrome-disabled {
   pointer-events: none;
+}
+
+/* ARTEMIS host TV: Guido spectates client attack — match Mictor public layout (dice only, no grey toolbar). */
+body.risque-artemis-attack-spectator #hud-attack-chrome .attack-toolbar-strip,
+body.risque-artemis-attack-spectator #hud-attack-chrome .attack-step-ctl-wrap,
+body.risque-artemis-attack-spectator #attack-dev-row-strip {
+  display: none !important;
+}
+
+body.risque-artemis-attack-spectator .attack-reinforce-footer {
+  display: none !important;
+}
+
+body.risque-artemis-attack-spectator #hud-attack-chrome .attack-dice-columns {
+  display: grid !important;
+  opacity: 1 !important;
+}
+
+body.risque-artemis-attack-spectator #hud-attack-chrome.hud-chrome-disabled {
+  opacity: 1 !important;
+  pointer-events: none;
+}
+
+body.risque-artemis-attack-spectator #hud-attack-chrome .attack-toolbar-strip .ucp-slot-strip-buttons button,
+body.risque-artemis-attack-spectator #hud-attack-chrome .attack-dev-row-strip .ucp-slot-strip-buttons button,
+body.risque-artemis-attack-spectator #hud-attack-chrome #cond-threshold {
+  pointer-events: none !important;
+  cursor: not-allowed !important;
 }
 
 .hud-attack-chrome.hud-chrome-disabled .attack-toolbar-strip .ucp-slot-strip-buttons,
@@ -10986,7 +11020,96 @@ html.risque-artemis-client .risque-artemis-top-bar {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.risque-artemis-sync-strip {
+  flex: 0 1 auto;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.95;
+}
+
+.risque-artemis-sync-strip[data-kind="wait"] {
+  color: #fde68a;
+}
+
+.risque-artemis-sync-strip[data-kind="warn"] {
+  color: #fecaca;
+}
+
+.risque-artemis-sync-strip[data-kind="ok"] {
+  color: #bbf7d0;
+}
+
+.risque-artemis-beat-sync-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100010;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 16px calc(var(--risque-artemis-bar-h, 34px) + 16px);
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent 45%);
+}
+
+.risque-artemis-beat-sync-overlay[hidden] {
+  display: none !important;
+}
+
+.risque-artemis-beat-sync-card {
+  pointer-events: auto;
+  width: min(640px, 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(15, 23, 42, 0.94);
+  color: #f8fafc;
+  padding: 14px 16px 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  font-family: system-ui, Segoe UI, Arial, sans-serif;
+}
+
+.risque-artemis-beat-sync-step {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #93c5fd;
+  margin-bottom: 4px;
+}
+
+.risque-artemis-beat-sync-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.risque-artemis-beat-sync-detail {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.92;
+  margin-bottom: 8px;
+}
+
+.risque-artemis-beat-sync-slots {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: #e2e8f0;
+  margin-bottom: 6px;
+}
+
+.risque-artemis-beat-sync-timer {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fde68a;
 }
 
 .risque-artemis-top-fs-hint {
@@ -11210,6 +11333,108 @@ html.risque-artemis-client .risque-artemis-host-bar {
   font-size: 14px;
   line-height: 1.45;
   color: #94a3b8;
+}
+
+/* ARTEMIS — host setup rig picker (login idle, before START) */
+.risque-artemis-rig-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 100060;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 6, 23, 0.92);
+  backdrop-filter: blur(10px);
+}
+
+.risque-artemis-rig-picker[hidden] {
+  display: none !important;
+}
+
+.risque-artemis-rig-picker-card {
+  width: min(560px, 100%);
+  padding: 32px 36px;
+  border-radius: 18px;
+  background: linear-gradient(165deg, #0f172a 0%, #1e293b 100%);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.5);
+  color: #f1f5f9;
+}
+
+.risque-artemis-rig-picker-title {
+  margin: 0 0 10px;
+  font-size: 28px;
+  font-weight: 800;
+  color: #38bdf8;
+  text-align: center;
+}
+
+.risque-artemis-rig-picker-lead {
+  margin: 0 0 24px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #cbd5e1;
+  text-align: center;
+}
+
+.risque-artemis-rig-picker-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.risque-artemis-rig-picker-btn {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 18px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+
+.risque-artemis-rig-picker-btn:hover {
+  border-color: #38bdf8;
+  background: rgba(30, 41, 59, 0.95);
+  transform: translateY(-1px);
+}
+
+.risque-artemis-rig-picker-btn-num {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #38bdf8;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.risque-artemis-rig-picker-btn-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.risque-artemis-rig-picker-btn-label {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.risque-artemis-rig-picker-btn-hint {
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.35;
 }
 
 /* ARTEMIS M2b — per-laptop login panel (clients) */
@@ -11445,13 +11670,20 @@ html.risque-artemis-client.risque-artemis-my-turn button.deploy1-action-btn {
 }
 
 html.risque-artemis-client.risque-artemis-my-turn #canvas .svg-overlay,
-html.risque-artemis-client.risque-artemis-my-turn #canvas .svg-overlay .territory-circle,
-html.risque-artemis-client.risque-artemis-my-turn #canvas .svg-overlay .territory-number,
-html.risque-artemis-host.risque-artemis-my-turn #canvas .svg-overlay,
-html.risque-artemis-host.risque-artemis-my-turn #canvas .svg-overlay .territory-circle,
-html.risque-artemis-host.risque-artemis-my-turn #canvas .svg-overlay .territory-number {
+html.risque-artemis-host.risque-artemis-my-turn #canvas .svg-overlay {
+  pointer-events: auto !important;
+}
+html.risque-artemis-client.risque-artemis-my-turn #canvas .svg-overlay .territory-hit,
+html.risque-artemis-host.risque-artemis-my-turn #canvas .svg-overlay .territory-hit {
   pointer-events: auto !important;
   cursor: pointer;
+}
+html.risque-artemis-client.risque-artemis-my-turn #canvas .svg-overlay .territory-circle,
+html.risque-artemis-client.risque-artemis-my-turn #canvas .svg-overlay .territory-number,
+html.risque-artemis-host.risque-artemis-my-turn #canvas .svg-overlay .territory-circle,
+html.risque-artemis-host.risque-artemis-my-turn #canvas .svg-overlay .territory-number {
+  pointer-events: none !important;
+  cursor: default;
 }
 
 /* Pass map clicks through the full-screen ui-overlay; only HUD + deploy dock capture input */
@@ -11846,6 +12078,45 @@ html.risque-artemis-host body:not([data-risque-phase="attack"]):not([data-risque
 
 html.risque-artemis-host .runtime-hud-root--setup #control-voice-report {
   display: block !important;
+}
+
+/*
+ * ARTEMIS income breakdown in control voice — must beat the 168px compact rules above.
+ * :has(income-stack) covers host when body data-risque-phase lags after cardplay→income.
+ */
+html.risque-artemis-host body[data-risque-phase="income"] #control-voice.ucp-control-voice,
+html.risque-artemis-host body[data-risque-phase="con-income"] #control-voice.ucp-control-voice,
+html.risque-artemis-client body[data-risque-phase="income"] #control-voice.ucp-control-voice,
+html.risque-artemis-client body[data-risque-phase="con-income"] #control-voice.ucp-control-voice,
+html.risque-artemis-host #control-voice.ucp-control-voice:has(#control-voice-text.ucp-voice-text--public-income-stack),
+html.risque-artemis-client #control-voice.ucp-control-voice:has(#control-voice-text.ucp-voice-text--public-income-stack) {
+  height: auto !important;
+  min-height: 380px !important;
+  max-height: min(78vh, 680px) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  flex-shrink: 0 !important;
+}
+
+html.risque-artemis-host body[data-risque-phase="income"] #control-voice.ucp-control-voice .ucp-voice-body,
+html.risque-artemis-host body[data-risque-phase="con-income"] #control-voice.ucp-control-voice .ucp-voice-body,
+html.risque-artemis-client body[data-risque-phase="income"] #control-voice.ucp-control-voice .ucp-voice-body,
+html.risque-artemis-client body[data-risque-phase="con-income"] #control-voice.ucp-control-voice .ucp-voice-body,
+html.risque-artemis-host #control-voice.ucp-control-voice:has(#control-voice-text.ucp-voice-text--public-income-stack) .ucp-voice-body,
+html.risque-artemis-client #control-voice.ucp-control-voice:has(#control-voice-text.ucp-voice-text--public-income-stack) .ucp-voice-body,
+html.risque-artemis-host body[data-risque-phase="income"] #control-voice.ucp-control-voice .ucp-voice-messages,
+html.risque-artemis-host body[data-risque-phase="con-income"] #control-voice.ucp-control-voice .ucp-voice-messages,
+html.risque-artemis-client body[data-risque-phase="income"] #control-voice.ucp-control-voice .ucp-voice-messages,
+html.risque-artemis-client body[data-risque-phase="con-income"] #control-voice.ucp-control-voice .ucp-voice-messages,
+html.risque-artemis-host #control-voice.ucp-control-voice:has(#control-voice-text.ucp-voice-text--public-income-stack) .ucp-voice-messages,
+html.risque-artemis-client #control-voice.ucp-control-voice:has(#control-voice-text.ucp-voice-text--public-income-stack) .ucp-voice-messages,
+html.risque-artemis-host body[data-risque-phase="income"] #control-voice.ucp-control-voice #control-voice-text,
+html.risque-artemis-host body[data-risque-phase="con-income"] #control-voice.ucp-control-voice #control-voice-text,
+html.risque-artemis-client body[data-risque-phase="income"] #control-voice.ucp-control-voice #control-voice-text,
+html.risque-artemis-client body[data-risque-phase="con-income"] #control-voice.ucp-control-voice #control-voice-text,
+html.risque-artemis-host #control-voice.ucp-control-voice:has(#control-voice-text.ucp-voice-text--public-income-stack) #control-voice-text,
+html.risque-artemis-client #control-voice.ucp-control-voice:has(#control-voice-text.ucp-voice-text--public-income-stack) #control-voice-text {
+  overflow: visible !important;
 }
 
 /*

@@ -3,6 +3,7 @@
 | File | Contents |
 |------|----------|
 | [DEVELOPMENT.md](DEVELOPMENT.md) | **Start here** — consolidated status, lab setup, file map |
+| [SESSION_NOTES.md](SESSION_NOTES.md) | **Current handoff** — read after reboot (m221, retest checklist) |
 | [manual.html](manual.html) | Game rules / manual (HTML) |
 | [help.html](help.html) | App help / troubleshooting (HTML) |
 | [ARTEMIS-DEVLOG.md](ARTEMIS-DEVLOG.md) | ARTEMIS network dev log (dated entries — append here) |
@@ -10,5 +11,5 @@
 | [POST-LOGIN-FLOW.md](POST-LOGIN-FLOW.md) | Step 1 — after login through setup (target vs current) |
 | [HANDOFF.md](HANDOFF.md) | Legacy single-machine developer handoff |
 | [MILESTONES.md](MILESTONES.md) | Milestone tracking |
-| [SESSION_NOTES.md](SESSION_NOTES.md) | Session notes |
+| [SESSION_NOTES.md](SESSION_NOTES.md) | **Current session handoff** (m221 — 2026-06-07) |
 | [replay.txt](replay.txt) | Instant replay — developer handoff (tape schema, hooks, mirror notes) |

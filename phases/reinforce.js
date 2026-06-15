@@ -1323,6 +1323,9 @@ function handleReinforceTerritoryClick(label, owner, troops) {
     if (typeof window.risqueSetSpectatorFocus === 'function') {
       window.risqueSetSpectatorFocus([label]);
     }
+    if (typeof window.risqueAnnounceTerritorySelection === 'function') {
+      window.risqueAnnounceTerritorySelection(label, { report: 'Pick adjacent territory to reinforce to.' });
+    }
     reinforceShowPrompt('Select adjacent territory to reinforce to.', [{ label: 'Cancel', onClick: resetReinforceSelection }]);
     syncReinforcePreviewToGameState();
     window.gameUtils.renderTerritories(selectedSource, window.gameState);
@@ -1354,6 +1357,9 @@ function handleReinforceTerritoryClick(label, owner, troops) {
     }
     if (typeof window.risqueSetSpectatorFocus === 'function') {
       window.risqueSetSpectatorFocus([selectedSource, label]);
+    }
+    if (typeof window.risqueAnnounceTerritorySelection === 'function') {
+      window.risqueAnnounceTerritorySelection(label, { report: 'Adjust troops to move on the wheel.' });
     }
     const maxMove = sourceTerritory.troops - 1;
     reinforceShowPrompt(

@@ -59,10 +59,20 @@
     if (typeof window.risqueArtemisBeginPhaseTransition === "function") {
       window.risqueArtemisBeginPhaseTransition(targetPhase || "deploy");
     }
-    var dest = destUrl;
-    if (typeof dest === "string" && dest.indexOf("deploy2.html") !== -1) {
-      dest = "game.html?phase=deploy&kind=turn";
+    if (typeof window.risqueTeardownArtemisSetupDeploy === "function") {
+      window.risqueTeardownArtemisSetupDeploy(true);
     }
+    if (typeof window.risqueArtemisUnmountPortableDeploy === "function") {
+      window.risqueArtemisUnmountPortableDeploy();
+    }
+    if (typeof window.risqueArtemisClearSetupDeployWinnerLock === "function") {
+      window.risqueArtemisClearSetupDeployWinnerLock(gs);
+    }
+    window.risqueDeploy1Active = false;
+    var dest =
+      typeof window.risqueSanitizeIncomeDeployNext === "function"
+        ? window.risqueSanitizeIncomeDeployNext(destUrl)
+        : "game.html?phase=deploy&kind=turn";
     window.gameState = gs;
     if (typeof window.risqueArtemisFlushClientStatePush === "function") {
       window.risqueArtemisFlushClientStatePush(gs);
@@ -94,6 +104,9 @@
     }
     if (typeof window.risqueArtemisSyncFromState === "function") {
       window.risqueArtemisSyncFromState(gs);
+    }
+    if (typeof window.risqueArtemisEnsureTurnDeployInteractive === "function") {
+      window.risqueArtemisEnsureTurnDeployInteractive(gs);
     }
     if (typeof window.risqueArtemisEndPhaseTransition === "function") {
       window.risqueArtemisEndPhaseTransition(gs);
@@ -204,7 +217,12 @@
     }
     var onLog = opts.onLog;
     // Default next step: stay inside JS runtime.
-    var legacyNext = opts.legacyNext != null ? opts.legacyNext : "game.html?phase=deploy&kind=turn";
+    var legacyNext =
+      opts.legacyNext != null
+        ? typeof window.risqueSanitizeIncomeDeployNext === "function"
+          ? window.risqueSanitizeIncomeDeployNext(opts.legacyNext)
+          : opts.legacyNext
+        : "game.html?phase=deploy&kind=turn";
 
     function logToStorage(message, data) {
       var ts = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
@@ -761,13 +779,11 @@
         (document.querySelector("#risque-phase-content .income-button") ||
           (window.risqueArtemisMode &&
             document.getElementById("risque-artemis-income-god-btn"))) &&
-        typeof window.risqueArtemisTriggerIncomeContinue === "function"
+        typeof window.risqueArtemisTriggerIncomeContinue === "function" &&
+        gameStateEarly &&
+        gameStateEarly.risquePublicIncomeBreakdown
       ) {
-        if (
-          gameStateEarly &&
-          gameStateEarly.risquePublicIncomeBreakdown &&
-          typeof window.risqueHostApplyIncomeBreakdownVoice === "function"
-        ) {
+        if (typeof window.risqueHostApplyIncomeBreakdownVoice === "function") {
           window.risqueHostApplyIncomeBreakdownVoice(gameStateEarly);
         }
         return;
@@ -799,7 +815,11 @@
         ensureContinentCollectionCounts(gameState);
         artemisClearIncomeTvGates(gameState);
         var currentPlayer = gameState.players.find(function (p) {
-          return p.name === gameState.currentPlayer;
+          return (
+            p &&
+            String(p.name || "").trim().toUpperCase() ===
+              String(gameState.currentPlayer || "").trim().toUpperCase()
+          );
         });
         if (!currentPlayer) {
           console.error("[Income] Current player not found");
@@ -981,6 +1001,27 @@
           if (window.risqueArtemisMode) {
             requestAnimationFrame(applyHostIncomeVoiceDom);
             setTimeout(applyHostIncomeVoiceDom, 120);
+            if (typeof window.risqueArtemisFlushClientStatePush === "function") {
+              var trIncPush = window.risqueArtemisPhaseTransition;
+              var incPushPh = String(gameState.phase || "");
+              var blockIncPush =
+                (trIncPush &&
+                  String(trIncPush.target || "") === "deploy" &&
+                  Date.now() - (Number(trIncPush.at) || 0) < 15000) ||
+                (window.gameState &&
+                  String(window.gameState.phase || "") === "deploy") ||
+                (incPushPh !== "income" && incPushPh !== "con-income");
+              if (!blockIncPush) {
+                window.risqueArtemisFlushClientStatePush(gameState);
+              }
+            } else if (
+              window.risqueArtemisHost &&
+              typeof window.risqueFlushMirrorPush === "function"
+            ) {
+              window.risqueFlushMirrorPush();
+            } else if (window.risqueArtemisHost && typeof window.risqueMirrorPushGameState === "function") {
+              window.risqueMirrorPushGameState();
+            }
           } else {
             if (typeof window.risqueMirrorPushGameState === "function") {
               window.risqueMirrorPushGameState();
@@ -1045,6 +1086,9 @@
           bookPlayedThisTurn: gameState.bookPlayedThisTurn
         });
         var confirmButton = document.querySelector(".income-button");
+        if (!confirmButton && window.risqueArtemisMode && useHud) {
+          confirmButton = document.getElementById("risque-artemis-income-god-btn");
+        }
         var PUBLIC_INCOME_GATE_KEY = "risquePublicIncomeGateAck";
         var incomeGateToken = gameState.risquePublicIncomeGateToken;
         function incomeGateAckMatches() {
@@ -1166,6 +1210,8 @@
             currentPlayer.bookValue = 0;
             gameState.phase = "deploy";
             gameState.risqueMirrorDeployRoute = "turn";
+            gameState.risqueArtemisControlSeq =
+              Math.max(Number(gameState.risqueArtemisControlSeq) || 0, 0) + 1;
             if (typeof window.risqueSetMirrorDeployRoute === "function") {
               window.risqueSetMirrorDeployRoute("turn");
             }
@@ -1223,7 +1269,7 @@
               window.risqueMirrorPushGameState();
             }
           }
-        } else {
+        } else if (!(window.risqueArtemisMode && useHud)) {
           console.error("[Income] Confirm button not found");
           window.gameUtils.showError("Confirm button not found");
         }
@@ -1368,6 +1414,20 @@
         /* ignore */
       }
 
+      var trIncMount = window.risqueArtemisPhaseTransition;
+      var liveIncPh =
+        window.gameState && window.gameState.phase != null
+          ? String(window.gameState.phase || "")
+          : "";
+      if (
+        liveIncPh === "deploy" ||
+        (trIncMount &&
+          String(trIncMount.target || "") === "deploy" &&
+          Date.now() - (Number(trIncMount.at) || 0) < 15000)
+      ) {
+        return;
+      }
+
       applyRoundOneCardCap(gameState);
       logToStorage("Player card counts on load", {
         players: gameState.players.map(function (p) {
@@ -1380,7 +1440,9 @@
         /* ignore */
       }
 
-      gameState.phase = "income";
+      if (String(gameState.phase || "") !== "income" && String(gameState.phase || "") !== "con-income") {
+        gameState.phase = "income";
+      }
       try {
         localStorage.setItem("gameState", JSON.stringify(gameState));
       } catch (e3) {

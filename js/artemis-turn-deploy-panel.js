@@ -40,6 +40,12 @@
 
   function isMine(gs) {
     if (!gs) return false;
+    if (
+      typeof window.risqueArtemisLocalOwnsTurnDeploy === "function" &&
+      window.risqueArtemisLocalOwnsTurnDeploy(gs)
+    ) {
+      return true;
+    }
     if (typeof window.risqueArtemisPanelIsMine === "function") {
       return window.risqueArtemisPanelIsMine(gs, ownerSlot(gs));
     }
@@ -106,6 +112,9 @@
     document.documentElement.classList.add("risque-view-host");
     document.body.classList.remove("risque-view-public");
     document.body.classList.add("risque-view-host");
+    if (typeof window.risqueArtemisSyncMyTurnClass === "function") {
+      window.risqueArtemisSyncMyTurnClass(window.gameState);
+    }
   }
 
   function exitClientPlayMode() {
@@ -121,6 +130,9 @@
 
   function teardownTurnUI() {
     turnMountedFor = "";
+    if (typeof window.risqueArtemisClearTurnDeployMountSession === "function") {
+      window.risqueArtemisClearTurnDeployMountSession();
+    }
     if (typeof window.risqueTeardownArtemisSetupDeploy === "function") {
       window.risqueTeardownArtemisSetupDeploy(true);
     }
@@ -147,6 +159,16 @@
 
   function mountRealTurnDeploy(gs) {
     if (!gs || !window.risquePhases || !window.risquePhases.deploy) return;
+    if (typeof window.risqueTeardownArtemisSetupDeploy === "function") {
+      window.risqueTeardownArtemisSetupDeploy(true);
+    }
+    if (typeof window.risqueArtemisUnmountPortableDeploy === "function") {
+      window.risqueArtemisUnmountPortableDeploy();
+    }
+    window.risqueDeploy1Active = false;
+    if (typeof window.risqueArtemisClearTurnDeployMountSession === "function") {
+      window.risqueArtemisClearTurnDeployMountSession();
+    }
     var up = normName(gs.currentPlayer);
     var ctrl = ownerSlot(gs);
     var mountKey = String(ctrl) + ":" + up;
@@ -217,6 +239,9 @@
       return;
     }
 
+    if (typeof window.risqueArtemisClearStaleTurnDeployHandoffLocks === "function") {
+      window.risqueArtemisClearStaleTurnDeployHandoffLocks(gs);
+    }
     if (typeof window.risqueArtemisStampControlSlot === "function") {
       window.risqueArtemisStampControlSlot(gs);
     }
@@ -225,6 +250,23 @@
     }
     if (typeof window.risqueArtemisClearTurnDeployHandoffFlags === "function") {
       window.risqueArtemisClearTurnDeployHandoffFlags(gs);
+    }
+    var activeTurnDeploySession =
+      typeof window.risqueArtemisClientHasActiveDeploySession === "function" &&
+      window.risqueArtemisClientHasActiveDeploySession();
+    if (
+      activeTurnDeploySession &&
+      typeof window.risqueArtemisStampDeployHandoffSyncMarkers === "function"
+    ) {
+      window.risqueArtemisStampDeployHandoffSyncMarkers(gs);
+    }
+    if (
+      !activeTurnDeploySession &&
+      typeof window.risqueArtemisDeployTurnSessionNeedsReset === "function" &&
+      window.risqueArtemisDeployTurnSessionNeedsReset(gs) &&
+      typeof window.risqueArtemisResetDeployTurnSession === "function"
+    ) {
+      window.risqueArtemisResetDeployTurnSession(gs);
     }
 
     if (typeof window.risqueSetMirrorDeployRoute === "function") {
@@ -244,6 +286,8 @@
       mountSpectatorHint(gs);
       if (typeof window.risqueArtemisApplyDeploySpectatorMap === "function") {
         window.risqueArtemisApplyDeploySpectatorMap(gs);
+      } else if (typeof window.risqueArtemisRefreshDeploySpectator === "function") {
+        window.risqueArtemisRefreshDeploySpectator(gs);
       }
       if (typeof window.risqueArtemisEnsureHudTogglesVisible === "function") {
         window.risqueArtemisEnsureHudTogglesVisible();
@@ -260,6 +304,16 @@
       window.risqueArtemisClientHasActiveDeploySession() &&
       turnControlsPresent()
     ) {
+      enterClientPlayMode();
+      if (typeof window.risqueArtemisSyncMyTurnClass === "function") {
+        window.risqueArtemisSyncMyTurnClass(gs);
+      }
+      if (typeof window.risqueArtemisReconcileClientPlayMode === "function") {
+        window.risqueArtemisReconcileClientPlayMode(gs);
+      }
+      if (typeof window.risqueArtemisStampDeployHandoffSyncMarkers === "function") {
+        window.risqueArtemisStampDeployHandoffSyncMarkers(gs);
+      }
       startTurnDeployWatchdog(gs);
       return;
     }
@@ -267,15 +321,22 @@
     window.gameState = gs;
     if (window.risqueArtemisNetClient) {
       enterClientPlayMode();
-      if (typeof window.risqueArtemisEnsureClientActivePlay === "function") {
-        window.risqueArtemisEnsureClientActivePlay(gs);
-      }
     }
     mountRealTurnDeploy(gs);
+    if (typeof window.risqueArtemisSyncMyTurnClass === "function") {
+      window.risqueArtemisSyncMyTurnClass(gs);
+    }
+    if (typeof window.risqueArtemisReconcileClientPlayMode === "function") {
+      window.risqueArtemisReconcileClientPlayMode(gs);
+    }
+    if (typeof window.risqueArtemisStampDeployHandoffSyncMarkers === "function") {
+      window.risqueArtemisStampDeployHandoffSyncMarkers(gs);
+    }
     startTurnDeployWatchdog(gs);
   };
 
   window.risqueArtemisEnsureTurnDeployInteractive = function (gsOpt) {
+    if (window.__risqueArtemisTurnDeployInteractiveDepth) return;
     var gs = gsOpt && typeof gsOpt === "object" ? gsOpt : window.gameState;
     if (!gs || gs.artemisCycleProbe) return;
     if (String(gs.phase || "") !== "deploy") return;
@@ -285,6 +346,8 @@
     ) {
       return;
     }
+    window.__risqueArtemisTurnDeployInteractiveDepth = true;
+    try {
     if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
       window.risqueArtemisResolveOwnerSlot(gs);
     }
@@ -295,11 +358,11 @@
     window.gameState = gs;
     if (window.risqueArtemisNetClient) {
       enterClientPlayMode();
-      if (typeof window.risqueArtemisEnsureClientActivePlay === "function") {
-        window.risqueArtemisEnsureClientActivePlay(gs);
-      }
     }
     if (turnControlsPresent()) {
+      if (typeof window.risqueArtemisStampDeployHandoffSyncMarkers === "function") {
+        window.risqueArtemisStampDeployHandoffSyncMarkers(gs);
+      }
       startTurnDeployWatchdog(gs);
       return;
     }
@@ -313,6 +376,9 @@
       });
     }
     startTurnDeployWatchdog(gs);
+    } finally {
+      window.__risqueArtemisTurnDeployInteractiveDepth = false;
+    }
   };
 
   window.risqueArtemisUnmountPortableTurnDeploy = function () {

@@ -182,6 +182,7 @@
     /* Campaign uses innerHTML on #control-voice-text; textContent would strip Begin/Commit UI. Also avoid the
      * instant_committed + no shell class case where a forced voice write wiped buttons but left campaignMode set. */
     if (
+      !opts.territorySelection &&
       typeof window.risqueIsAttackCampaignActive === "function" &&
       window.risqueIsAttackCampaignActive()
     ) {
@@ -528,6 +529,14 @@
   }
 
   function setAttackChromeInteractive(on) {
+    if (
+      on &&
+      window.risqueArtemisMode &&
+      typeof window.risqueArtemisShouldAttackChromeBeInteractive === "function" &&
+      !window.risqueArtemisShouldAttackChromeBeInteractive(window.gameState)
+    ) {
+      on = false;
+    }
     var chrome = document.getElementById("hud-attack-chrome");
     if (!chrome) return;
     chrome.classList.toggle("hud-chrome-disabled", !on);

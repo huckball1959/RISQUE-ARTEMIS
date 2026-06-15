@@ -15,6 +15,16 @@
     "EXHOSTED ALL TROOPS, FAILED TO PROTECT ALL TERRITORIES";
 
   var STYLE_ID_DEPLOY_TURN = "risque-deploy2-styles-v1";
+  var __risqueTurnDeployWheelSvg = null;
+  var __risqueTurnDeployWheelHandler = null;
+  var __risqueTurnDeployKeyHandler = null;
+  var __risqueTurnDeployMountKey = "";
+
+  window.risqueArtemisClearTurnDeployMountSession = function () {
+    __risqueTurnDeployMountKey = "";
+    window.__risqueArtemisTurnDeployControlsLive = false;
+    window.__risqueArtemisTurnDeployMountInProgress = false;
+  };
 
   function deployContinentDisplayName(contKey) {
     var gu = window.gameUtils;
@@ -421,6 +431,33 @@
     document.head.appendChild(s);
   }
 
+  /** Resolve current deployer — names may differ only by casing (GUIDO vs Guido). */
+  function deployResolvePlayer(gs) {
+    if (
+      window.risqueArtemisMode &&
+      typeof window.risqueArtemisDeployResolveCurrentPlayer === "function"
+    ) {
+      return window.risqueArtemisDeployResolveCurrentPlayer(gs);
+    }
+    if (!gs || !Array.isArray(gs.players)) return null;
+    var up = String(gs.currentPlayer || "").trim().toUpperCase();
+    if (!up) return null;
+    return (
+      gs.players.find(function (p) {
+        return p && String(p.name || "").trim().toUpperCase() === up;
+      }) || null
+    );
+  }
+
+  function turnDeployWheelLive() {
+    return !!(
+      __risqueTurnDeployWheelHandler &&
+      __risqueTurnDeployWheelSvg &&
+      document.getElementById("confirm") &&
+      document.getElementById("bank-number")
+    );
+  }
+
   /** Turn deploy: single player, then attack (classic or continental con-deploy when opts.continentalDeploy). */
   function mountTurnDeploy(host, opts) {
     opts = opts || {};
@@ -455,6 +492,9 @@
     }
 
     var gameState = window.gameState;
+    if (gameState) {
+      gameState.risqueMirrorDeployRoute = "turn";
+    }
     if (!gameState || !gameState.players || !gameState.currentPlayer) {
       console.warn("[Deploy] Invalid game state for deploy (turn).");
       setTimeout(function () {
@@ -462,6 +502,18 @@
       }, 2000);
       return;
     }
+
+    var mountCtrl =
+      Number(gameState.artemisControlSlot) ||
+      (typeof window.risqueArtemisResolveOwnerSlot === "function"
+        ? Number(window.risqueArtemisResolveOwnerSlot(gameState)) || 0
+        : 0);
+    var mountUp = String(gameState.currentPlayer || "").trim().toUpperCase();
+    var mountKeyTd = String(mountCtrl) + ":" + mountUp;
+    if (__risqueTurnDeployMountKey === mountKeyTd && turnDeployWheelLive()) {
+      return;
+    }
+    window.__risqueArtemisTurnDeployMountInProgress = true;
 
     if (continentalDeploy) {
       try {
@@ -590,13 +642,17 @@
 
     function pushDeployMirror(immediate) {
       if (
+        gameState &&
+        window.risqueArtemisMode &&
+        typeof window.risqueArtemisStampDeployMirrorDraftOnState === "function"
+      ) {
+        window.risqueArtemisStampDeployMirrorDraftOnState(gameState);
+      }
+      if (
         window.risqueArtemisNetClient &&
         immediate &&
         typeof window.risqueArtemisFlushClientStatePush === "function"
       ) {
-        if (typeof window.risqueArtemisStampDeployMirrorDraftOnState === "function" && gameState) {
-          window.risqueArtemisStampDeployMirrorDraftOnState(gameState);
-        }
         window.risqueArtemisFlushClientStatePush(gameState);
         return;
       }
@@ -607,6 +663,7 @@
 
     function refreshPublicDeployPrivateMirror() {
       if (!gameState || window.risqueDisplayIsPublic) return;
+      if (window.risqueArtemisMode) return;
       if (
         window.risqueArtemisNetClient &&
         typeof window.risqueArtemisIsMyTurn === "function" &&
@@ -620,9 +677,7 @@
         }
         return;
       }
-      var player = gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
+      var player = deployResolvePlayer(gameState);
       if (!player) return;
       var bank = Math.max(0, Number(player.bankValue) || 0);
       try {
@@ -639,10 +694,9 @@
 
     function captureDeployPublicBoardSnapshot() {
       if (!gameState || window.risqueDisplayIsPublic) return;
+      if (window.risqueArtemisMode) return;
       try {
-        var cur = gameState.players.find(function (p) {
-          return p.name === gameState.currentPlayer;
-        });
+        var cur = deployResolvePlayer(gameState);
         var baseline = {};
         if (cur && cur.territories) {
           cur.territories.forEach(function (t) {
@@ -733,9 +787,7 @@
         advanceFn();
         return;
       }
-      var player = gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
+      var player = deployResolvePlayer(gameState);
       var steps = buildTurnDeployPublishSteps(player);
       if (!steps.length) {
         advanceFn();
@@ -817,11 +869,14 @@
       if (!window.risqueRuntimeHud || typeof window.risqueRuntimeHud.setControlVoiceText !== "function") {
         return;
       }
-      var player = gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
+      var player = deployResolvePlayer(gameState);
       if (!player) return;
       refreshPublicDeployPrivateMirror();
+      if (!warnMessage && typeof window.risqueRefreshDeployNarration === "function") {
+        window.risqueRefreshDeployNarration(gameState);
+        persistGameStateForPublicMirror();
+        return;
+      }
       var primary = player.name.toUpperCase() + "\nDEPLOY ALL TROOPS FROM YOUR BANK";
       var bank = Math.max(0, Number(player.bankValue) || 0);
       var r =
@@ -836,9 +891,7 @@
     }
 
     function updateBankDisplay() {
-      var player = gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
+      var player = deployResolvePlayer(gameState);
       var bankNumber = document.getElementById("bank-number");
       if (bankNumber) {
         var v = player ? Number(player.bankValue) : 0;
@@ -853,9 +906,7 @@
     }
 
     function updatePlayerNameDisplay() {
-      var player = gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
+      var player = deployResolvePlayer(gameState);
       if (window.risqueRuntimeHud && document.getElementById("runtime-hud-root")) {
         window.risqueRuntimeHud.updateTurnBannerFromState(gameState);
         return;
@@ -887,9 +938,7 @@
         return;
       }
 
-      var currentPlayer = gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
+      var currentPlayer = deployResolvePlayer(gameState);
       if (!currentPlayer) {
         console.warn("[Deploy] Current player not found.");
         setTimeout(function () {
@@ -942,6 +991,9 @@
 
     /** Same idea as setup deploy: after phase leaves deploy, one redraw without bumps / satellites / white fill. */
     function clearTurnDeployChromeThenRedraw() {
+      __risqueTurnDeployMountKey = "";
+      window.__risqueArtemisTurnDeployControlsLive = false;
+      window.__risqueArtemisTurnDeployMountInProgress = false;
       try {
         document.body.classList.remove("risque-con-deploy-mounted");
       } catch (eRmDep) {
@@ -967,18 +1019,24 @@
     }
 
     function bindWheelAndKeyboardHandlers() {
-      stageSvg.addEventListener(
-        "wheel",
-        function (e) {
+      if (__risqueTurnDeployWheelSvg && __risqueTurnDeployWheelHandler) {
+        __risqueTurnDeployWheelSvg.removeEventListener(
+          "wheel",
+          __risqueTurnDeployWheelHandler
+        );
+      }
+      if (__risqueTurnDeployKeyHandler) {
+        document.removeEventListener("keydown", __risqueTurnDeployKeyHandler);
+      }
+
+      __risqueTurnDeployWheelHandler = function (e) {
           if (!window.selectedTerritory) {
             return;
           }
 
           e.preventDefault();
 
-          var player = gameState.players.find(function (p) {
-            return p.name === gameState.currentPlayer;
-          });
+      var player = deployResolvePlayer(gameState);
           if (!player) return;
 
           var territory = player.territories.find(function (t) {
@@ -1029,18 +1087,16 @@
           } catch (e2) {
             /* ignore */
           }
-        },
-        { passive: false }
-      );
+        };
+      __risqueTurnDeployWheelSvg = stageSvg;
+      stageSvg.addEventListener("wheel", __risqueTurnDeployWheelHandler, { passive: false });
 
-      document.addEventListener("keydown", function (e) {
+      __risqueTurnDeployKeyHandler = function (e) {
         if (!window.selectedTerritory) {
           return;
         }
 
-        var player = gameState.players.find(function (p) {
-          return p.name === gameState.currentPlayer;
-        });
+      var player = deployResolvePlayer(gameState);
         if (!player) return;
 
         var territory = player.territories.find(function (t) {
@@ -1130,13 +1186,12 @@
             keyboardBuffer = keyboardBuffer.slice(0, -1);
           }
         }
-      });
+      };
+      document.addEventListener("keydown", __risqueTurnDeployKeyHandler);
     }
 
     function deployInit() {
-      var player = gameState.players.find(function (p) {
-        return p.name === gameState.currentPlayer;
-      });
+      var player = deployResolvePlayer(gameState);
       if (!player) {
         console.warn("[Deploy] Current player not found.");
         return;
@@ -1247,11 +1302,16 @@
 
       initializeDeployment();
       bindWheelAndKeyboardHandlers();
+      __risqueTurnDeployMountKey = mountKeyTd;
+      window.__risqueArtemisTurnDeployControlsLive = turnDeployWheelLive();
+      window.__risqueArtemisTurnDeployMountInProgress = false;
 
       confirmButton = document.getElementById("confirm");
       var resetButton = document.getElementById("reset");
 
       if (!confirmButton || !resetButton) {
+        window.__risqueArtemisTurnDeployControlsLive = false;
+        window.__risqueArtemisTurnDeployMountInProgress = false;
         console.warn("[Deploy] Missing critical DOM elements.");
         return;
       }
@@ -1259,9 +1319,7 @@
       resetButton.addEventListener("click", function () {
         abortDeployPublishGate();
 
-        var p = gameState.players.find(function (x) {
-          return x.name === gameState.currentPlayer;
-        });
+        var p = deployResolvePlayer(gameState);
         if (!p) return;
 
         p.bankValue = initialBankValues[p.name] || 0;
@@ -1306,9 +1364,7 @@
         if (!gameState || !window.selectedTerritory) {
           return;
         }
-        var player = gameState.players.find(function (p) {
-          return p.name === gameState.currentPlayer;
-        });
+      var player = deployResolvePlayer(gameState);
         if (!player) return;
         var territory = player.territories.find(function (t) {
           return t.name === window.selectedTerritory;
@@ -1364,9 +1420,7 @@
         if (!gameState) {
           return;
         }
-        var player = gameState.players.find(function (p) {
-          return p.name === gameState.currentPlayer;
-        });
+      var player = deployResolvePlayer(gameState);
         if (!player) {
           return;
         }
@@ -1444,9 +1498,7 @@
         if (!window.selectedTerritory) {
           return;
         }
-        var player = gameState.players.find(function (p) {
-          return p.name === gameState.currentPlayer;
-        });
+      var player = deployResolvePlayer(gameState);
         if (!player) return;
         var territory = player.territories.find(function (t) {
           return t.name === window.selectedTerritory;
@@ -1543,9 +1595,7 @@
           return gameState;
         },
         getPlayer: function () {
-          return gameState.players.find(function (p) {
-            return p.name === gameState.currentPlayer;
-          });
+          return deployResolvePlayer(gameState);
         },
         applyScope: function (scopeKey) {
           applyProtectAllTurn(scopeKey);
@@ -1603,9 +1653,7 @@
       };
 
       confirmButton.addEventListener("click", function () {
-        var p = gameState.players.find(function (x) {
-          return x.name === gameState.currentPlayer;
-        });
+        var p = deployResolvePlayer(gameState);
         if (!p) return;
         if (p.bankValue > 0) {
           window.gameUtils.showError("");
@@ -1732,6 +1780,7 @@
     }
 
     deployInit();
+    window.__risqueArtemisTurnDeployMountInProgress = false;
     try {
       if (typeof opts.onLog === "function") {
         opts.onLog("Deploy turn mount complete", {

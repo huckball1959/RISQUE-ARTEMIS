@@ -49,12 +49,31 @@
   /** True when setup deploy can mount (territories dealt, bank available for current deployer). */
   window.risqueArtemisSetupDeployMirrorReady = function (gs) {
     if (!gs || String(gs.phase || "") !== "deploy") return false;
+    if (
+      window.risqueArtemisDeployPushLocked ||
+      Number(window.risqueArtemisDeployHandoffPending) > 0 ||
+      Number(window.risqueArtemisDeployRelinquishedSeq) > 0
+    ) {
+      return true;
+    }
     if (typeof window.risqueArtemisEnsureRosterOnState === "function") {
       window.risqueArtemisEnsureRosterOnState(gs);
     }
+    var mySlot = Number(window.risqueArtemisPlayerSlot) || 0;
+    var ctrl = Number(gs.artemisControlSlot) || 0;
+    if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
+      ctrl = Number(window.risqueArtemisResolveOwnerSlot(gs)) || ctrl;
+    }
+    if (mySlot >= 1 && ctrl >= 1 && mySlot !== ctrl) {
+      return true;
+    }
     var player = deployResolveCurrentPlayer(gs);
     if (!player || !player.territories || !player.territories.length) return false;
-    return deploySyncActiveBankFromBoard(gs, player) > 0 || deployExpectedSetupBank(gs, player) > 0;
+    var activeBank = deploySyncActiveBankFromBoard(gs, player);
+    var expectedBank = deployExpectedSetupBank(gs, player);
+    if (activeBank > 0 || expectedBank > 0) return true;
+    /* Active deployer finished placing — ready to mount CONFIRM (bank drained). */
+    return deployBankDeployedOnBoard(player) > 0 || (player.territories || []).length > 0;
   };
 
   window.risqueArtemisLogSetupDeployBank = deployLogBankStatus;
@@ -133,14 +152,63 @@
     return null;
   }
 
-  /** Resolve active setup deployer â€” ARTEMIS: control slot first (matches HUD banner + bank). */
+  function artemisIsTurnDeployRouteGs(gs) {
+    if (!gs || String(gs.phase || "") !== "deploy") return false;
+    var route = String(gs.risqueMirrorDeployRoute || "");
+    if (route === "turn" || route === "deploy2") return true;
+    try {
+      var rkTd = localStorage.getItem("risqueMirrorDeployRoute");
+      if (rkTd === "turn" || rkTd === "deploy2") return true;
+    } catch (eRkTd) {
+      /* ignore */
+    }
+    if (gs.setupComplete === true) {
+      var banksTd = 0;
+      (gs.players || []).forEach(function (p) {
+        if ((Number(p.bankValue) || 0) > 0) banksTd += 1;
+      });
+      if (banksTd <= 1) return true;
+    }
+    return false;
+  }
+
+  /** Resolve active setup deployer — ARTEMIS: control slot first (matches HUD banner + bank). */
   function deployResolveCurrentPlayer(gs) {
     if (!gs || !Array.isArray(gs.players)) return null;
+    if (
+      window.risqueArtemisMode &&
+      String(gs.phase || "") === "deploy" &&
+      artemisIsTurnDeployRouteGs(gs) &&
+      Number(gs.artemisControlSlot) >= 1
+    ) {
+      var turnPlayer = deployResolvePlayerByControlSlot(gs);
+      if (turnPlayer) {
+        gs.currentPlayer = turnPlayer.name;
+        return turnPlayer;
+      }
+    }
+    if (
+      window.risqueArtemisMode &&
+      typeof window.risqueArtemisHostHasSetupDeployWinnerLock === "function" &&
+      window.risqueArtemisHostHasSetupDeployWinnerLock(gs) &&
+      typeof window.risqueArtemisApplySetupDeployWinnerLock === "function" &&
+      window.risqueArtemisApplySetupDeployWinnerLock(gs)
+    ) {
+      var locked = deployFindPlayer(gs, gs.currentPlayer);
+      if (locked) {
+        deployRepairSetupBankIfNeeded(gs, locked);
+        return locked;
+      }
+    }
     var player = null;
     if (
       window.risqueArtemisMode &&
       String(gs.phase || "") === "deploy" &&
-      Number(gs.artemisControlSlot) >= 1
+      Number(gs.artemisControlSlot) >= 1 &&
+      !(
+        typeof window.risqueArtemisHostHasSetupDeployWinnerLock === "function" &&
+        window.risqueArtemisHostHasSetupDeployWinnerLock(gs)
+      )
     ) {
       player = deployResolvePlayerByControlSlot(gs);
       if (player) {
@@ -497,7 +565,11 @@
           skipMirror: !!window.risqueArtemisMode,
           artemisDeployOwner: !!window.risqueArtemisMode
         });
-        persistGameStateForPublicMirror();
+        if (window.risqueArtemisMode && typeof window.risquePersistHostGameState === "function") {
+          window.risquePersistHostGameState(gameState);
+        } else {
+          persistGameStateForPublicMirror();
+        }
         return;
       }
       if (typeof window.risqueRefreshDeployNarration === "function") {
@@ -565,7 +637,9 @@
       territory.troops = newTroops;
       player.bankValue -= delta;
       player.troopsTotal += delta;
-      deployedTroops[artemisNormName(player.name)][territory.name] = territory.troops - 1;
+      var depPk = artemisNormName(player.name);
+      if (!deployedTroops[depPk]) deployedTroops[depPk] = {};
+      deployedTroops[depPk][territory.name] = territory.troops - 1;
       renderMap(window.selectedTerritory);
       updateBankDisplay();
       window.gameUtils.showError("");
@@ -621,7 +695,9 @@
       territory.troops += toAdd;
       player.bankValue -= toAdd;
       player.troopsTotal += toAdd;
-      deployedTroops[artemisNormName(player.name)][territory.name] = territory.troops - 1;
+      var bulkPk = artemisNormName(player.name);
+      if (!deployedTroops[bulkPk]) deployedTroops[bulkPk] = {};
+      deployedTroops[bulkPk][territory.name] = territory.troops - 1;
       renderMap(window.selectedTerritory);
       updateBankDisplay();
       window.gameUtils.showError("");
@@ -671,7 +747,9 @@
       territory.troops = newTroops;
       player.bankValue -= troopChange;
       player.troopsTotal += troopChange;
-      deployedTroops[artemisNormName(player.name)][territory.name] = territory.troops - 1;
+      var bankPk = artemisNormName(player.name);
+      if (!deployedTroops[bankPk]) deployedTroops[bankPk] = {};
+      deployedTroops[bankPk][territory.name] = territory.troops - 1;
       renderMap(window.selectedTerritory);
       updateBankDisplay();
       window.gameUtils.showError("");
@@ -772,7 +850,9 @@
         territory.troops = newTroops2;
         player.bankValue -= troopChange;
         player.troopsTotal += troopChange;
-        deployedTroops[artemisNormName(player.name)][territory.name] = territory.troops - 1;
+        var keyPk = artemisNormName(player.name);
+        if (!deployedTroops[keyPk]) deployedTroops[keyPk] = {};
+        deployedTroops[keyPk][territory.name] = territory.troops - 1;
         keyboardBuffer = "";
         negativeInput = false;
         var prettyT1 =
@@ -859,6 +939,21 @@
           return;
         }
         gameState = loadedGameState;
+        if (
+          window.risqueArtemisHost &&
+          typeof window.risqueArtemisHostHasSetupDeployWinnerLock === "function" &&
+          window.risqueArtemisHostHasSetupDeployWinnerLock(gameState) &&
+          typeof window.risqueArtemisForcePostRouletteWinner === "function"
+        ) {
+          window.risqueArtemisForcePostRouletteWinner(gameState, "deployOrder");
+        }
+        if (
+          typeof window.risqueArtemisHostHasSetupDeployWinnerLock === "function" &&
+          window.risqueArtemisHostHasSetupDeployWinnerLock(gameState) &&
+          typeof window.risqueArtemisApplySetupDeployWinnerLock === "function"
+        ) {
+          window.risqueArtemisApplySetupDeployWinnerLock(gameState);
+        }
         deployEnsureActivePlayerSetupBank(gameState);
         deployLogBankStatus(gameState, "init");
         var invalidPlayer = gameState.players.find(function (p) {
@@ -1060,9 +1155,14 @@
             }
             return;
           }
-          if (typeof window.risqueArtemisRelinquishDeployControl === "function") {
+          gameState.phase = "playerSelect";
+          gameState.risquePublicUiSelectKind = "cardPlay";
+          if (typeof window.risqueArtemisClientReleaseSetupDeployChrome === "function") {
+            window.risqueArtemisClientReleaseSetupDeployChrome(gameState);
+          } else if (typeof window.risqueArtemisRelinquishDeployControl === "function") {
             window.risqueArtemisRelinquishDeployControl(gameState);
           }
+          window.risqueArtemisAwaitSetupDeployFinish = true;
           try {
             localStorage.setItem("gameState", JSON.stringify(gameState));
           } catch (eLsFin) {
@@ -1282,6 +1382,8 @@
         if (resetButton) resetButton.disabled = true;
         if (typeof window.risqueArtemisRelinquishDeployControl === "function") {
           window.risqueArtemisRelinquishDeployControl(gameState, { handoffPending: true });
+        } else if (typeof window.risqueArtemisReplaceShellGameState === "function") {
+          window.risqueArtemisReplaceShellGameState(gameState);
         }
         return;
       }
@@ -1407,7 +1509,6 @@
             return false;
           }
           if (
-            window.risqueArtemisNetClient &&
             typeof window.risqueArtemisClientHasActiveDeploySession === "function" &&
             window.risqueArtemisClientHasActiveDeploySession()
           ) {
@@ -1417,6 +1518,7 @@
           gameState = mirrorGs;
           var activePlayer = deployResolveCurrentPlayer(gameState);
           deployLogBankStatus(gameState, "mirror-refresh");
+          var selKeep = window.selectedTerritory;
           if (activePlayer) {
             var apk = artemisNormName(activePlayer.name);
             initialBankValues[apk] = Number(activePlayer.bankValue) || 0;
@@ -1445,7 +1547,12 @@
           });
           window.gameState = gameState;
           updateBankDisplay();
-          renderMap(null);
+          window.__risqueArtemisApplyingDeployMirror = true;
+          try {
+            renderMap(selKeep || null);
+          } finally {
+            window.__risqueArtemisApplyingDeployMirror = false;
+          }
           if (
             window.risqueRuntimeHud &&
             typeof window.risqueRuntimeHud.updateTurnBannerFromState === "function"

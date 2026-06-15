@@ -426,6 +426,138 @@
 
   setInterval(receiveCardSnapshot, 8000);
 
+  var CARDPLAY_ORDER_PROBE_MS = 2000;
+  var CARDPLAY_ORDER_PROBE_WINDOW_MS = 50000;
+  var cardplayOrderProbeTimer = null;
+  var cardplayOrderProbeUntil = 0;
+  var cardplayOrderProbeContext = null;
+
+  function urlPhaseParam() {
+    try {
+      return String(new URL(window.location.href).searchParams.get("phase") || "");
+    } catch (eUrl) {
+      return "";
+    }
+  }
+
+  function cardplayOrderProbeDetail() {
+    var gs = window.gameState;
+    var livePh = gs ? String(gs.phase || "") : "";
+    var urlPh = urlPhaseParam();
+    var selectKind =
+      gs && gs.risquePublicUiSelectKind != null
+        ? String(gs.risquePublicUiSelectKind)
+        : gs && gs.selectionPhase != null
+          ? String(gs.selectionPhase)
+          : "";
+    return {
+      urlPhase: urlPh,
+      gamePhase: livePh,
+      selectKind: selectKind,
+      setupComplete: !!(gs && gs.setupComplete),
+      currentPlayer: gs ? String(gs.currentPlayer || "") : "",
+      controlSlot: gs ? Number(gs.artemisControlSlot) || 0 : 0,
+      mirrorSeq: gs ? Number(gs.risquePublicMirrorSeq) || 0 : 0,
+      clientPlaying: !!window.risqueArtemisClientPlaying,
+      deployChromeActive:
+        typeof window.risqueArtemisClientSetupDeployChromeActive === "function" &&
+        window.risqueArtemisClientSetupDeployChromeActive(),
+      deploySessionActive:
+        typeof window.risqueArtemisClientHasActiveDeploySession === "function" &&
+        window.risqueArtemisClientHasActiveDeploySession(),
+      lastMirrorReject: window.__risqueArtemisLastMirrorReject || null,
+      context: cardplayOrderProbeContext || null,
+    };
+  }
+
+  function cardplayOrderProbeIsLagging(detail) {
+    if (!detail) return false;
+    var livePh = String(detail.gamePhase || "");
+    var urlPh = String(detail.urlPhase || "");
+    if (livePh === "deploy" && (urlPh === "playerSelect" || urlPh === "cardplay")) return true;
+    if (livePh === "playerSelect" && urlPh === "cardplay") return true;
+    if (detail.lastMirrorReject && String(detail.lastMirrorReject.incomingPhase || "") === "playerSelect") {
+      return true;
+    }
+    return false;
+  }
+
+  function cardplayOrderProbeTick() {
+    if (!window.risqueArtemisLobbyStarted) return;
+    if (Date.now() > cardplayOrderProbeUntil) {
+      if (cardplayOrderProbeTimer) {
+        clearInterval(cardplayOrderProbeTimer);
+        cardplayOrderProbeTimer = null;
+      }
+      sendDiag({
+        kind: "cardplay_order_probe_end",
+        summary: "P" + slotLabel() + " cardplay-order probe ended",
+        detail: cardplayOrderProbeDetail(),
+      });
+      return;
+    }
+    var detail = cardplayOrderProbeDetail();
+    var lagging = cardplayOrderProbeIsLagging(detail);
+    sendDiag({
+      kind: lagging ? "cardplay_order_lag" : "cardplay_order_probe",
+      summary:
+        "P" +
+        slotLabel() +
+        (lagging ? " LAG" : " ok") +
+        " live=" +
+        detail.gamePhase +
+        " url=" +
+        (detail.urlPhase || "—"),
+      detail: detail,
+    });
+  }
+
+  window.risqueArtemisStartCardplayOrderProbe = function (ctx) {
+    if (!window.risqueArtemisMode) return;
+    cardplayOrderProbeContext = ctx && typeof ctx === "object" ? ctx : { reason: "manual" };
+    cardplayOrderProbeUntil = Date.now() + CARDPLAY_ORDER_PROBE_WINDOW_MS;
+    cardplayOrderProbeTick();
+    if (cardplayOrderProbeTimer) return;
+    cardplayOrderProbeTimer = setInterval(cardplayOrderProbeTick, CARDPLAY_ORDER_PROBE_MS);
+  };
+
+  window.risqueArtemisDiagCardplayOrderReject = function (incoming, livePh) {
+    sendDiag({
+      kind: "cardplay_order_mirror_reject",
+      summary:
+        "P" +
+        slotLabel() +
+        " rejected playerSelect mirror (live=" +
+        String(livePh || "?") +
+        ")",
+      detail: {
+        incomingPhase: incoming ? String(incoming.phase || "") : "",
+        selectKind:
+          incoming && incoming.risquePublicUiSelectKind != null
+            ? String(incoming.risquePublicUiSelectKind)
+            : "",
+        livePhase: String(livePh || ""),
+        urlPhase: urlPhaseParam(),
+        setupComplete: !!(incoming && incoming.setupComplete),
+      },
+    });
+  };
+
+  function watchCardplayOrderPhaseEntry() {
+    if (!window.risqueArtemisLobbyStarted) return;
+    var gs = window.gameState;
+    if (!gs) return;
+    var sk = String(gs.risquePublicUiSelectKind || gs.selectionPhase || "");
+    if (String(gs.phase || "") !== "playerSelect" || sk !== "cardPlay") return;
+    if (window.__risqueArtemisCardplayOrderProbeArmed === sk) return;
+    window.__risqueArtemisCardplayOrderProbeArmed = sk;
+    if (typeof window.risqueArtemisStartCardplayOrderProbe === "function") {
+      window.risqueArtemisStartCardplayOrderProbe({ reason: "playerSelect_cardPlay_mount", selectKind: sk });
+    }
+  }
+
+  setInterval(watchCardplayOrderPhaseEntry, 1500);
+
   /** Log HUD / phase button clicks + whether anything visibly changed (~2.5s). */
   var UI_CLICK_RESPONSE_MS = 2500;
   var UI_CLICK_DEBOUNCE_MS = 350;
@@ -610,7 +742,139 @@
     wireUiClickDiagnostics();
   }
 
+  /** Forward browser console + uncaught errors to host diagnostics (batched). */
+  var CONSOLE_LINE_MAX = 480;
+  var CONSOLE_BATCH_MAX = 14;
+  var CONSOLE_FLUSH_MS = 2000;
+  var CONSOLE_QUEUE_CAP = 120;
+  var consoleQueue = [];
+  var consoleFlushTimer = null;
+
+  function consoleCaptureEnabled() {
+    return !!window.risqueArtemisMode;
+  }
+
+  function formatConsoleArg(a) {
+    if (a == null) return String(a);
+    if (typeof a === "string") return a;
+    if (typeof a === "number" || typeof a === "boolean") return String(a);
+    if (a instanceof Error) {
+      return a.stack || a.message || String(a);
+    }
+    try {
+      return JSON.stringify(a);
+    } catch (eJson) {
+      try {
+        return String(a);
+      } catch (eStr) {
+        return "[object]";
+      }
+    }
+  }
+
+  function formatConsoleLine(args) {
+    var parts = [];
+    for (var i = 0; i < args.length; i += 1) {
+      parts.push(formatConsoleArg(args[i]));
+    }
+    var text = parts.join(" ");
+    if (text.length > CONSOLE_LINE_MAX) {
+      text = text.slice(0, CONSOLE_LINE_MAX - 3) + "...";
+    }
+    return text;
+  }
+
+  function enqueueConsoleLine(level, text) {
+    if (!consoleCaptureEnabled()) return;
+    if (!text || !String(text).trim()) return;
+    consoleQueue.push({
+      level: String(level || "log"),
+      text: String(text),
+      t: Date.now(),
+    });
+    if (consoleQueue.length > CONSOLE_QUEUE_CAP) {
+      consoleQueue = consoleQueue.slice(-Math.floor(CONSOLE_QUEUE_CAP * 0.6));
+    }
+    scheduleConsoleFlush();
+  }
+
+  function scheduleConsoleFlush() {
+    if (consoleFlushTimer != null) return;
+    consoleFlushTimer = window.setTimeout(flushConsoleQueue, CONSOLE_FLUSH_MS);
+  }
+
+  function flushConsoleQueue() {
+    consoleFlushTimer = null;
+    if (!consoleQueue.length) return;
+    if (!window.risqueArtemisLobbyStarted || typeof window.risqueArtemisSend !== "function") {
+      scheduleConsoleFlush();
+      return;
+    }
+    var batch = consoleQueue.splice(0, CONSOLE_BATCH_MAX);
+    if (consoleQueue.length) scheduleConsoleFlush();
+    sendDiag({
+      kind: "browser_console",
+      summary:
+        "P" +
+        slotLabel() +
+        " console×" +
+        batch.length +
+        (batch[0] && batch[0].text ? ": " + String(batch[0].text).slice(0, 72) : ""),
+      detail: { lines: batch },
+    });
+  }
+
+  window.risqueArtemisDiagFlushConsole = function () {
+    flushConsoleQueue();
+  };
+
+  function installConsoleCapture() {
+    if (window.__risqueArtemisConsolePatched) return;
+    window.__risqueArtemisConsolePatched = true;
+    ["log", "warn", "error", "info", "debug"].forEach(function (level) {
+      var orig = console[level];
+      if (typeof orig !== "function") return;
+      console[level] = function risqueArtemisConsoleForward() {
+        var args = arguments;
+        try {
+          if (consoleCaptureEnabled()) {
+            enqueueConsoleLine(level, formatConsoleLine(args));
+          }
+        } catch (eCap) {
+          /* ignore capture errors */
+        }
+        return orig.apply(console, args);
+      };
+    });
+    window.addEventListener("error", function (ev) {
+      try {
+        if (!consoleCaptureEnabled()) return;
+        var loc = ev.filename ? String(ev.filename) : "";
+        if (ev.lineno) loc += ":" + ev.lineno;
+        enqueueConsoleLine(
+          "error",
+          "[uncaught] " + String(ev.message || "error") + (loc ? " @ " + loc : "")
+        );
+      } catch (eErr) {
+        /* ignore */
+      }
+    });
+    window.addEventListener("unhandledrejection", function (ev) {
+      try {
+        if (!consoleCaptureEnabled()) return;
+        enqueueConsoleLine("error", "[unhandledrejection] " + formatConsoleLine([ev.reason]));
+      } catch (eRej) {
+        /* ignore */
+      }
+    });
+  }
+
+  installConsoleCapture();
+
   window.risqueArtemisDiagOpenReport = function () {
+    if (typeof window.risqueArtemisDiagFlushConsole === "function") {
+      window.risqueArtemisDiagFlushConsole();
+    }
     var url = "/api/artemis/diag";
     try {
       window.open(url, "_blank");

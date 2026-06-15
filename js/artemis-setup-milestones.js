@@ -21,5 +21,12 @@
     } catch (eLog) {
       /* ignore */
     }
+    if (typeof window.risqueArtemisDiag === "function") {
+      try {
+        window.risqueArtemisDiag("setup_milestone", id, detail != null ? { detail: String(detail) } : null);
+      } catch (eDiag) {
+        /* ignore */
+      }
+    }
   };
 })();
