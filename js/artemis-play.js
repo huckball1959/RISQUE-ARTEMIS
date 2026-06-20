@@ -131,6 +131,17 @@
     return 0;
   }
 
+  /** Turn deploy: currentPlayer roster slot wins over stale artemisControlSlot on the host. */
+  function artemisHostTurnDeployActiveSlot(gs) {
+    if (!gs) return 0;
+    if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
+      window.risqueArtemisResolveOwnerSlot(gs);
+    }
+    var fromPlayer = activePlayerSlot(gs);
+    if (fromPlayer >= 1) return fromPlayer;
+    return Number(gs.artemisControlSlot) || 0;
+  }
+
   function isSetupDeploy(gs) {
     if (typeof window.risqueArtemisIsSetupDeploy === "function") {
       return window.risqueArtemisIsSetupDeploy(gs);
@@ -603,7 +614,7 @@
             window.risqueArtemisResolveOwnerSlot(gs);
           }
           var hostLocal = myLocalSlot();
-          var hostActive = Number(gs.artemisControlSlot) || activePlayerSlot(gs);
+          var hostActive = artemisHostTurnDeployActiveSlot(gs);
           if (hostLocal >= 1 && hostActive === hostLocal) {
             window.risqueArtemisDeployHandoffPending = 0;
             window.risqueArtemisDeployPushLocked = false;
@@ -620,11 +631,8 @@
           }
         }
         if (deployRouteHost === "turn" || deployRouteHost === "deploy2") {
-          if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
-            window.risqueArtemisResolveOwnerSlot(gs);
-          }
           var hostLocalTurn = myLocalSlot();
-          var hostActiveTurn = Number(gs.artemisControlSlot) || activePlayerSlot(gs);
+          var hostActiveTurn = artemisHostTurnDeployActiveSlot(gs);
           if (hostLocalTurn >= 1 && hostActiveTurn === hostLocalTurn) {
             window.risqueArtemisDeployHandoffPending = 0;
             window.risqueArtemisDeployPushLocked = false;
@@ -791,7 +799,7 @@
           window.risqueArtemisResolveOwnerSlot(gs);
         }
         var hostLocal = myLocalSlot();
-        var hostActive = Number(gs.artemisControlSlot) || activePlayerSlot(gs);
+        var hostActive = artemisHostTurnDeployActiveSlot(gs);
         if (hostLocal >= 1 && hostActive === hostLocal) {
           window.risqueArtemisDeployHandoffPending = 0;
           window.risqueArtemisDeployPushLocked = false;
@@ -814,7 +822,7 @@
           window.risqueArtemisStampControlSlot(gs);
         }
         var hostLocalTurnPlay = myLocalSlot();
-        var hostActiveTurnPlay = Number(gs.artemisControlSlot) || activePlayerSlot(gs);
+        var hostActiveTurnPlay = artemisHostTurnDeployActiveSlot(gs);
         if (hostLocalTurnPlay >= 1 && hostActiveTurnPlay === hostLocalTurnPlay) {
           window.risqueArtemisDeployHandoffPending = 0;
           window.risqueArtemisDeployPushLocked = false;
@@ -937,7 +945,10 @@
     if (route !== "turn" && route !== "deploy2") {
       return false;
     }
-    if (document.getElementById("confirm") && document.getElementById("bank-number")) return true;
+    if (document.getElementById("confirm")) {
+      if (window.risqueArtemisMode) return true;
+      if (document.getElementById("bank-number")) return true;
+    }
     return false;
   };
 
@@ -1532,20 +1543,11 @@
       if (typeof window.risqueArtemisClearIncomeVoiceDom === "function") {
         window.risqueArtemisClearIncomeVoiceDom();
       }
-      var setupDep =
-        typeof window.risqueArtemisIsSetupDeploy === "function" &&
-        window.risqueArtemisIsSetupDeploy(gs);
       if (mine) {
-        if (setupDep) {
-          window.risqueRuntimeHud.setControlVoiceText(
-            nameU + " — FIRST DEPLOYMENT",
-            "Place starting troops from your bank."
-          );
-        } else {
-          window.risqueRuntimeHud.setControlVoiceText(
-            nameU + " — DEPLOYMENT",
-            "Deploy income troops from your bank."
-          );
+        if (typeof window.risqueArtemisApplyDeployVoiceFromState === "function") {
+          window.risqueArtemisApplyDeployVoiceFromState(gs);
+        } else if (typeof window.risqueRefreshDeployNarration === "function") {
+          window.risqueRefreshDeployNarration(gs);
         }
       } else if (typeof window.risqueArtemisRefreshDeploySpectator === "function") {
         window.risqueArtemisRefreshDeploySpectator(gs);
@@ -1562,6 +1564,13 @@
     if (ph === "attack" || ph === "reinforce") {
       if (typeof window.risqueArtemisClearIncomeVoiceDom === "function") {
         window.risqueArtemisClearIncomeVoiceDom();
+      }
+      if (
+        ph === "attack" &&
+        typeof window.risqueIsAttackCampaignMapPlanning === "function" &&
+        window.risqueIsAttackCampaignMapPlanning()
+      ) {
+        return;
       }
       if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
         window.risquePublicApplyVoiceAndLogMirror(gs);
@@ -2567,7 +2576,9 @@
       return window.gameUtils.resolveTerritoryLabelFromMapTarget(target);
     }
     if (!target || !target.closest) return null;
-    var hit = target.closest(".territory-hit, .territory-circle, .territory-number, .territory-mgm-hit");
+    var hit = target.closest(
+      ".territory-hit, .territory-circle, .territory-number, .territory-mgm-hit, .territory-circle-outline, .territory-troop-fill, .territory-troop-notches, .territory-marker-inner, .territory-deploy-satellite"
+    );
     if (!hit) return null;
     return hit.getAttribute("data-label") || (hit.dataset && hit.dataset.label) || null;
   }

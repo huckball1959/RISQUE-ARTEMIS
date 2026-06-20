@@ -1454,6 +1454,19 @@
     );
   }
 
+  /** ARTEMIS reinforce: spectators need live wheel preview while board troops stay frozen. */
+  function risqueArtemisAttachLiveReinforcePreview(out, gs) {
+    if (!window.risqueArtemisMode || !out || !gs) return;
+    if (String(out.phase || "") !== "reinforce") return;
+    if (gs.risqueReinforcePreview && typeof gs.risqueReinforcePreview === "object") {
+      try {
+        out.risqueReinforcePreview = JSON.parse(JSON.stringify(gs.risqueReinforcePreview));
+      } catch (eRfPrev) {
+        out.risqueReinforcePreview = gs.risqueReinforcePreview;
+      }
+    }
+  }
+
   /** ARTEMIS turn deploy: spectators need live draft + voice while board troops stay frozen. */
   function risqueArtemisAttachLiveDeployMirrorDraft(out, gs) {
     if (!window.risqueArtemisMode || !out || !gs) return;
@@ -1497,7 +1510,11 @@
     var spectatorDraftFirst =
       window.risqueArtemisMode &&
       (window.risqueDisplayIsPublic ||
-        (typeof window.risqueArtemisIsMyTurn === "function" && !window.risqueArtemisIsMyTurn(gs)));
+        (typeof window.risqueArtemisIsMyTurn === "function" && !window.risqueArtemisIsMyTurn(gs)) ||
+        (window.risqueArtemisHost &&
+          !window.risqueArtemisNetClient &&
+          typeof window.risqueArtemisIsMyTurn === "function" &&
+          !window.risqueArtemisIsMyTurn(gs)));
     if (spectatorDraftFirst) {
       var draftSpec =
         gs.risqueDeployMirrorDraft && typeof gs.risqueDeployMirrorDraft === "object"
@@ -2395,10 +2412,18 @@
       ) {
         var skipArtemisDeployStamp =
           window.risqueArtemisHost &&
+          typeof window.risqueArtemisIsMyTurn === "function" &&
+          !window.risqueArtemisIsMyTurn(gs);
+        if (
+          !skipArtemisDeployStamp &&
+          window.risqueArtemisHost &&
           typeof window.risqueArtemisIsSetupDeploy === "function" &&
           window.risqueArtemisIsSetupDeploy(gs) &&
           typeof window.risqueArtemisLocalOwnsSetupDeploy === "function" &&
-          !window.risqueArtemisLocalOwnsSetupDeploy(gs);
+          !window.risqueArtemisLocalOwnsSetupDeploy(gs)
+        ) {
+          skipArtemisDeployStamp = true;
+        }
         if (!skipArtemisDeployStamp) {
           risqueArtemisStampDeployMirrorDraftOnState(gs);
         }
@@ -2528,9 +2553,13 @@
           }
         }
         delete out.risqueDeployMirrorDraft;
-        delete out.risqueReinforcePreview;
         delete out.risqueTransferPulse;
         risqueArtemisAttachLiveDeployMirrorDraft(out, gs);
+        if (String(phMir) === "reinforce") {
+          risqueArtemisAttachLiveReinforcePreview(out, gs);
+        } else {
+          delete out.risqueReinforcePreview;
+        }
         if (Array.isArray(out.risqueSpectatorFocusLabels)) {
           out.risqueSpectatorFocusLabels = [];
         } else {
@@ -2692,9 +2721,11 @@
         var skipHostDeployMirrorSync =
           (phHostMir === "deploy" || phHostMir === "con-deploy") &&
           (window.__risqueArtemisTurnDeployMountInProgress ||
+            window.__risqueArtemisTurnDeployLocalEdit ||
+            (typeof window.risqueArtemisHostTurnDeployLocalOwnsLiveState === "function" &&
+              window.risqueArtemisHostTurnDeployLocalOwnsLiveState(gs)) ||
             (window.__risqueArtemisTurnDeployControlsLive &&
               document.getElementById("confirm") &&
-              document.getElementById("bank-number") &&
               typeof window.risqueArtemisLocalOwnsTurnDeploy === "function" &&
               window.risqueArtemisLocalOwnsTurnDeploy(gs)));
         if (
@@ -2880,6 +2911,15 @@
   /** Stamp live deploy deltas on mirrored gameState (ARTEMIS real-time setup deploy). */
   function risqueArtemisStampDeployMirrorDraftOnState(gs) {
     if (!gs || String(gs.phase || "") !== "deploy") return;
+    /* Host spectating a client deploy: keep mirrored draft from player_state — do not stamp empty local troops. */
+    if (
+      window.risqueArtemisHost &&
+      !window.risqueArtemisNetClient &&
+      typeof window.risqueArtemisIsMyTurn === "function" &&
+      !window.risqueArtemisIsMyTurn(gs)
+    ) {
+      return;
+    }
     if (typeof window.risqueArtemisSanitizeDeployMirrorDraft === "function") {
       window.risqueArtemisSanitizeDeployMirrorDraft(gs);
     }
@@ -2930,7 +2970,8 @@
     }
     gs.risqueDeployMirrorDraft = {
       deltas: deltasCopy,
-      selected: sel
+      selected: sel,
+      controlSlot: Number(gs.artemisControlSlot) || 0
     };
     if (window.risqueArtemisMode) {
       delete gs.risqueDeploySuppressPublicSpectator;
@@ -3644,7 +3685,15 @@
         document.body.removeAttribute("data-risque-public-hide-cursor");
         risquePublicApplyCursorMirror();
       } else {
-        document.body.removeAttribute("data-risque-show-public-dice");
+        if (
+          document.body.classList.contains("risque-artemis-attack-spectator") &&
+          gs &&
+          String(gs.phase || "") === "attack"
+        ) {
+          document.body.setAttribute("data-risque-show-public-dice", "1");
+        } else {
+          document.body.removeAttribute("data-risque-show-public-dice");
+        }
         document.body.removeAttribute("data-risque-public-hide-cursor");
       }
       syncHostHudStatsColumnRetiredClass(gs);
@@ -5346,17 +5395,24 @@
         cv && cv.primary != null ? String(cv.primary).trim() : "";
       var bannerDeploy =
         gs.risquePublicDeployBanner != null ? String(gs.risquePublicDeployBanner).trim() : "";
+      var builtSpecDeploy =
+        typeof window.risqueBuildDeployVoiceLinesFromState === "function"
+          ? window.risqueBuildDeployVoiceLinesFromState(gs, { includeDeployerName: true })
+          : null;
       if (deployLocalActive) {
-        if (cvDeployPri) {
+        var builtOwnerDeploy =
+          typeof window.risqueBuildDeployVoiceLinesFromState === "function"
+            ? window.risqueBuildDeployVoiceLinesFromState(gs)
+            : null;
+        if (builtOwnerDeploy && builtOwnerDeploy.primary) {
+          basePrimary = builtOwnerDeploy.primary;
+        } else if (cvDeployPri) {
           basePrimary = risquePublicSanitizeControlVoicePrimary(cv.primary);
           if (!basePrimary) basePrimary = cvDeployPri;
-        } else if (String(gs.currentPlayer || "").trim() !== "") {
-          basePrimary =
-            String(gs.currentPlayer || "")
-              .trim()
-              .toUpperCase() + "\nDEPLOY ALL TROOPS FROM YOUR BANK";
         }
-        if (cv && cv.report != null && String(cv.report).trim() !== "") {
+        if (builtOwnerDeploy && builtOwnerDeploy.report) {
+          reportText = builtOwnerDeploy.report;
+        } else if (cv && cv.report != null && String(cv.report).trim() !== "") {
           reportText = String(cv.report).trim();
         }
       } else {
@@ -5366,7 +5422,9 @@
         }
         if (specDeployLine) {
           basePrimary = specDeployLine;
-        } else if (bannerDeploy) {
+        } else if (builtSpecDeploy && builtSpecDeploy.primary) {
+          basePrimary = builtSpecDeploy.primary;
+        } else if (bannerDeploy && !/IS DEPLOYING/i.test(bannerDeploy)) {
           basePrimary = bannerDeploy;
         } else if (
           window.__risqueArtemisPinnedDeployWaitLine &&
@@ -5378,7 +5436,7 @@
           if (!curDeploy || pinnedWait.toUpperCase().indexOf(curDeploy) >= 0) {
             basePrimary = pinnedWait;
           }
-        } else if (cvDeployPri) {
+        } else if (cvDeployPri && !/IS DEPLOYING/i.test(cvDeployPri) && !/from your bank/i.test(cvDeployPri)) {
           basePrimary = risquePublicSanitizeControlVoicePrimary(cv.primary);
           if (!basePrimary) basePrimary = cvDeployPri;
         } else if (
@@ -5388,22 +5446,36 @@
         ) {
           basePrimary =
             "WAITING FOR " + String(gs.currentPlayer || "NEXT").toUpperCase() + " TO DEPLOY";
-        } else if (
-          window.risqueArtemisNetClient &&
-          !window.risqueArtemisHost &&
-          String(gs.currentPlayer || "").trim() !== ""
-        ) {
-          basePrimary =
-            bannerDeploy ||
-            String(gs.currentPlayer || "")
-              .trim()
-              .toUpperCase() +
-              " IS DEPLOYING TROOPS";
+        } else if (String(gs.currentPlayer || "").trim() !== "") {
+          if (builtSpecDeploy && builtSpecDeploy.primary) {
+            basePrimary = builtSpecDeploy.primary;
+          } else {
+            basePrimary =
+              "WAITING FOR " +
+              String(gs.currentPlayer || "NEXT")
+                .trim()
+                .toUpperCase() +
+              " TO DEPLOY";
+          }
         }
       }
       if (!reportText) {
-        reportText =
-          gs.risquePublicDeployReport != null ? String(gs.risquePublicDeployReport).trim() : "";
+        if (builtSpecDeploy && builtSpecDeploy.report) {
+          reportText = builtSpecDeploy.report;
+        } else {
+          reportText =
+            gs.risquePublicDeployReport != null ? String(gs.risquePublicDeployReport).trim() : "";
+        }
+      }
+      if (
+        !deployLocalActive &&
+        reportText &&
+        typeof window.risqueDeploySanitizeSpectatorReport === "function"
+      ) {
+        reportText = window.risqueDeploySanitizeSpectatorReport(reportText);
+        if (!reportText && builtSpecDeploy && builtSpecDeploy.report) {
+          reportText = builtSpecDeploy.report;
+        }
       }
       reportClassName = "ucp-voice-report ucp-voice-report--public-deploy";
     } else if (
@@ -5557,9 +5629,11 @@
       /^(receivecard|getcard|con-receivecard)$/i.test(String(gs.phase || ""))
     ) {
       var pubRcPlayer = gs.currentPlayer ? String(gs.currentPlayer).trim() : "";
-      if (pubRcPlayer) {
-        basePrimary = pubRcPlayer.toUpperCase() + " RECEIVES CARD";
-      }
+      var specRc =
+        gs.risquePublicReceiveCardSpectator &&
+        typeof gs.risquePublicReceiveCardSpectator === "object"
+          ? gs.risquePublicReceiveCardSpectator
+          : {};
       var pubRcN = 0;
       try {
         var pubRcPl = (gs.players || []).find(function (p) {
@@ -5569,7 +5643,31 @@
       } catch (ePubRc) {
         pubRcN = 0;
       }
-      reportText = "TOTAL CARDS IN HAND = " + pubRcN;
+      var pubRcHandN =
+        typeof risquePublicSpectatorHandCountFromGs === "function"
+          ? risquePublicSpectatorHandCountFromGs(gs)
+          : pubRcN;
+      var rcReceived =
+        !!gs.cardAwardedThisTurn &&
+        pubRcHandN > 0 &&
+        (!specRc.showStaging || specRc.stagingMerged === true);
+      if (pubRcPlayer) {
+        if (rcReceived) {
+          var rcDisp =
+            gs.risquePublicCardplaySpectatorPlayer != null &&
+            String(gs.risquePublicCardplaySpectatorPlayer).trim() !== ""
+              ? String(gs.risquePublicCardplaySpectatorPlayer).trim()
+              : pubRcPlayer.charAt(0).toUpperCase() + pubRcPlayer.slice(1);
+          basePrimary = rcDisp.toUpperCase() + " HAS RECEIVED A CARD";
+          reportText = risquePublicFormatCardplaySpectatorHandLine(gs);
+        } else if (specRc.showStaging && (Number(specRc.stagingBackCount) > 0 || gs.cardAwardedThisTurn)) {
+          basePrimary = pubRcPlayer.toUpperCase() + " RECEIVES CARD";
+          reportText = "Card drawn — adding to hand…";
+        } else {
+          basePrimary = pubRcPlayer.toUpperCase() + " RECEIVES CARD";
+          reportText = "Waiting…";
+        }
+      }
       reportClassName = "ucp-voice-report ucp-voice-report--public-receivecard";
     }
 
@@ -5614,10 +5712,17 @@
         window.risqueArtemisLocalOwnsSetupDeploy(gs)) ||
         (typeof window.risqueArtemisIsMyTurn === "function" && window.risqueArtemisIsMyTurn(gs)));
 
+    var skipHostVoiceMirrorForCampaignMapPlanning =
+      !window.risqueDisplayIsPublic &&
+      String(gs.phase || "") === "attack" &&
+      typeof window.risqueIsAttackCampaignMapPlanning === "function" &&
+      window.risqueIsAttackCampaignMapPlanning();
+
     var skipHostVoiceMirrorClobber =
       skipHostVoiceMirrorForAttackXfer ||
       skipHostVoiceMirrorForConquestCeleb ||
-      skipHostVoiceMirrorForSetupDeployActive;
+      skipHostVoiceMirrorForSetupDeployActive ||
+      skipHostVoiceMirrorForCampaignMapPlanning;
 
     var conquestCelebHtml =
       gs &&
@@ -8565,7 +8670,14 @@
    * Public TV receive-card: private hint + in-hand / staging card backs (mirrors host layout, no faces).
    */
   function risquePublicEnsureReceiveCardPrivateHint(gs) {
-    if (!window.risqueDisplayIsPublic || !gs) return;
+    var artemisHostSpectate =
+      !window.risqueDisplayIsPublic &&
+      window.risqueArtemisHost &&
+      !window.risqueArtemisNetClient &&
+      gs &&
+      typeof window.risqueArtemisIsMyTurn === "function" &&
+      !window.risqueArtemisIsMyTurn(gs);
+    if ((!window.risqueDisplayIsPublic && !artemisHostSpectate) || !gs) return;
     var ph = String(gs.phase || "");
     var slot = document.getElementById("risque-phase-content");
     if (ph !== "receivecard" && ph !== "con-receivecard" && ph !== "getcard") {
@@ -12725,6 +12837,20 @@
       state = window.gameState;
     }
     if (
+      !window.risqueDisplayIsPublic &&
+      window.risqueArtemisMode &&
+      window.risqueArtemisHost &&
+      !window.risqueArtemisNetClient &&
+      window.gameState &&
+      typeof window.gameState === "object" &&
+      String(window.gameState.phase || "") === "deploy" &&
+      typeof window.risqueArtemisLocalOwnsTurnDeploy === "function" &&
+      window.risqueArtemisLocalOwnsTurnDeploy(window.gameState)
+    ) {
+      /* Active turn deploy owner: local wheel/reset owns troops + CV — never rewind shell state. */
+      state = window.gameState;
+    }
+    if (
       window.risqueArtemisMode &&
       window.risqueArtemisNetClient &&
       !window.risqueArtemisHost &&
@@ -12752,6 +12878,35 @@
     if (
       !window.risqueDisplayIsPublic &&
       window.risqueArtemisHost &&
+      !window.risqueArtemisNetClient &&
+      window.gameState &&
+      state &&
+      String(window.gameState.phase || "") === "deploy" &&
+      typeof window.risqueArtemisIsMyTurn === "function" &&
+      !window.risqueArtemisIsMyTurn(window.gameState)
+    ) {
+      try {
+        if (
+          window.gameState.risqueDeployMirrorDraft &&
+          typeof window.gameState.risqueDeployMirrorDraft === "object"
+        ) {
+          state.risqueDeployMirrorDraft = JSON.parse(
+            JSON.stringify(window.gameState.risqueDeployMirrorDraft)
+          );
+        }
+        if (window.gameState.risquePublicDeployBanner) {
+          state.risquePublicDeployBanner = window.gameState.risquePublicDeployBanner;
+        }
+        if (window.gameState.risquePublicDeployReport != null) {
+          state.risquePublicDeployReport = window.gameState.risquePublicDeployReport;
+        }
+      } catch (eHostDepMir) {
+        /* ignore */
+      }
+    }
+    if (
+      !window.risqueDisplayIsPublic &&
+      window.risqueArtemisHost &&
       window.gameState &&
       state &&
       String(window.gameState.phase || "") === "attack" &&
@@ -12768,9 +12923,30 @@
         if (window.gameState.risqueCombatLogTail) {
           state.risqueCombatLogTail = window.gameState.risqueCombatLogTail;
         }
+        if (window.gameState.risqueAttackOutcomePrimary) {
+          state.risqueAttackOutcomePrimary = window.gameState.risqueAttackOutcomePrimary;
+        }
+        if (window.gameState.risqueAttackOutcomeReport) {
+          state.risqueAttackOutcomeReport = window.gameState.risqueAttackOutcomeReport;
+        }
+        if (window.gameState.risqueAttackOutcomeAcquisition) {
+          state.risqueAttackOutcomeAcquisition = window.gameState.risqueAttackOutcomeAcquisition;
+        }
       } catch (eHostAtkDice) {
         /* ignore */
       }
+    }
+    if (
+      window.risqueArtemisHost &&
+      !window.risqueArtemisNetClient &&
+      window.gameState &&
+      state &&
+      String(window.gameState.phase || "") === "attack" &&
+      typeof window.risqueArtemisShouldHostMountAttack === "function" &&
+      !window.risqueArtemisShouldHostMountAttack(window.gameState)
+    ) {
+      /* Host spectating client attack: live troops + dice from attack_live / player_state. */
+      state = window.gameState;
     }
     if (
       window.risqueArtemisHost &&
@@ -12996,8 +13172,8 @@
           var skipHostTurnDeployMapPaint =
             window.risqueArtemisHost &&
             !window.risqueArtemisNetClient &&
-            typeof window.risqueArtemisClientHasActiveDeploySession === "function" &&
-            window.risqueArtemisClientHasActiveDeploySession();
+            typeof window.risqueArtemisHostTurnDeployLocalOwnsLiveState === "function" &&
+            window.risqueArtemisHostTurnDeployLocalOwnsLiveState(state);
           if (!skipHostTurnDeployMapPaint) {
             risqueArtemisPaintDeployMapFromState(state);
           }
@@ -13016,10 +13192,16 @@
               typeof window.risqueArtemisLocalOwnsTurnDeploy === "function" &&
               window.risqueArtemisLocalOwnsTurnDeploy(state);
             if (hostOwnsTurnDeployPaint) {
-              if (typeof window.risqueArtemisApplyDeployVoiceFromState === "function") {
+              if (
+                !window.__risqueArtemisTurnDeployLocalEdit &&
+                typeof window.risqueArtemisApplyDeployVoiceFromState === "function"
+              ) {
                 window.risqueArtemisApplyDeployVoiceFromState(state);
               }
-              if (typeof window.risqueArtemisEnsureTurnDeployInteractive === "function") {
+              if (
+                !window.__risqueArtemisTurnDeployLocalEdit &&
+                typeof window.risqueArtemisEnsureTurnDeployInteractive === "function"
+              ) {
                 window.risqueArtemisEnsureTurnDeployInteractive(state);
               }
             } else if (typeof window.risqueArtemisRefreshDeploySpectator === "function") {
@@ -13049,7 +13231,19 @@
             }
           }
         }
-        risquePublicApplyVoiceAndLogMirror(state);
+        if (
+          !(
+            !window.risqueDisplayIsPublic &&
+            window.risqueArtemisHost &&
+            !window.risqueArtemisNetClient &&
+            state &&
+            String(state.phase || "") === "deploy" &&
+            typeof window.risqueArtemisHostTurnDeployLocalOwnsLiveState === "function" &&
+            window.risqueArtemisHostTurnDeployLocalOwnsLiveState(state)
+          )
+        ) {
+          risquePublicApplyVoiceAndLogMirror(state);
+        }
         if (
           !window.risqueDisplayIsPublic &&
           window.risqueArtemisHost &&
@@ -13084,6 +13278,21 @@
           try {
             window.risqueArtemisApplyHostReinforceSpectator(state);
           } catch (eHostRfPaint) {
+            /* ignore */
+          }
+        }
+        if (
+          !window.risqueDisplayIsPublic &&
+          window.risqueArtemisHost &&
+          state &&
+          /^(receivecard|getcard)$/i.test(String(state.phase || "")) &&
+          typeof window.risqueArtemisIsMyTurn === "function" &&
+          !window.risqueArtemisIsMyTurn(state) &&
+          typeof window.risquePublicEnsureReceiveCardPrivateHint === "function"
+        ) {
+          try {
+            window.risquePublicEnsureReceiveCardPrivateHint(state);
+          } catch (eHostRcHint) {
             /* ignore */
           }
         }

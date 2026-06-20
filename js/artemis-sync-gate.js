@@ -86,53 +86,28 @@
     }
   }
 
-  function ensureSyncStrip() {
-    if (syncStripEl) return syncStripEl;
-    var bar = document.getElementById("risque-artemis-top-bar");
-    if (!bar) return null;
-    syncStripEl = document.getElementById("risque-artemis-sync-strip");
-    if (!syncStripEl) {
-      syncStripEl = document.createElement("span");
-      syncStripEl.id = "risque-artemis-sync-strip";
-      syncStripEl.className = "risque-artemis-sync-strip";
-      syncStripEl.setAttribute("aria-live", "polite");
-      var status = document.getElementById("risque-artemis-top-status");
-      if (status && status.nextSibling) {
-        bar.insertBefore(syncStripEl, status.nextSibling);
-      } else {
-        bar.appendChild(syncStripEl);
-      }
+  /** On-screen SYNC strip retired — barriers/heartbeats still run; diagnostics only. */
+  function hideSyncUi() {
+    var strip = document.getElementById("risque-artemis-sync-strip");
+    if (strip) {
+      strip.textContent = "";
+      strip.hidden = true;
+      strip.style.display = "none";
     }
-    bar.hidden = false;
-    return syncStripEl;
+    syncStripEl = strip;
+  }
+
+  function ensureSyncStrip() {
+    hideSyncUi();
+    return null;
   }
 
   function renderSyncStrip(text, kind) {
-    var el = ensureSyncStrip();
-    if (!el) return;
-    el.textContent = text || "";
-    el.setAttribute("data-kind", kind || "ok");
-    if (typeof window.risqueArtemisScheduleLayoutSync === "function") {
-      window.risqueArtemisScheduleLayoutSync();
-    }
+    hideSyncUi();
   }
 
   window.risqueArtemisRenderPhaseMismatchStrip = function () {
-    if (activeBarrier) return;
-    var rej = window.__risqueArtemisLastMirrorReject;
-    if (
-      !rej ||
-      !rej.livePhase ||
-      !rej.incomingPhase ||
-      Date.now() - (Number(rej.at) || 0) > 45000
-    ) {
-      renderSyncStrip("", "ok");
-      return;
-    }
-    renderSyncStrip(
-      "SYNC phase stuck: you " + rej.livePhase + ", host " + rej.incomingPhase,
-      "warn"
-    );
+    hideSyncUi();
   };
 
   function noteMirrorApplied() {
@@ -481,4 +456,6 @@
       slot: slotNum(),
     });
   }
+
+  hideSyncUi();
 })();

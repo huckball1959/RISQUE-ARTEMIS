@@ -11023,6 +11023,8 @@ html.risque-artemis-client .risque-artemis-top-bar {
 }
 
 .risque-artemis-sync-strip {
+  display: none !important;
+  visibility: hidden !important;
   flex: 0 1 auto;
   max-width: 55%;
   overflow: hidden;
@@ -11046,10 +11048,12 @@ html.risque-artemis-client .risque-artemis-top-bar {
 }
 
 .risque-artemis-beat-sync-overlay {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
   position: fixed;
   inset: 0;
   z-index: 100010;
-  display: flex;
   align-items: flex-end;
   justify-content: center;
   padding: 0 16px calc(var(--risque-artemis-bar-h, 34px) + 16px);
@@ -11684,6 +11688,34 @@ html.risque-artemis-host.risque-artemis-my-turn #canvas .svg-overlay .territory-
 html.risque-artemis-host.risque-artemis-my-turn #canvas .svg-overlay .territory-number {
   pointer-events: none !important;
   cursor: default;
+}
+/* Attack / reinforce: whole marker (fill, ring, number, notches) is clickable. */
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="attack"] #canvas .svg-overlay .territory-circle,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="attack"] #canvas .svg-overlay .territory-circle-outline,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="attack"] #canvas .svg-overlay .territory-number,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="attack"] #canvas .svg-overlay .territory-troop-fill,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="attack"] #canvas .svg-overlay .territory-troop-notches,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="attack"] #canvas .svg-overlay .territory-marker-inner,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="reinforce"] #canvas .svg-overlay .territory-circle,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="reinforce"] #canvas .svg-overlay .territory-circle-outline,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="reinforce"] #canvas .svg-overlay .territory-number,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="reinforce"] #canvas .svg-overlay .territory-troop-fill,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="reinforce"] #canvas .svg-overlay .territory-troop-notches,
+html.risque-artemis-client.risque-artemis-my-turn body[data-risque-phase="reinforce"] #canvas .svg-overlay .territory-marker-inner,
+html.risque-artemis-host.risque-artemis-my-turn body[data-risque-phase="attack"] #canvas .svg-overlay .territory-circle,
+html.risque-artemis-host.risque-artemis-my-turn body[data-risque-phase="attack"] #canvas .svg-overlay .territory-circle-outline,
+html.risque-artemis-host.risque-artemis-my-turn body[data-risque-phase="attack"] #canvas .svg-overlay .territory-number,
+html.risque-artemis-host.risque-artemis-my-turn body[data-risque-phase="attack"] #canvas .svg-overlay .territory-troop-fill,
+html.risque-artemis-host.risque-artemis-my-turn body[data-risque-phase="attack"] #canvas .svg-overlay .territory-troop-notches,
+html.risque-artemis-host.risque-artemis-my-turn body[data-risque-phase="attack"] #canvas .svg-overlay .territory-marker-inner,
+html.risque-artemis-host.risque-artemis-my-turn body[data-risque-phase="reinforce"] #canvas .svg-overlay .territory-circle,
+html.risque-artemis-host.risque-artemis-my-turn body[data-risque-phase="reinforce"] #canvas .svg-overlay .territory-circle-outline,
+html.risque-artemis-host.risque-artemis-my-turn body[data-risque-phase="reinforce"] #canvas .svg-overlay .territory-number,
+html.risque-artemis-host.risque-artemis-my-turn body[data-risque-phase="reinforce"] #canvas .svg-overlay .territory-troop-fill,
+html.risque-artemis-host.risque-artemis-my-turn body[data-risque-phase="reinforce"] #canvas .svg-overlay .territory-troop-notches,
+html.risque-artemis-host.risque-artemis-my-turn body[data-risque-phase="reinforce"] #canvas .svg-overlay .territory-marker-inner {
+  pointer-events: auto !important;
+  cursor: pointer;
 }
 
 /* Pass map clicks through the full-screen ui-overlay; only HUD + deploy dock capture input */

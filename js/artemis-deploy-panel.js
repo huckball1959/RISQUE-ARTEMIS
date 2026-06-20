@@ -99,6 +99,8 @@
     try {
       delete gs.risqueDeployMirrorDraft;
       delete gs.risqueDeployTransientPrimary;
+      delete gs.risqueDeploySessionTroopTotal;
+      delete gs.risqueDeploySessionBudgetSlot;
     } catch (eDraftClr) {
       /* ignore */
     }
@@ -196,7 +198,31 @@
   }
 
   function deployTurnSessionNeedsReset(gs) {
-    if (!gs || String(gs.phase || "") !== "deploy" || isSetupDeploy(gs)) return false;
+    if (!gs || String(gs.phase || "") !== "deploy") return false;
+    if (artemisClientSpectatesDeploy(gs)) {
+      return deploySpectatorCtrlHandoffChanged(gs);
+    }
+    if (isSetupDeploy(gs)) {
+      if (deploySpectatorHandoffChanged(gs)) return true;
+      var setupDraft =
+        gs.risqueDeployMirrorDraft &&
+        typeof gs.risqueDeployMirrorDraft === "object"
+          ? gs.risqueDeployMirrorDraft
+          : null;
+      if (
+        setupDraft &&
+        setupDraft.selected != null &&
+        String(setupDraft.selected).trim() !== "" &&
+        !deployTerritoryOwnedByCurrent(gs, setupDraft.selected)
+      ) {
+        return true;
+      }
+      if (window.selectedTerritory != null && String(window.selectedTerritory).trim() !== "") {
+        if (!deployTerritoryOwnedByCurrent(gs, window.selectedTerritory)) return true;
+      }
+      return false;
+    }
+    if (!isTurnDeployRoute(gs)) return false;
     if (
       isTurnDeployRoute(gs) &&
       typeof window.risqueArtemisLocalOwnsTurnDeploy === "function" &&
@@ -341,6 +367,26 @@
     }
     return isMine(gs);
   }
+
+  /** Host income-cycle deploy: wheel/reset owns troops — mirror ticks must not swap gameState or repaint. */
+  function hostTurnDeployLocalOwnsLiveState(gs) {
+    if (!isTurnDeployRoute(gs)) return false;
+    if (typeof window.risqueArtemisIsMyTurn === "function" && !window.risqueArtemisIsMyTurn(gs)) {
+      return false;
+    }
+    if (!hostIsActiveDeployOwner(gs)) return false;
+    if (window.__risqueArtemisTurnDeployLocalEdit) return true;
+    if (window.__risqueArtemisTurnDeployControlsLive) return true;
+    if (
+      typeof window.risqueArtemisClientHasActiveDeploySession === "function" &&
+      window.risqueArtemisClientHasActiveDeploySession()
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  window.risqueArtemisHostTurnDeployLocalOwnsLiveState = hostTurnDeployLocalOwnsLiveState;
 
   function mayStampLocalDeploySelection(gs) {
     if (!gs || String(gs.phase || "") !== "deploy") return false;
@@ -576,6 +622,10 @@
   function deploySpectatorSanitizeReport(gs, repLine) {
     repLine = String(repLine || "").trim();
     if (!repLine) return "";
+    if (typeof window.risqueDeploySanitizeSpectatorReport === "function") {
+      repLine = window.risqueDeploySanitizeSpectatorReport(repLine);
+      if (!repLine) return "";
+    }
     var active = deployingPlayerRecord(gs);
     var bank = active ? Number(active.bankValue) || 0 : -1;
     var lower = repLine.toLowerCase();
@@ -634,41 +684,51 @@
 
   function deploySpectatorLiveNarrationLine(gs) {
     if (!gs) return "";
-    var troopPhrase = deploySpectatorDraftTroopPhrase(gs);
-    if (troopPhrase) {
-      return troopPhrase;
+    if (typeof window.risqueBuildDeployVoiceLinesFromState === "function") {
+      var built = window.risqueBuildDeployVoiceLinesFromState(gs, { includeDeployerName: true });
+      if (built && built.primary && !deploySpectatorWaitBanner(built.primary)) {
+        return built.primary;
+      }
     }
     var banner = String(gs.risquePublicDeployBanner || "").trim();
-    if (banner && !deploySpectatorWaitBanner(banner)) {
+    if (
+      banner &&
+      !deploySpectatorWaitBanner(banner) &&
+      !/IS DEPLOYING/i.test(banner) &&
+      !/from your bank/i.test(banner)
+    ) {
       return banner;
     }
-    var draft =
-      gs.risqueDeployMirrorDraft && typeof gs.risqueDeployMirrorDraft === "object"
-        ? gs.risqueDeployMirrorDraft
-        : null;
-    if (!draft || draft.selected == null || String(draft.selected).trim() === "") {
-      return banner;
-    }
-    var sel = String(draft.selected).trim();
-    if (!deployTerritoryOwnedByCurrent(gs, sel)) {
-      return banner;
-    }
-    var pretty =
-      window.gameUtils && typeof window.gameUtils.formatTerritoryDisplayName === "function"
-        ? window.gameUtils.formatTerritoryDisplayName(sel)
-        : sel.replace(/_/g, " ");
-    return deployingDisplayName(gs) + " selects " + pretty + " for Deployment";
+    return "";
   }
 
   function deploySpectatorControlVoiceText(gs) {
     if (!gs) return "";
+    if (typeof window.risqueBuildDeployVoiceLinesFromState === "function") {
+      var built = window.risqueBuildDeployVoiceLinesFromState(gs, { includeDeployerName: true });
+      if (built && built.primary && !deploySpectatorWaitBanner(built.primary)) {
+        return built.primary;
+      }
+    }
+    var cv =
+      gs.risqueControlVoice && typeof gs.risqueControlVoice === "object"
+        ? gs.risqueControlVoice
+        : null;
+    if (cv && cv.primary != null) {
+      var pri = String(cv.primary).trim();
+      if (
+        pri &&
+        !deploySpectatorWaitBanner(pri) &&
+        !/IS DEPLOYING/i.test(pri) &&
+        !/from your bank/i.test(pri) &&
+        !/DEPLOY ALL TROOPS/i.test(pri) &&
+        !/FIRST DEPLOYMENT/i.test(pri)
+      ) {
+        return pri;
+      }
+    }
     var banner = deploySpectatorLiveNarrationLine(gs);
     if (banner) return banner;
-    var cv =
-      gs.risqueControlVoice && gs.risqueControlVoice.primary != null
-        ? String(gs.risqueControlVoice.primary).trim()
-        : "";
-    if (cv && !deploySpectatorWaitBanner(cv) && !/has been selected/i.test(cv)) return cv;
     var waitName = deployingDisplayName(gs);
     return "WAITING FOR " + waitName.toUpperCase() + " TO DEPLOY";
   }
@@ -709,6 +769,10 @@
     var waitName = deployingDisplayName(gs);
     var ctrl = deployOwnerSlot(gs) || Number(gs.artemisControlSlot) || 0;
     var voiceKey = "wait:" + ctrl + ":" + normName(waitName);
+    var builtSpectator =
+      typeof window.risqueBuildDeployVoiceLinesFromState === "function"
+        ? window.risqueBuildDeployVoiceLinesFromState(gs, { includeDeployerName: true })
+        : null;
     var line = deploySpectatorControlVoiceText(gs);
     if (!line) {
       line =
@@ -738,12 +802,16 @@
           ? String(gs.risqueControlVoice.report).trim()
           : "")
     );
+    if (!repLine && builtSpectator && builtSpectator.report) {
+      repLine = builtSpectator.report;
+    }
     var repClass = "ucp-voice-report ucp-voice-report--public-deploy";
     window.risqueRuntimeHud.setControlVoiceText(line, repLine, {
       skipMirror: true,
       reportClass: repClass
     });
     try {
+      gs.risquePublicDeployReport = repLine;
       gs.risqueControlVoice = { primary: line, report: repLine, reportClass: repClass };
       if (window.gameState === gs || !window.gameState) {
         window.gameState = gs;
@@ -824,33 +892,9 @@
     window.__risqueDeployVoiceTypographyStamped = Date.now();
   };
 
-  /** Active deploy owner: keep "{Territory} has been selected" while a territory stays highlighted. */
+  /** Active deploy owner: selection + bank live in CV report; primary stays troop budget headline. */
   function deployOwnerSelectionVoicePrimary(gs) {
-    var sel =
-      window.selectedTerritory != null && String(window.selectedTerritory).trim() !== ""
-        ? String(window.selectedTerritory).trim()
-        : "";
-    if (
-      !sel &&
-      gs &&
-      gs.risqueDeployMirrorDraft &&
-      gs.risqueDeployMirrorDraft.selected != null &&
-      String(gs.risqueDeployMirrorDraft.selected).trim() !== ""
-    ) {
-      sel = String(gs.risqueDeployMirrorDraft.selected).trim();
-    }
-    if (!sel) return "";
-    if (!deployTerritoryOwnedByCurrent(gs, sel)) return "";
-    var dep = window.deployedTroops || deploySpectatorDepsFromState(gs);
-    var nSel = dep[sel] || 0;
-    if (nSel > 0 && typeof window.risqueDeployTroopsDeployedToPhrase === "function") {
-      return window.risqueDeployTroopsDeployedToPhrase(nSel, sel);
-    }
-    var pretty =
-      window.gameUtils && typeof window.gameUtils.formatTerritoryDisplayName === "function"
-        ? window.gameUtils.formatTerritoryDisplayName(sel)
-        : sel.replace(/_/g, " ");
-    return pretty + " has been selected";
+    return "";
   }
 
   /** Mirror + spectator laptops: paint deploy narration without clobbering active deployer's local voice. */
@@ -858,38 +902,51 @@
     if (!gs || String(gs.phase || "") !== "deploy") return;
     sanitizeDeployMirrorDraft(gs);
     if (isMine(gs)) {
+      var built =
+        typeof window.risqueBuildDeployVoiceLinesFromState === "function"
+          ? window.risqueBuildDeployVoiceLinesFromState(gs)
+          : null;
       var cvObj = gs.risqueControlVoice && typeof gs.risqueControlVoice === "object" ? gs.risqueControlVoice : null;
       var pri =
-        cvObj && cvObj.primary != null ? String(cvObj.primary).trim() : "";
-      var selPri = deployOwnerSelectionVoicePrimary(gs);
-      if (selPri) {
-        pri = selPri;
-      } else if (/has been selected/i.test(pri)) {
-        pri = "";
-      }
+        built && built.primary
+          ? built.primary
+          : cvObj && cvObj.primary != null
+            ? String(cvObj.primary).trim()
+            : "";
       var rep =
-        cvObj && cvObj.report != null ? String(cvObj.report).trim() : "";
-      if (!rep) {
-        rep = String(gs.risquePublicDeployReport || "").trim();
-      }
-      if (!pri && String(gs.currentPlayer || "").trim() !== "") {
-        pri =
-          String(gs.currentPlayer || "")
-            .trim()
-            .toUpperCase() + "\nDEPLOY ALL TROOPS FROM YOUR BANK";
+        built && built.report
+          ? built.report
+          : cvObj && cvObj.report != null
+            ? String(cvObj.report).trim()
+            : String(gs.risquePublicDeployReport || "").trim();
+      if (!pri && typeof window.risqueRefreshDeployNarration === "function") {
+        window.risqueRefreshDeployNarration(gs);
+        return;
       }
       if (
         pri &&
         window.risqueRuntimeHud &&
         typeof window.risqueRuntimeHud.setControlVoiceText === "function"
       ) {
+        var voiceStamp = pri + "\n" + rep;
+        var vtCur = document.getElementById("control-voice-text");
+        var vrCur = document.getElementById("control-voice-report");
+        if (
+          window.__risqueDeployOwnerVoiceStamp === voiceStamp &&
+          vtCur &&
+          vrCur &&
+          String(vtCur.textContent || "").trim() === pri &&
+          String(vrCur.textContent || "").trim() === rep
+        ) {
+          return;
+        }
+        window.__risqueDeployOwnerVoiceStamp = voiceStamp;
         var repClass =
           cvObj && cvObj.reportClass ? String(cvObj.reportClass) : "ucp-voice-report ucp-voice-report--public-deploy";
         window.risqueRuntimeHud.setControlVoiceText(pri, rep, {
           reportClass: repClass,
           skipMirror: true,
-          artemisDeployOwner: true,
-          territorySelection: !!selPri
+          artemisDeployOwner: true
         });
         try {
           gs.risqueControlVoice = {
@@ -897,6 +954,8 @@
             report: rep,
             reportClass: repClass
           };
+          gs.risquePublicDeployBanner = pri;
+          gs.risquePublicDeployReport = rep;
         } catch (eCvPin) {
           /* ignore */
         }
@@ -940,6 +999,9 @@
   /** Live mirror tick — voice + map only; no HUD rebuild (avoids blink + empty voice). */
   function applyDeploySpectatorLiveRefresh(gs) {
     if (!gs) return;
+    if (hostTurnDeployLocalOwnsLiveState(gs)) {
+      return;
+    }
     window.gameState = gs;
     try {
       document.body.setAttribute("data-risque-phase", "deploy");
@@ -1002,11 +1064,15 @@
   window.risqueArtemisRefreshDeploySpectator = function (gs) {
     if (!gs || String(gs.phase || "") !== "deploy") return;
     if (window.risqueArtemisHost && !window.risqueArtemisNetClient) {
+      if (hostTurnDeployLocalOwnsLiveState(gs)) {
+        return;
+      }
       if (hostIsActiveDeployOwner(gs)) {
         if (typeof window.risqueArtemisApplyDeployVoiceFromState === "function") {
           window.risqueArtemisApplyDeployVoiceFromState(gs);
         }
         ensureHostActiveDeployOwnerInteractive(gs);
+        paintDeploySpectatorMap(gs);
         return;
       }
       if (typeof window.risqueArtemisApplyHostDeploySpectator === "function") {
@@ -1049,12 +1115,23 @@
   /** Host map + HUD: paint live setup deploy from client player_state (real-time mirror). */
   window.risqueArtemisApplyHostDeploySpectator = function (gs) {
     if (!window.risqueArtemisHost || !gs || String(gs.phase || "") !== "deploy") return;
+    if (
+      typeof window.risqueArtemisIsMyTurn === "function" &&
+      !window.risqueArtemisIsMyTurn(gs)
+    ) {
+      window.__risqueArtemisTurnDeployControlsLive = false;
+      window.__risqueArtemisTurnDeployLocalEdit = false;
+    }
+    if (hostTurnDeployLocalOwnsLiveState(gs)) {
+      return;
+    }
     if (hostIsActiveDeployOwner(gs)) {
       window.gameState = gs;
       if (typeof window.risqueArtemisApplyDeployVoiceFromState === "function") {
         window.risqueArtemisApplyDeployVoiceFromState(gs);
       }
       ensureHostActiveDeployOwnerInteractive(gs);
+      paintDeploySpectatorMap(gs);
       return;
     }
     var setup = isSetupDeploy(gs);
@@ -1088,6 +1165,10 @@
     delete gs.risquePublicDeployProcessing;
 
     window.gameState = gs;
+
+    if (typeof window.risqueHostReplaceShellGameState === "function") {
+      window.risqueHostReplaceShellGameState(gs);
+    }
 
     if (typeof window.risqueArtemisEnsureOmniClientHud === "function") {
       window.risqueArtemisEnsureOmniClientHud(gs);

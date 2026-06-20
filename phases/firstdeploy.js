@@ -462,10 +462,12 @@
 
     phaseSlot.innerHTML =
       '<div class="deploy2-compact-root">' +
-      '<div class="deploy2-bank-row">' +
-      '<span class="deploy2-bank-label">Bank</span>' +
-      '<span id="deploy1-bank-number" class="deploy2-bank-number">000</span>' +
-      "</div>" +
+      (window.risqueArtemisMode
+        ? ""
+        : '<div class="deploy2-bank-row">' +
+          '<span class="deploy2-bank-label">Bank</span>' +
+          '<span id="deploy1-bank-number" class="deploy2-bank-number">000</span>' +
+          "</div>") +
       '<p class="deploy2-hint">Select a territory. Scroll the wheel or type a number and press Enter. Use âˆ’ for removals.</p>' +
       '<div class="deploy2-actions deploy1-deploy-actions deploy1-deploy-actions--hud-row">' +
       '<button type="button" id="deploy1-reset" class="deploy1-action-btn">RESET</button>' +
@@ -551,38 +553,27 @@
         return;
       }
       if (!gameState) return;
-      var player = deployResolveCurrentPlayer(gameState);
-      if (!player) return;
-      var primary = player.name.toUpperCase() + "\nDEPLOY ALL TROOPS FROM YOUR BANK";
-      if (warnMessage) {
-        try {
-          gameState.risquePublicDeployBanner =
-            player.name.toUpperCase() + " IS DEPLOYING TROOPS";
-          gameState.risquePublicDeployReport = String(warnMessage);
-        } catch (eBanner0) {}
-        window.risqueRuntimeHud.setControlVoiceText(primary, String(warnMessage), {
-          reportClass: "ucp-voice-report ucp-voice-report--public-deploy",
-          skipMirror: !!window.risqueArtemisMode,
-          artemisDeployOwner: !!window.risqueArtemisMode
-        });
-        if (window.risqueArtemisMode && typeof window.risquePersistHostGameState === "function") {
-          window.risquePersistHostGameState(gameState);
-        } else {
-          persistGameStateForPublicMirror();
-        }
-        return;
-      }
       if (typeof window.risqueRefreshDeployNarration === "function") {
-        window.risqueRefreshDeployNarration(gameState);
+        window.risqueRefreshDeployNarration(gameState, { warnMessage: warnMessage || "" });
         persistGameStateForPublicMirror();
         return;
       }
-      try {
-        gameState.risquePublicDeployBanner =
-          player.name.toUpperCase() + " IS DEPLOYING TROOPS";
-        gameState.risquePublicDeployReport = "";
-      } catch (eBanner1) {}
-      window.risqueRuntimeHud.setControlVoiceText(primary, "", {
+      var player = deployResolveCurrentPlayer(gameState);
+      if (!player) return;
+      var bank = Math.max(0, Number(player.bankValue) || 0);
+      var total = bank + (typeof window.risqueDeploySumDeployedTroops === "function"
+        ? window.risqueDeploySumDeployedTroops(deployedTroops[artemisNormName(player.name)] || {})
+        : 0);
+      var primary =
+        typeof window.risqueDeployTroopBudgetHeadline === "function"
+          ? window.risqueDeployTroopBudgetHeadline(total)
+          : "DEPLOY TROOPS";
+      var report = warnMessage
+        ? String(warnMessage)
+        : typeof window.risqueDeployBankShortLabel === "function"
+          ? window.risqueDeployBankShortLabel(bank)
+          : "BANK: " + bank;
+      window.risqueRuntimeHud.setControlVoiceText(primary, report, {
         reportClass: "ucp-voice-report ucp-voice-report--public-deploy",
         skipMirror: !!window.risqueArtemisMode,
         artemisDeployOwner: !!window.risqueArtemisMode
@@ -1283,6 +1274,8 @@
         delete gameState.risquePublicDeployReport;
         delete gameState.risqueDeployMirrorDraft;
         delete gameState.risqueDeployTransientPrimary;
+        delete gameState.risqueDeploySessionTroopTotal;
+        delete gameState.risqueDeploySessionBudgetSlot;
         try {
           gameState.risquePublicDeployBanner =
             "WAITING FOR " + String(gameState.currentPlayer || "NEXT").toUpperCase() + " TO DEPLOY";

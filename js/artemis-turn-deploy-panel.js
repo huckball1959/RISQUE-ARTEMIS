@@ -62,7 +62,9 @@
   }
 
   function turnControlsPresent() {
-    return !!document.getElementById("confirm") && !!document.getElementById("bank-number");
+    if (!document.getElementById("confirm")) return false;
+    if (window.risqueArtemisMode) return true;
+    return !!document.getElementById("bank-number");
   }
 
   function stopTurnDeployWatchdog() {
@@ -318,6 +320,19 @@
       return;
     }
 
+    if (
+      window.risqueArtemisHost &&
+      !window.risqueArtemisNetClient &&
+      typeof window.risqueArtemisHostTurnDeployLocalOwnsLiveState === "function" &&
+      window.risqueArtemisHostTurnDeployLocalOwnsLiveState(gs)
+    ) {
+      if (typeof window.risqueArtemisStampDeployHandoffSyncMarkers === "function") {
+        window.risqueArtemisStampDeployHandoffSyncMarkers(gs);
+      }
+      startTurnDeployWatchdog(window.gameState || gs);
+      return;
+    }
+
     window.gameState = gs;
     if (window.risqueArtemisNetClient) {
       enterClientPlayMode();
@@ -355,6 +370,18 @@
       window.risqueArtemisStampControlSlot(gs);
     }
     if (!isMine(gs)) return;
+    if (
+      window.risqueArtemisHost &&
+      !window.risqueArtemisNetClient &&
+      typeof window.risqueArtemisHostTurnDeployLocalOwnsLiveState === "function" &&
+      window.risqueArtemisHostTurnDeployLocalOwnsLiveState(gs)
+    ) {
+      if (typeof window.risqueArtemisStampDeployHandoffSyncMarkers === "function") {
+        window.risqueArtemisStampDeployHandoffSyncMarkers(gs);
+      }
+      startTurnDeployWatchdog(window.gameState || gs);
+      return;
+    }
     window.gameState = gs;
     if (window.risqueArtemisNetClient) {
       enterClientPlayMode();

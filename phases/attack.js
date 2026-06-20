@@ -803,6 +803,19 @@ function prettyTerritoryName(id) {
     .join(' ');
 }
 
+function pushArtemisClientAttackLiveMirror() {
+  if (
+    !window.risqueArtemisMode ||
+    !window.risqueArtemisNetClient ||
+    window.risqueArtemisHost ||
+    !window.gameState ||
+    String(window.gameState.phase || "") !== "attack"
+  ) {
+    return;
+  }
+  pushPublicAttackMirror();
+}
+
 function pushPublicAttackMirror() {
   risqueAttackScheduleMirrorPush();
   if (
@@ -1537,11 +1550,7 @@ function dismissPrompt(opts) {
   const legacy = document.getElementById('prompt');
   if (legacy) legacy.remove();
 
-  if (
-    !keepInstantCampaignHud &&
-    typeof window.risqueIsAttackCampaignActive === 'function' &&
-    window.risqueIsAttackCampaignActive()
-  ) {
+  if (!keepInstantCampaignHud && isAttackCampaignMapPlanning()) {
     clearAttackCampaignPlanningAfterRun();
   }
 
@@ -1631,11 +1640,9 @@ function showPrompt(message, buttons = [], selectOptions = null, report = '') {
   const voiceReport = document.getElementById('control-voice-report');
   const extras = document.getElementById('control-voice-extras');
   const cvRoot = document.getElementById('control-voice');
-  const messagePlain = typeof message === 'string' && message.indexOf('<') === -1;
   const keepInstantCampaignHud =
-    messagePlain &&
-    cvRoot &&
-    cvRoot.classList.contains('ucp-control-voice--campaign-instant');
+    isAttackCampaignMapPlanning() ||
+    !!(cvRoot && cvRoot.classList.contains('ucp-control-voice--campaign-instant'));
 
   if (!elements.uiOverlay) {
     elements.uiOverlay = document.getElementById('ui-overlay');
@@ -1992,6 +1999,24 @@ function pushAttackDiceMirrorToNetwork() {
   }
 }
 
+/** Campaign / automated blitz rounds: dice row + troop board for host and other clients. */
+function flushAutomatedAttackCombatMirror(snap) {
+  if (!snap || !window.gameState) return;
+  if (!window.risqueDisplayIsPublic) {
+    revealDiceFromSnap(snap);
+  } else if (snap.attackerRolls && snap.defenderRolls) {
+    window.gameState.risqueLastDiceDisplay = {
+      spinning: false,
+      attackerRolls: snap.attackerRolls.slice(),
+      defenderRolls: snap.defenderRolls.slice(),
+      attackerDiceUsed: snap.attackerDiceUsed,
+      defenderDiceCount: snap.defenderDiceCount
+    };
+    pushAttackDiceMirrorToNetwork();
+  }
+  pushPublicAttackMirror();
+}
+
 function startDiceSpinForSnap(snap) {
   const { attackerDiceUsed, defenderDiceCount } = snap;
   if (window.gameState) {
@@ -2252,6 +2277,12 @@ function applyBattleRoundAfterRoll(snap, opts) {
   const skipLossFlash = !!opts.skipLossFlash;
   const instantBlitz = !!opts.instantBlitz;
   const combatLogLead = opts.combatLogLead != null ? String(opts.combatLogLead) : '';
+  function finishApplyBattleRound(result) {
+    if (skipBattleVoice) {
+      flushAutomatedAttackCombatMirror(snap);
+    }
+    return result;
+  }
   const {
     player,
     opponent,
@@ -2333,6 +2364,7 @@ function applyBattleRoundAfterRoll(snap, opts) {
   prependCombatLog(outcomeFriendly, 'battle');
   updatePlayerTroopsTotal(player);
   updatePlayerTroopsTotal(opponent);
+  pushArtemisClientAttackLiveMirror();
 
   if (defenderTerritory.troops <= 0) {
     isAcquiring = true;
@@ -2416,14 +2448,25 @@ function applyBattleRoundAfterRoll(snap, opts) {
         window.gameState.risqueCampaignInterruptedByElimination = true;
         if (window.gameState.turnOrder.length === 1) {
           scheduleImmediateGameWinAfterElimination(player, opponent, true);
-          return { conquered: true, campaignHalted: false, campaignInterruptedByElimination: true };
+          return finishApplyBattleRound({
+            conquered: true,
+            campaignHalted: false,
+            campaignInterruptedByElimination: true
+          });
         }
         scheduleAttackEliminatedProceedToConquerPrompt(player, opponent);
-        return { conquered: true, campaignHalted: false, campaignInterruptedByElimination: true };
+        return finishApplyBattleRound({
+          conquered: true,
+          campaignHalted: false,
+          campaignInterruptedByElimination: true
+        });
       } else {
         checkWinCondition();
       }
-      return { conquered: true, campaignHalted: !!(transferRes && transferRes.campaignHalted) };
+      return finishApplyBattleRound({
+        conquered: true,
+        campaignHalted: !!(transferRes && transferRes.campaignHalted)
+      });
     }
 
     window.gameState.attackPhase = 'pending_transfer';
@@ -2436,7 +2479,7 @@ function applyBattleRoundAfterRoll(snap, opts) {
       isAcquiring = false;
       if (window.gameState.turnOrder.length === 1) {
         scheduleImmediateGameWinAfterElimination(player, opponent, false);
-        return { conquered: true };
+        return finishApplyBattleRound({ conquered: true });
       }
       /* Elimination: finish the same post-capture troop UI as a normal capture, then run conquer
        * celebration (risqueDeferredEliminationConquerPrompt → scheduleAttackEliminated… on CONFIRM). */
@@ -2453,11 +2496,11 @@ function applyBattleRoundAfterRoll(snap, opts) {
         window.risqueMirrorPushGameState();
       }
       initTroopTransfer();
-      return { conquered: true };
+      return finishApplyBattleRound({ conquered: true });
     }
     initTroopTransfer();
     checkWinCondition();
-    return { conquered: true };
+    return finishApplyBattleRound({ conquered: true });
   }
 
   if (typeof window.risqueReplayRecordBattle === 'function') {
@@ -2477,7 +2520,7 @@ function applyBattleRoundAfterRoll(snap, opts) {
   saveGameState();
   window.gameUtils.renderTerritories(null, window.gameState);
   window.gameUtils.renderStats(window.gameState);
-  return { conquered: false };
+  return finishApplyBattleRound({ conquered: false });
 }
 
 function clearPausableBlitzRoundTimers() {
@@ -3691,9 +3734,7 @@ function publishPublicBattleBanner(primary, report) {
   if (!window.gameState) return;
   window.gameState.risquePublicBlitzBanner = primary != null ? String(primary) : '';
   window.gameState.risquePublicBlitzBannerReport = report != null ? String(report) : '';
-  if (typeof window.risqueMirrorPushGameState === 'function') {
-    window.risqueMirrorPushGameState();
-  }
+  pushPublicAttackMirror();
 }
 
 function clearConditionCountdownMirror() {
@@ -3897,10 +3938,21 @@ function applyPostCampaignOutcomeAndIdlePrompt(primary, report, reportClass) {
   const reportWithIdle = baseRep ? baseRep + tail : 'Select a territory to attack from.';
   clearAttackCampaignPlanningAfterRun();
   showPrompt('Select territory to attack from.', [{ label: 'Cancel', onClick: cancelAttack }]);
+  if (window.gameState) {
+    window.gameState.risqueControlVoice = {
+      primary: p,
+      report: reportWithIdle,
+      reportClass: reportClass || ''
+    };
+    window.gameState.risqueAttackOutcomePrimary = '';
+    window.gameState.risqueAttackOutcomeReport = '';
+    window.gameState.risqueAttackOutcomeAcquisition = '';
+  }
   if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.setControlVoiceText === 'function') {
     window.risqueRuntimeHud.setControlVoiceText(p, reportWithIdle, {
       force: true,
-      reportClass: reportClass || ''
+      reportClass: reportClass || '',
+      skipMirror: true
     });
   }
   if (
@@ -3916,7 +3968,10 @@ function applyPostCampaignOutcomeAndIdlePrompt(primary, report, reportClass) {
   } catch (eSave) {
     /* ignore */
   }
-  if (typeof window.risqueMirrorPushGameState === 'function') {
+  pushPublicAttackMirror();
+  if (typeof window.risqueFlushMirrorPush === 'function') {
+    window.risqueFlushMirrorPush();
+  } else if (typeof window.risqueMirrorPushGameState === 'function') {
     window.risqueMirrorPushGameState();
   }
 }
@@ -3960,6 +4015,16 @@ function qDevCampaignPlanningMirrorOpts() {
 /** INSTANT, PAUSE, Campaign Step CON, and Instant COND share the same Commit / Begin / Reset map UI. */
 function isCommitRunCampaignType() {
   return campaignType === 'instant' || campaignType === 'pause' || campaignType === 'cond';
+}
+
+/** Map path-building modes — must not fall through to normal attacker/defender picks. */
+function isAttackCampaignMapPlanning() {
+  return (
+    campaignMode === 'start' ||
+    campaignMode === 'path' ||
+    campaignMode === 'instant_launch' ||
+    campaignMode === 'instant_extend'
+  );
 }
 
 function campaignTrace(msg, data) {
@@ -4164,9 +4229,7 @@ function paintInstantCampaignHud(reportLine, mirrorOpts) {
               ? 'ucp-voice-report--instant'
               : ''
       };
-      if (typeof window.risqueMirrorPushGameState === 'function') {
-        window.risqueMirrorPushGameState();
-      }
+      pushPublicAttackMirror();
     }
   } catch (eCampVoice) {
     /* ignore */
@@ -4576,6 +4639,8 @@ function risqueYieldInstantCampaignPaint() {
   if (window.risqueDisplayIsPublic) return Promise.resolve();
   return new Promise(function (resolve) {
     requestAnimationFrame(function () {
+      renderAfterCampaignWarpathSync();
+      pushPublicAttackMirror();
       requestAnimationFrame(resolve);
     });
   });
@@ -5366,6 +5431,7 @@ function startInstantCampaignPlanning(opts) {
   defender = null;
   updateBattlePanelReadout();
   document.querySelectorAll('.territory-circle.selected').forEach(c => c.classList.remove('selected'));
+  clearPublicAttackSelectionLine();
   campaignType = 'instant';
   campaignMode = 'instant_launch';
   campaignPath = [];
@@ -5409,6 +5475,7 @@ function startInstantCondCampaignPlanning() {
   defender = null;
   updateBattlePanelReadout();
   document.querySelectorAll('.territory-circle.selected').forEach(c => c.classList.remove('selected'));
+  clearPublicAttackSelectionLine();
   campaignType = 'cond';
   campaignCondFromPauseRow = false;
   campaignCondThreshold = null;
@@ -5449,6 +5516,7 @@ function startPauseCampaignPlanning() {
   defender = null;
   updateBattlePanelReadout();
   document.querySelectorAll('.territory-circle.selected').forEach(c => c.classList.remove('selected'));
+  clearPublicAttackSelectionLine();
   campaignType = 'pause';
   campaignMode = 'instant_launch';
   campaignPath = [];
@@ -5517,6 +5585,9 @@ function handleInstantCampaignTerritoryClick(label) {
     );
     paintInstantCampaignHud('', instantCampaignPlanningMirrorOpts() || undefined);
     renderAfterCampaignWarpathSync();
+    attacker = null;
+    defender = null;
+    clearPublicAttackSelectionLine();
     if (campaignQDevMode) {
       dismissPrompt({ keepInstantCampaignHud: true });
       syncAttackPhaseActionLocks();
@@ -5580,6 +5651,9 @@ function handleInstantCampaignTerritoryClick(label) {
     );
     paintInstantCampaignHud('', instantCampaignPlanningMirrorOpts() || undefined);
     renderAfterCampaignWarpathSync();
+    attacker = null;
+    defender = null;
+    clearPublicAttackSelectionLine();
     if (campaignQDevMode) {
       showQDevCampaignConfirmPrompt();
       syncAttackPhaseActionLocks();
@@ -5911,6 +5985,7 @@ function startCampaignCheckConPlanning() {
   defender = null;
   updateBattlePanelReadout();
   document.querySelectorAll('.territory-circle.selected').forEach(c => c.classList.remove('selected'));
+  clearPublicAttackSelectionLine();
   campaignType = 'cond';
   campaignCondFromPauseRow = true;
   campaignCondThreshold = null;
@@ -5939,7 +6014,13 @@ function startCampaignCheckConPlanning() {
 }
 
 function handleCampaignTerritoryClick(label) {
-  if (campaignType === 'instant' || campaignType === 'pause' || campaignType === 'cond') {
+  if (
+    campaignType === 'instant' ||
+    campaignType === 'pause' ||
+    campaignType === 'cond' ||
+    campaignMode === 'instant_launch' ||
+    campaignMode === 'instant_extend'
+  ) {
     return handleInstantCampaignTerritoryClick(label);
   }
 
@@ -6189,9 +6270,72 @@ function samePlayerName(a, b) {
   return String(a || '').trim().toUpperCase() === String(b || '').trim().toUpperCase();
 }
 
+function lookupTerritoryOwnerTroops(label) {
+  if (!window.gameState || !label || !Array.isArray(window.gameState.players)) return null;
+  for (let pi = 0; pi < window.gameState.players.length; pi++) {
+    const pl = window.gameState.players[pi];
+    if (!pl || !Array.isArray(pl.territories)) continue;
+    const t = pl.territories.find(x => x && x.name === label);
+    if (t) return { owner: pl.name, troops: Number(t.troops) || 0 };
+  }
+  return null;
+}
+
+function refreshAttackSelectionTroopsFromGameState() {
+  if (!window.gameState) return;
+  if (attacker) {
+    const liveAtk = lookupTerritoryOwnerTroops(attacker.label);
+    if (liveAtk && samePlayerName(liveAtk.owner, window.gameState.currentPlayer)) {
+      attacker.owner = liveAtk.owner;
+      attacker.troops = liveAtk.troops;
+    }
+  }
+  if (defender) {
+    const liveDef = lookupTerritoryOwnerTroops(defender.label);
+    if (liveDef) {
+      defender.owner = liveDef.owner;
+      defender.troops = liveDef.troops;
+    }
+  }
+}
+
+/** Map click during post-capture transfer: abandon transfer UI and allow a fresh attack pick. */
+function clearPendingTransferForMapRetarget() {
+  if (!window.gameState || window.gameState.attackPhase !== 'pending_transfer') return false;
+  risqueDeferredEliminationConquerPrompt = null;
+  try {
+    delete window.gameState.risqueDeferConquerElimination;
+  } catch (eDefer) {
+    /* ignore */
+  }
+  teardownAttackTroopTransferWheel();
+  dismissPrompt();
+  window.gameState.attackPhase = 'attack';
+  window.gameState.attackingTerritory = null;
+  window.gameState.acquiredTerritory = null;
+  window.gameState.minTroopsToTransfer = 0;
+  window.gameState.risqueInstantBlitzTransferUi = false;
+  try {
+    delete window.gameState.risquePublicTransferMirrorSeal;
+  } catch (eSeal) {
+    /* ignore */
+  }
+  attacker = null;
+  defender = null;
+  updateBattlePanelReadout();
+  syncAttackPhaseActionLocks();
+  return true;
+}
+
 function risqueAttackPhaseTerritoryClick(label, owner, troops) {
-  if (window.gameState.attackPhase === 'pending_transfer') return;
+  clearPendingTransferForMapRetarget();
   if (isAwaitingAerialConfirm) return;
+
+  const livePick = lookupTerritoryOwnerTroops(label);
+  if (livePick) {
+    owner = livePick.owner;
+    troops = livePick.troops;
+  }
 
   if (
     campaignMode === 'armed' ||
@@ -6202,14 +6346,13 @@ function risqueAttackPhaseTerritoryClick(label, owner, troops) {
     return;
   }
 
-  const campaignPlanning =
-    campaignMode === 'start' ||
-    campaignMode === 'path' ||
-    campaignMode === 'instant_launch' ||
-    campaignMode === 'instant_extend';
-  if (campaignPlanning && handleCampaignTerritoryClick(label)) {
+  const campaignPlanning = isAttackCampaignMapPlanning();
+  if (campaignPlanning) {
+    handleCampaignTerritoryClick(label);
     return;
   }
+
+  refreshAttackSelectionTroopsFromGameState();
 
   // Defensive resync: after long rounds/phase churn, stale attacker/defender can linger.
   const currentPlayerName = window.gameState.currentPlayer;
@@ -6334,6 +6477,52 @@ function risqueAttackPhaseTerritoryClick(label, owner, troops) {
     setPublicAttackTargetSelection(label);
     dismissPrompt();
     document.querySelectorAll('.territory-circle').forEach(c => c.classList.toggle('selected', c.dataset.label === label || c.dataset.label === attacker.label));
+    const maxAttackerDice = Math.min(attacker.troops - 1, 3);
+    attackerDice = maxAttackerDice;
+    prependCombatLog(
+      `${window.gameState.currentPlayer}: attack ${prettyTerritoryName(attacker.label)} → ${prettyTerritoryName(label)} (${defender.owner} defends).`,
+      'voice'
+    );
+    if (typeof window.risqueAnnounceTerritorySelection === 'function') {
+      window.risqueAnnounceTerritorySelection(label, { report: 'ROLL / BLITZ / CAMPAIGN.' });
+    }
+    showPrompt('Refer to the buttons above for attack choices.', [{ label: 'Cancel', onClick: cancelAttack }], {
+      attacker: Array.from({ length: maxAttackerDice }, (_, i) => ({ value: i + 1, label: `${i + 1} Dice` }))
+    });
+  } else {
+    const adjacencies = window.gameUtils.getAdjacencies(attacker.label);
+    const isAerial = aerialBridge && aerialBridge.source === attacker.label && aerialBridge.target === label;
+    if (samePlayerName(owner, currentPlayerName)) {
+      if (troops < 2) {
+        showPrompt('That territory needs at least 2 troops to attack.', [{ label: 'Cancel', onClick: cancelAttack }]);
+        return;
+      }
+      attacker = { label, owner, troops };
+      defender = null;
+      resetAttackDiceUI();
+      updateBattlePanelReadout();
+      setPublicAttackFromSelection(owner, label);
+      document.querySelectorAll('.territory-circle').forEach(c =>
+        c.classList.toggle('selected', c.dataset.label === label)
+      );
+      prependCombatLog(`${owner}: attacking from ${prettyTerritoryName(label)} (${troops} troops).`, 'voice');
+      if (typeof window.risqueAnnounceTerritorySelection === 'function') {
+        window.risqueAnnounceTerritorySelection(label, { report: 'Pick a territory to attack.' });
+      }
+      showPrompt('Select territory to attack.', [{ label: 'Cancel', onClick: cancelAttack }]);
+      return;
+    }
+    if (!isAerial && !adjacencies.includes(label)) {
+      showPrompt('Target must be adjacent (or linked by aerial bridge).', [{ label: 'Cancel', onClick: cancelAttack }]);
+      return;
+    }
+    defender = { label, owner, troops };
+    updateBattlePanelReadout();
+    setPublicAttackTargetSelection(label);
+    dismissPrompt();
+    document.querySelectorAll('.territory-circle').forEach(c =>
+      c.classList.toggle('selected', c.dataset.label === label || c.dataset.label === attacker.label)
+    );
     const maxAttackerDice = Math.min(attacker.troops - 1, 3);
     attackerDice = maxAttackerDice;
     prependCombatLog(
@@ -7059,6 +7248,11 @@ window.initAttackPhase = initAttackPhase;
 /** True while campaign path planning is active (attack.js). Used by runtime HUD to avoid clobbering innerHTML voice. */
 window.risqueIsAttackCampaignActive = function () {
   return campaignMode != null;
+};
+
+/** True while building a multi-territory campaign path on the map (Instant / Step / COND). */
+window.risqueIsAttackCampaignMapPlanning = function () {
+  return isAttackCampaignMapPlanning();
 };
 
 document.addEventListener('DOMContentLoaded', () => {

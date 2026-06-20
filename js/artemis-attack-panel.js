@@ -237,6 +237,14 @@
     if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
       window.risquePublicApplyVoiceAndLogMirror(gs);
     }
+    requestAnimationFrame(function () {
+      if (typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
+        window.risquePublicApplyDiceAndBattleReadout(gs);
+      }
+      if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
+        window.risquePublicApplyVoiceAndLogMirror(gs);
+      }
+    });
   };
 
   function ensureAttackSpectatorHud(gs) {
@@ -454,8 +462,8 @@
     }
     if (window.risqueArtemisHost && !window.risqueArtemisNetClient) {
       ensureHostAttackSpectatorChrome(gs);
-      paintHostAttackSpectatorMap(gs);
     }
+    paintHostAttackSpectatorMap(gs);
     if (typeof window.risqueArtemisReassertHostAttackSpectator === "function") {
       window.risqueArtemisReassertHostAttackSpectator(gs);
     } else if (

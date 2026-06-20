@@ -81,38 +81,24 @@
     }, delayMs || 1200);
   }
 
-  function showOverlay(beat) {
-    var root = ensureOverlay();
-    activeBeat = beat;
-    root.hidden = false;
-    var stepEl = root.querySelector(".risque-artemis-beat-sync-step");
-    var stepNum = Number(beat.stepIndex) || 0;
-    var total = Number(beat.totalSteps) || SETUP_TOTAL_STEPS;
-    if (stepEl) {
-      stepEl.textContent = "STEP " + stepNum + " / " + total;
+  /** Beat-sync overlay retired — host hold steps still gate on the server. */
+  function hideBeatOverlay() {
+    var root = document.getElementById("risque-artemis-beat-sync-overlay");
+    if (root) {
+      root.hidden = true;
+      root.style.display = "none";
     }
-    if (overlayTitleEl) {
-      overlayTitleEl.textContent = String(beat.label || "Syncing…").toUpperCase();
-    }
-    if (overlayDetailEl) {
-      overlayDetailEl.textContent = "Waiting for all laptops — min " + Math.round((Number(beat.minDisplayMs) || 0) / 1000) + "s";
-    }
-    if (overlaySlotsEl) {
-      overlaySlotsEl.textContent = "P1 … · P2 … · P3 …";
-    }
+    overlayEl = root;
+    activeBeat = null;
     clearCountdown();
-    if (overlayTimerEl && beat.minDisplayMs > 0) {
-      var started = Number(beat.localReceivedAt) || Date.now();
-      function tickTimer() {
-        if (!activeBeat || !overlayTimerEl) return;
-        var left = Math.max(0, Math.ceil((started + beat.minDisplayMs - Date.now()) / 1000));
-        overlayTimerEl.textContent = left > 0 ? "Hold " + left + "s…" : "Confirming sync…";
-      }
-      tickTimer();
-      countdownTimer = setInterval(tickTimer, 250);
-    } else if (overlayTimerEl) {
-      overlayTimerEl.textContent = "Confirming sync…";
+    if (overlayHideTimer) {
+      clearTimeout(overlayHideTimer);
+      overlayHideTimer = null;
     }
+  }
+
+  function showOverlay(beat) {
+    hideBeatOverlay();
   }
 
   function renderSlotStatus(msg) {
@@ -132,38 +118,19 @@
   }
 
   window.risqueArtemisBeatSyncOnBarrier = function (barrier) {
-    if (!barrier) return;
-    showOverlay(barrier);
+    hideBeatOverlay();
   };
 
   window.risqueArtemisBeatSyncOnStatus = function (msg) {
-    renderSlotStatus(msg);
+    /* slot status UI retired */
   };
 
   window.risqueArtemisBeatSyncOnLocalAck = function (barrier) {
-    if (overlayDetailEl) {
-      overlayDetailEl.textContent = "This laptop ready — waiting for others…";
-    }
+    /* overlay retired */
   };
 
   window.risqueArtemisBeatSyncOnRelease = function (msg) {
-    clearCountdown();
-    if (overlayDetailEl) {
-      if (msg && msg.ok && !(msg.laggers && msg.laggers.length)) {
-        overlayDetailEl.textContent = "All laptops synced — continuing";
-      } else if (msg && msg.laggers && msg.laggers.length) {
-        overlayDetailEl.textContent =
-          "Continuing — lag: " +
-          msg.laggers
-            .map(function (s) {
-              return slotLabel(s);
-            })
-            .join(", ");
-      } else {
-        overlayDetailEl.textContent = "Sync timeout — continuing anyway";
-      }
-    }
-    hideOverlaySoon(1600);
+    hideBeatOverlay();
   };
 
   function mergeBeatOpts(opts) {
@@ -211,4 +178,6 @@
   window.risqueArtemisBeatHostGateBeforeLoad = function () {
     return window.risqueArtemisBeatHostGateBeforeStart();
   };
+
+  hideBeatOverlay();
 })();

@@ -190,9 +190,19 @@
     }
     var vt = document.getElementById("control-voice-text");
     var vr = document.getElementById("control-voice-report");
-    if (vt) vt.textContent = primary != null ? primary : "";
+    var priText = primary != null ? String(primary) : "";
+    var repText = report !== undefined && report != null ? String(report) : "";
+    if (
+      !opts.force &&
+      vt &&
+      String(vt.textContent || "") === priText &&
+      (!vr || String(vr.textContent || "") === repText)
+    ) {
+      return;
+    }
+    if (vt) vt.textContent = priText;
     if (vr && report !== undefined) {
-      var rt = report != null ? String(report) : "";
+      var rt = repText;
       vr.textContent = rt;
       vr.style.display = rt ? "block" : "none";
       vr.className =
@@ -698,7 +708,11 @@
     return "";
   }
 
-  function artemisPhaseHudTitle(phase, gs) {
+  function artemisPhaseHudTitle(phase, gs, opts) {
+    opts = opts || {};
+    var activeOnly = !!opts.activePlayerOnly;
+    var nameU = artemisActivePlayerNameUpper(gs);
+    var nameSuffix = nameU ? "-" + nameU : "";
     var p = String(phase || "");
     if (p === "cardplay" || p === "con-cardplay") {
       if (window.risqueArtemisMode && gs) {
@@ -707,16 +721,22 @@
       }
       return "CARD PLAY";
     }
-    if (p === "income" || p === "con-income") return "INCOME";
+    if (p === "income" || p === "con-income") {
+      return activeOnly ? "INCOME" : "INCOME" + nameSuffix;
+    }
     if (p === "deploy" || p === "deploy1" || p === "deploy2" || p === "con-deploy") {
       if (window.risqueArtemisMode && gs && isArtemisSetupDeployPhase(gs)) {
         var depName = artemisActivePlayerNameUpper(gs);
         return depName ? "FIRST DEPLOYMENT-" + depName : "FIRST DEPLOYMENT";
       }
-      return "DEPLOYMENT";
+      return activeOnly ? "DEPLOYMENT" : "DEPLOYMENT" + nameSuffix;
     }
-    if (p === "attack") return "ATTACK";
-    if (p === "reinforce") return "REINFORCEMENT";
+    if (p === "attack") {
+      return activeOnly ? "ATTACK" : "ATTACK" + nameSuffix;
+    }
+    if (p === "reinforce") {
+      return activeOnly ? "REINFORCEMENT" : "REINFORCEMENT" + nameSuffix;
+    }
     if (p === "receivecard" || p === "getcard") return "RECEIVE CARD";
     if (p === "playerSelect") {
       var sk = gs && String(gs.selectionPhase || gs.risquePublicUiSelectKind || "");
@@ -943,6 +963,7 @@
       if (titleEl && window.risqueArtemisMode) {
         titleEl.textContent = sub;
         titleEl.classList.add("hud-banner-phase-title");
+        titleEl.style.color = "#00ff00";
         el.textContent = "";
         el.innerHTML = "";
         return;
@@ -1011,7 +1032,11 @@
     var suffixU = String(suffix || "").toUpperCase();
 
     if (window.risqueArtemisMode && titleEl) {
-      titleEl.textContent = artemisPhaseHudTitle(phase, gs);
+      var artemisOwnsPhase =
+        (typeof window.risqueArtemisIsMyTurn === "function" && window.risqueArtemisIsMyTurn(gs)) ||
+        (typeof window.risqueArtemisClientNameMatchesCurrent === "function" &&
+          window.risqueArtemisClientNameMatchesCurrent(gs));
+      titleEl.textContent = artemisPhaseHudTitle(phase, gs, { activePlayerOnly: artemisOwnsPhase });
       titleEl.classList.add("hud-banner-phase-title");
       titleEl.style.color = color;
       el.textContent = "";

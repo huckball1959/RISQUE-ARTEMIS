@@ -110,6 +110,39 @@
     }
   }
 
+  function receiveCardSpectatorMirrorKey(gs) {
+    if (!gs) return "";
+    var spec =
+      gs.risquePublicReceiveCardSpectator &&
+      typeof gs.risquePublicReceiveCardSpectator === "object"
+        ? gs.risquePublicReceiveCardSpectator
+        : {};
+    var handN =
+      spec.handBackCount != null && Number.isFinite(Number(spec.handBackCount))
+        ? Math.max(0, Math.floor(Number(spec.handBackCount)))
+        : typeof window.risquePublicSpectatorHandCountFromGs === "function"
+          ? window.risquePublicSpectatorHandCountFromGs(gs)
+          : 0;
+    var stagingN = spec.showStaging === true ? Math.max(0, Number(spec.stagingBackCount) || 0) : 0;
+    return (
+      ownerSlot(gs) +
+      ":" +
+      normName(gs.currentPlayer) +
+      ":" +
+      handN +
+      ":" +
+      stagingN +
+      ":" +
+      (spec.showStaging ? "1" : "0") +
+      ":" +
+      (spec.stagingMerged ? "1" : "0") +
+      ":" +
+      (spec.mergeAnimSeq != null ? String(spec.mergeAnimSeq) : "") +
+      ":" +
+      (gs.cardAwardedThisTurn ? "1" : "0")
+    );
+  }
+
   function mountSpectatorHint(gs) {
     var uio = document.getElementById("ui-overlay");
     if (!uio || !window.risqueRuntimeHud) return;
@@ -130,15 +163,33 @@
       window.risqueRuntimeHud.setAttackChromeInteractive(false);
     }
     wireOmniToggles(gs);
+    var mirrorKey = receiveCardSpectatorMirrorKey(gs);
+
+    /* Spectators (public TV + host): card backs + voice from mirrored receive-card layout. */
+    if (
+      window.risqueDisplayIsPublic ||
+      (window.risqueArtemisHost &&
+        !window.risqueArtemisNetClient &&
+        typeof window.risqueArtemisIsMyTurn === "function" &&
+        !window.risqueArtemisIsMyTurn(gs))
+    ) {
+      if (typeof window.risquePublicEnsureReceiveCardPrivateHint === "function") {
+        window.risquePublicEnsureReceiveCardPrivateHint(gs);
+      }
+      if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
+        window.risquePublicApplyVoiceAndLogMirror(gs);
+      }
+      spectatorHintKey = mirrorKey;
+      return;
+    }
+
     var slot = document.getElementById("risque-phase-content");
     if (!slot) return;
     var name = gs && gs.currentPlayer ? String(gs.currentPlayer) : "?";
-    var ctrl = ownerSlot(gs);
-    var hintKey = ctrl + ":" + normName(name);
-    if (hintKey === spectatorHintKey && slot.querySelector(".risque-artemis-receivecard-spectate")) {
+    if (mirrorKey === spectatorHintKey && slot.querySelector(".risque-artemis-receivecard-spectate")) {
       return;
     }
-    spectatorHintKey = hintKey;
+    spectatorHintKey = mirrorKey;
     var p = (gs.players || []).find(function (pl) {
       return normName(pl && pl.name) === normName(name);
     });
@@ -164,6 +215,28 @@
       );
     }
   }
+
+  /** Host map + HUD: live receive-card from client player_state (card backs, no faces). */
+  window.risqueArtemisApplyHostReceiveCardSpectator = function (gs) {
+    if (!window.risqueArtemisHost || window.risqueArtemisNetClient || !gs) return;
+    if (String(gs.phase || "") !== "receivecard" && String(gs.phase || "") !== "getcard") return;
+    if (
+      typeof window.risqueArtemisIsMyTurn === "function" &&
+      window.risqueArtemisIsMyTurn(gs)
+    ) {
+      return;
+    }
+    clearReceiveCardControls();
+    stampReceiveCardPhaseChrome(gs);
+    window.gameState = gs;
+    if (typeof window.risqueArtemisEnsureOmniClientHud === "function") {
+      window.risqueArtemisEnsureOmniClientHud(gs);
+    }
+    if (typeof window.risqueArtemisEnsureHudTogglesVisible === "function") {
+      window.risqueArtemisEnsureHudTogglesVisible();
+    }
+    mountSpectatorHint(gs);
+  };
 
   function teardownOtherPortablePhases() {
     if (typeof window.risqueArtemisTeardownMockPhases === "function") {

@@ -186,6 +186,26 @@
         /* ignore */
       }
     }
+    if (
+      window.risqueArtemisNetClient &&
+      typeof window.risqueArtemisFlushClientStatePush === "function"
+    ) {
+      try {
+        window.risqueArtemisFlushClientStatePush(gs);
+      } catch (eRcFlush) {
+        /* ignore */
+      }
+    } else if (
+      window.risqueArtemisHost &&
+      !window.risqueArtemisNetClient &&
+      typeof window.risqueFlushMirrorPush === "function"
+    ) {
+      try {
+        window.risqueFlushMirrorPush();
+      } catch (eHostRcFlush) {
+        /* ignore */
+      }
+    }
   }
   window.refreshReceiveCardPublicSpectatorMirror = refreshReceiveCardPublicSpectatorMirror;
 
@@ -740,6 +760,13 @@
         if (typeof window.risqueHostReplaceShellGameState === "function") {
           window.risqueHostReplaceShellGameState(gsAfter);
         }
+        if (
+          window.risqueArtemisMode &&
+          window.risqueArtemisNetClient &&
+          typeof window.risqueArtemisFlushClientStatePush === "function"
+        ) {
+          window.risqueArtemisFlushClientStatePush(gsAfter);
+        }
         if (typeof window.risqueMirrorPushGameState === "function") {
           window.risqueMirrorPushGameState();
         }
@@ -926,6 +953,7 @@
       gameState.round = completedRound + 1;
     }
     gameState.phase = "cardplay";
+    gameState.risqueArtemisControlSeq = Math.max(Number(gameState.risqueArtemisControlSeq) || 0, 0) + 1;
     receiveCardLog("Advanced turn", {
       currentPlayer: gameState.currentPlayer,
       round: gameState.round,

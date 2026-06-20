@@ -276,6 +276,17 @@ function renderReinforcePreview() {
   if (typeof window.risquePersistHostGameState === 'function') {
     window.risquePersistHostGameState();
   }
+  if (
+    window.risqueArtemisMode &&
+    window.risqueArtemisNetClient &&
+    typeof window.risqueArtemisFlushClientStatePush === 'function'
+  ) {
+    try {
+      window.risqueArtemisFlushClientStatePush(window.gameState);
+    } catch (eRfFlush) {
+      /* ignore */
+    }
+  }
 }
 
 function getLiveCurrentPlayer() {
@@ -921,6 +932,16 @@ function reinforceProceedAfterReinforce() {
       try {
         window.risqueMirrorPushGameState();
       } catch (eMirror) {
+        /* ignore */
+      }
+    }
+    if (
+      window.risqueArtemisNetClient &&
+      typeof window.risqueArtemisFlushClientStatePush === 'function'
+    ) {
+      try {
+        window.risqueArtemisFlushClientStatePush(gs);
+      } catch (eRcPush) {
         /* ignore */
       }
     }
