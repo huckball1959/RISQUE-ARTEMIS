@@ -2728,11 +2728,18 @@
               document.getElementById("confirm") &&
               typeof window.risqueArtemisLocalOwnsTurnDeploy === "function" &&
               window.risqueArtemisLocalOwnsTurnDeploy(gs)));
+        var skipHostAttackMirrorSync =
+          phHostMir === "attack" &&
+          window.risqueArtemisHost &&
+          !window.risqueArtemisNetClient &&
+          typeof window.risqueArtemisShouldHostMountAttack === "function" &&
+          window.risqueArtemisShouldHostMountAttack(gs);
         if (
           !skipHostCardplayMirrorSync &&
           !skipHostReinforceMirrorSync &&
           !skipHostReceiveCardMirrorSync &&
           !skipHostDeployMirrorSync &&
+          !skipHostAttackMirrorSync &&
           phHostMir !== "login" &&
           phHostMir !== "welcome" &&
           phHostMir !== "playerSelect" &&

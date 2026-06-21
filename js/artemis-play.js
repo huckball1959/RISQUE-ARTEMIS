@@ -2637,8 +2637,19 @@
   };
   window.risqueArtemisWireAttackMapClickDelegate();
 
+  /** Attack map routing is live — avoid retry-loop renderTerritories (host hover swell flicker). */
+  window.risqueArtemisIsAttackMapRoutingReady = function () {
+    return (
+      typeof window.risqueAttackPhaseTerritoryClick === "function" &&
+      window.handleTerritoryClick === window.risqueAttackPhaseTerritoryClick &&
+      document.body.getAttribute("data-risque-phase") === "attack"
+    );
+  };
+
   /** Active client attack: body phase + global click handler so renderTerritories wires attack taps. */
-  window.risqueArtemisEnsureAttackMapRouting = function (gsOpt) {
+  window.risqueArtemisEnsureAttackMapRouting = function (gsOpt, opts) {
+    opts = opts && typeof opts === "object" ? opts : {};
+    var forceRender = opts.forceRender !== false;
     var gs = gsOpt && typeof gsOpt === "object" ? gsOpt : window.gameState;
     if (!gs || String(gs.phase || "") !== "attack") return;
     var ownsAttack =
@@ -2688,14 +2699,21 @@
     if (typeof window.risqueArtemisSyncMyTurnClass === "function") {
       window.risqueArtemisSyncMyTurnClass(gs);
     }
-    if (window.gameUtils && typeof window.gameUtils.renderTerritories === "function") {
+    if (
+      forceRender &&
+      window.gameUtils &&
+      typeof window.gameUtils.renderTerritories === "function"
+    ) {
       try {
         window.gameUtils.renderTerritories(null, gs);
       } catch (eMap) {
         /* ignore */
       }
     }
-    if (typeof window.risqueAttackResyncTerritorySelectionVisuals === "function") {
+    if (
+      forceRender &&
+      typeof window.risqueAttackResyncTerritorySelectionVisuals === "function"
+    ) {
       try {
         window.risqueAttackResyncTerritorySelectionVisuals();
       } catch (eResyncSel) {
@@ -2727,6 +2745,12 @@
   window.risqueArtemisScheduleAttackMapRouting = function (gsOpt) {
     var gs = gsOpt && typeof gsOpt === "object" ? gsOpt : window.gameState;
     if (!gs || String(gs.phase || "") !== "attack") return;
+    if (
+      typeof window.risqueArtemisIsAttackMapRoutingReady === "function" &&
+      window.risqueArtemisIsAttackMapRoutingReady()
+    ) {
+      return;
+    }
     if (__artemisAttackMapReadyTimer) {
       try {
         clearTimeout(__artemisAttackMapReadyTimer);
@@ -2739,7 +2763,14 @@
     var tick = function () {
       attempt += 1;
       if (typeof window.risqueArtemisEnsureAttackMapRouting === "function") {
-        window.risqueArtemisEnsureAttackMapRouting(gs);
+        window.risqueArtemisEnsureAttackMapRouting(gs, { forceRender: attempt === 1 });
+      }
+      if (
+        typeof window.risqueArtemisIsAttackMapRoutingReady === "function" &&
+        window.risqueArtemisIsAttackMapRoutingReady()
+      ) {
+        __artemisAttackMapReadyTimer = null;
+        return;
       }
       if (attempt < 12) {
         __artemisAttackMapReadyTimer = setTimeout(tick, attempt < 4 ? 120 : 280);

@@ -118,9 +118,7 @@ html, body {
 .territory-number.territory-number--deal-pop {
   transition: opacity 0.38s ease-out;
 }
-.territory-circle:hover {
-  r: 35;
-}
+/* Hover swell is handled in core.js (hit circle only) — fixed CSS r fought scaled campaign markers. */
 .territory-number {
   font-family: Arial, sans-serif;
   font-weight: bold;

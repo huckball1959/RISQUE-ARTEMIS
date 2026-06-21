@@ -968,15 +968,13 @@ window.gameUtils = {
       .territory-number.territory-number--deal-pop {
         transition: opacity 0.38s ease-out;
       }
-      .territory-circle:hover {
-        r: 35;
-      }
       .territory-circle.selected {
         stroke-width: 3;
       }
       .territory-circle.campaign-warpath {
         stroke-width: 3;
         filter: drop-shadow(0 0 4px rgba(255, 255, 120, 0.9));
+        transition: stroke-width 0.2s, filter 0.2s;
       }
       .territory-number {
         font-family: Arial, sans-serif;
@@ -2174,9 +2172,9 @@ window.gameUtils = {
         }
         let territoryHoverEnter = null;
         let territoryHoverLeave = null;
+        /* Base radii always — attack/reinforce skip hover swell only (not this init). */
         if (useMgmDual && mgmVis) {
           const visR = displayBaseR * MGM_SELECT_R_MULT;
-          let hoverDepth = 0;
           circle.setAttributeNS(null, 'r', popIn ? '0' : String(displayBaseR));
           mgmVis.setAttributeNS(null, 'r', popIn ? '0' : String(displayBaseR));
           if (markerOutline) {
@@ -2189,47 +2187,49 @@ window.gameUtils = {
               popIn ? '0' : String(markerInnerSeparatorRadiusFor(displayBaseR))
             );
           }
-          const bumpMgmRadii = () => {
-            const hitR = displayBaseR + 5;
-            circle.setAttributeNS(null, 'r', String(hitR));
-            mgmVis.setAttributeNS(null, 'r', String(hitR * MGM_SELECT_R_MULT));
-            if (markerOutline) {
-              markerOutline.setAttributeNS(null, 'r', String(markerOutlineRadiusFor(hitR * MGM_SELECT_R_MULT)));
-            }
-            if (markerInnerSeparator) {
-              markerInnerSeparator.setAttributeNS(
-                null,
-                'r',
-                String(markerInnerSeparatorRadiusFor(hitR * MGM_SELECT_R_MULT))
-              );
-            }
-          };
-          const resetMgmRadii = () => {
-            circle.setAttributeNS(null, 'r', String(displayBaseR));
-            mgmVis.setAttributeNS(null, 'r', String(visR));
-            if (markerOutline) {
-              markerOutline.setAttributeNS(null, 'r', String(markerOutlineRadiusFor(visR)));
-            }
-            if (markerInnerSeparator) {
-              markerInnerSeparator.setAttributeNS(
-                null,
-                'r',
-                String(markerInnerSeparatorRadiusFor(visR))
-              );
-            }
-          };
-          const onHoverEnter = () => {
-            hoverDepth += 1;
-            if (!deployTerritorySelected) bumpMgmRadii();
-          };
-          const onHoverLeave = () => {
-            hoverDepth = Math.max(0, hoverDepth - 1);
-            if (hoverDepth === 0) resetMgmRadii();
-          };
-          territoryHoverEnter = onHoverEnter;
-          territoryHoverLeave = onHoverLeave;
+          if (!useGlobalTerritoryHandler) {
+            let hoverDepth = 0;
+            const bumpMgmRadii = () => {
+              const hitR = displayBaseR + 5;
+              circle.setAttributeNS(null, 'r', String(hitR));
+              mgmVis.setAttributeNS(null, 'r', String(hitR * MGM_SELECT_R_MULT));
+              if (markerOutline) {
+                markerOutline.setAttributeNS(null, 'r', String(markerOutlineRadiusFor(hitR * MGM_SELECT_R_MULT)));
+              }
+              if (markerInnerSeparator) {
+                markerInnerSeparator.setAttributeNS(
+                  null,
+                  'r',
+                  String(markerInnerSeparatorRadiusFor(hitR * MGM_SELECT_R_MULT))
+                );
+              }
+            };
+            const resetMgmRadii = () => {
+              circle.setAttributeNS(null, 'r', String(displayBaseR));
+              mgmVis.setAttributeNS(null, 'r', String(visR));
+              if (markerOutline) {
+                markerOutline.setAttributeNS(null, 'r', String(markerOutlineRadiusFor(visR)));
+              }
+              if (markerInnerSeparator) {
+                markerInnerSeparator.setAttributeNS(
+                  null,
+                  'r',
+                  String(markerInnerSeparatorRadiusFor(visR))
+                );
+              }
+            };
+            const onHoverEnter = () => {
+              hoverDepth += 1;
+              if (!deployTerritorySelected && !onWarpath) bumpMgmRadii();
+            };
+            const onHoverLeave = () => {
+              hoverDepth = Math.max(0, hoverDepth - 1);
+              if (hoverDepth === 0) resetMgmRadii();
+            };
+            territoryHoverEnter = onHoverEnter;
+            territoryHoverLeave = onHoverLeave;
+          }
         } else {
-          let hoverDepth = 0;
           circle.setAttributeNS(null, 'r', popIn ? '0' : String(displayBaseR));
           if (markerOutline) {
             markerOutline.setAttributeNS(null, 'r', popIn ? '0' : String(markerOutlineRadiusFor(displayBaseR)));
@@ -2241,38 +2241,41 @@ window.gameUtils = {
               popIn ? '0' : String(markerInnerSeparatorRadiusFor(displayBaseR))
             );
           }
-          const bumpBaseRadii = () => {
-            circle.setAttributeNS(null, 'r', displayBaseR + 5);
-            if (markerOutline) markerOutline.setAttributeNS(null, 'r', String(markerOutlineRadiusFor(displayBaseR + 5)));
-            if (markerInnerSeparator) {
-              markerInnerSeparator.setAttributeNS(
-                null,
-                'r',
-                String(markerInnerSeparatorRadiusFor(displayBaseR + 5))
-              );
-            }
-          };
-          const resetBaseRadii = () => {
-            circle.setAttributeNS(null, 'r', String(displayBaseR));
-            if (markerOutline) markerOutline.setAttributeNS(null, 'r', String(markerOutlineRadiusFor(displayBaseR)));
-            if (markerInnerSeparator) {
-              markerInnerSeparator.setAttributeNS(
-                null,
-                'r',
-                String(markerInnerSeparatorRadiusFor(displayBaseR))
-              );
-            }
-          };
-          const onHoverEnter = () => {
-            hoverDepth += 1;
-            if (!deployTerritorySelected) bumpBaseRadii();
-          };
-          const onHoverLeave = () => {
-            hoverDepth = Math.max(0, hoverDepth - 1);
-            if (hoverDepth === 0) resetBaseRadii();
-          };
-          territoryHoverEnter = onHoverEnter;
-          territoryHoverLeave = onHoverLeave;
+          if (!useGlobalTerritoryHandler) {
+            let hoverDepth = 0;
+            const bumpBaseRadii = () => {
+              circle.setAttributeNS(null, 'r', displayBaseR + 5);
+              if (markerOutline) markerOutline.setAttributeNS(null, 'r', String(markerOutlineRadiusFor(displayBaseR + 5)));
+              if (markerInnerSeparator) {
+                markerInnerSeparator.setAttributeNS(
+                  null,
+                  'r',
+                  String(markerInnerSeparatorRadiusFor(displayBaseR + 5))
+                );
+              }
+            };
+            const resetBaseRadii = () => {
+              circle.setAttributeNS(null, 'r', String(displayBaseR));
+              if (markerOutline) markerOutline.setAttributeNS(null, 'r', String(markerOutlineRadiusFor(displayBaseR)));
+              if (markerInnerSeparator) {
+                markerInnerSeparator.setAttributeNS(
+                  null,
+                  'r',
+                  String(markerInnerSeparatorRadiusFor(displayBaseR))
+                );
+              }
+            };
+            const onHoverEnter = () => {
+              hoverDepth += 1;
+              if (!deployTerritorySelected && !onWarpath) bumpBaseRadii();
+            };
+            const onHoverLeave = () => {
+              hoverDepth = Math.max(0, hoverDepth - 1);
+              if (hoverDepth === 0) resetBaseRadii();
+            };
+            territoryHoverEnter = onHoverEnter;
+            territoryHoverLeave = onHoverLeave;
+          }
         }
         if (markerOutline) svg.appendChild(markerOutline);
         if (mgmVis) svg.appendChild(mgmVis);
@@ -2401,7 +2404,7 @@ window.gameUtils = {
         );
         hitCircle.setAttributeNS(null, 'fill', 'transparent');
         hitCircle.setAttributeNS(null, 'stroke', 'none');
-        const wireTerritoryPointer = function (el) {
+        const wireTerritoryPointer = function (el, wireHover) {
           if (!el) return;
           el.style.pointerEvents = 'all';
           el.style.cursor = 'pointer';
@@ -2411,22 +2414,22 @@ window.gameUtils = {
           if (territoryKeydownHandler) {
             el.addEventListener('keydown', territoryKeydownHandler);
           }
-          if (territoryHoverEnter) {
+          if (wireHover !== false && territoryHoverEnter) {
             el.addEventListener('mouseenter', territoryHoverEnter);
           }
-          if (territoryHoverLeave) {
+          if (wireHover !== false && territoryHoverLeave) {
             el.addEventListener('mouseleave', territoryHoverLeave);
           }
         };
         if (useGlobalTerritoryHandler) {
-          wireTerritoryPointer(circle);
-          wireTerritoryPointer(number);
-          wireTerritoryPointer(troopFill);
-          wireTerritoryPointer(markerOutline);
-          wireTerritoryPointer(markerInnerSeparator);
-          wireTerritoryPointer(troopNotchGroup);
-          wireTerritoryPointer(mgmVis);
-          wireTerritoryPointer(hitCircle);
+          wireTerritoryPointer(circle, false);
+          wireTerritoryPointer(number, false);
+          wireTerritoryPointer(troopFill, false);
+          wireTerritoryPointer(markerOutline, false);
+          wireTerritoryPointer(markerInnerSeparator, false);
+          wireTerritoryPointer(troopNotchGroup, false);
+          wireTerritoryPointer(mgmVis, false);
+          wireTerritoryPointer(hitCircle, true);
         } else {
           hitCircle.style.pointerEvents = 'all';
           hitCircle.style.cursor = 'pointer';
