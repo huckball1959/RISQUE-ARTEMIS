@@ -1555,6 +1555,18 @@
     if (!gs || !window.gameUtils || typeof window.gameUtils.renderTerritories !== "function") {
       return;
     }
+    if (
+      window.risqueArtemisHost &&
+      !window.risqueArtemisNetClient &&
+      typeof window.risqueArtemisIsMyTurn === "function" &&
+      !window.risqueArtemisIsMyTurn(gs)
+    ) {
+      try {
+        delete window.__risqueSuppressHostMapRedraw;
+      } catch (eDepSup) {
+        /* ignore */
+      }
+    }
     var dep = risqueArtemisDeployMapDepsFromState(gs);
     window.deployedTroops = dep;
     try {
@@ -1810,6 +1822,7 @@
   /** Public TV receive-card: staging → hand merge fly animation. */
   var _pubRc = {
     playedMergeSeq: null,
+    mergeAnimTargetSeq: null,
     mergeAnimRunning: false,
     mergeFallbackTimer: null
   };
@@ -1822,16 +1835,74 @@
     var oldFly = document.querySelector(".risque-public-receivecard-flyer");
     if (oldFly && oldFly.parentNode) oldFly.parentNode.removeChild(oldFly);
     _pubRc.mergeAnimRunning = false;
+    _pubRc.mergeAnimTargetSeq = null;
   }
+
+  function risquePublicReceiveCardSpectatorVoice(gs) {
+    if (!gs || !/^(receivecard|getcard|con-receivecard)$/i.test(String(gs.phase || ""))) {
+      return null;
+    }
+    var pubRcPlayer = gs.currentPlayer ? String(gs.currentPlayer).trim() : "";
+    var specRc =
+      gs.risquePublicReceiveCardSpectator &&
+      typeof gs.risquePublicReceiveCardSpectator === "object"
+        ? gs.risquePublicReceiveCardSpectator
+        : {};
+    var pubRcN = 0;
+    try {
+      var pubRcPl = (gs.players || []).find(function (p) {
+        return p && p.name === pubRcPlayer;
+      });
+      pubRcN = pubRcPl && pubRcPl.cards ? pubRcPl.cards.length : 0;
+    } catch (ePubRc) {
+      pubRcN = 0;
+    }
+    var pubRcHandN =
+      typeof risquePublicSpectatorHandCountFromGs === "function"
+        ? risquePublicSpectatorHandCountFromGs(gs)
+        : pubRcN;
+    var rcReceived =
+      !!gs.cardAwardedThisTurn &&
+      pubRcHandN > 0 &&
+      (!specRc.showStaging || specRc.stagingMerged === true);
+    var basePrimary = "";
+    var reportText = "";
+    if (pubRcPlayer) {
+      if (rcReceived) {
+        var rcDisp =
+          gs.risquePublicCardplaySpectatorPlayer != null &&
+          String(gs.risquePublicCardplaySpectatorPlayer).trim() !== ""
+            ? String(gs.risquePublicCardplaySpectatorPlayer).trim()
+            : pubRcPlayer.charAt(0).toUpperCase() + pubRcPlayer.slice(1);
+        basePrimary = rcDisp.toUpperCase() + " HAS RECEIVED A CARD";
+        reportText = risquePublicFormatCardplaySpectatorHandLine(gs);
+      } else if (specRc.showStaging && (Number(specRc.stagingBackCount) > 0 || gs.cardAwardedThisTurn)) {
+        basePrimary = pubRcPlayer.toUpperCase() + " RECEIVES CARD";
+        reportText = "Card drawn — adding to hand…";
+      } else {
+        basePrimary = pubRcPlayer.toUpperCase() + " RECEIVES CARD";
+        reportText = "Waiting…";
+      }
+    }
+    return {
+      basePrimary: basePrimary,
+      reportText: reportText,
+      reportClassName: "ucp-voice-report ucp-voice-report--public-receivecard"
+    };
+  }
+  window.risquePublicReceiveCardSpectatorVoice = risquePublicReceiveCardSpectatorVoice;
 
   function risquePublicReceiveCardFinishMergeAnim(finalHandCount) {
     risquePublicReceiveCardClearMergeAnimTimers();
+    if (typeof window.risqueArtemisClearCardplaySpectatorVoiceBacks === "function") {
+      window.risqueArtemisClearCardplaySpectatorVoiceBacks();
+    }
     var handEl = document.getElementById("risque-public-receivecard-hand-backs");
     var stagingEl = document.getElementById("risque-public-receivecard-staging-backs");
     var stagingWrap = document.getElementById("risque-public-receivecard-staging-wrap");
     var nFinal = Math.max(0, Math.floor(Number(finalHandCount) || 0));
-    risquePublicUpdateCardBacksContainer(handEl, nFinal);
-    risquePublicUpdateCardBacksContainer(stagingEl, 0);
+    risquePublicUpdateCardBacksContainer(handEl, nFinal, { keepEmptyVisible: true });
+    risquePublicUpdateCardBacksContainer(stagingEl, 0, { keepEmptyVisible: false });
     if (stagingWrap) {
       stagingWrap.hidden = true;
     }
@@ -1846,16 +1917,35 @@
     }
   }
 
+  function risquePublicReceiveCardScheduleMergeAnim(spec) {
+    if (!spec || spec.mergeAnimSeq == null) return;
+    var seq = Number(spec.mergeAnimSeq);
+    if (!Number.isFinite(seq) || seq <= 0) return;
+    if (_pubRc.mergeAnimRunning && _pubRc.mergeAnimTargetSeq === seq) return;
+    if (_pubRc.playedMergeSeq === seq) return;
+    var specCopy = {
+      mergeAnimSeq: spec.mergeAnimSeq,
+      mergeAnimFromHand: spec.mergeAnimFromHand,
+      mergeFinalHandCount: spec.mergeFinalHandCount
+    };
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        risquePublicReceiveCardPlayMergeAnim(specCopy);
+      });
+    });
+  }
+
   function risquePublicReceiveCardPlayMergeAnim(spec) {
     if (!spec || spec.mergeAnimSeq == null) return;
     var seq = Number(spec.mergeAnimSeq);
     if (!Number.isFinite(seq) || seq <= 0) return;
-    if (_pubRc.mergeAnimRunning && _pubRc.playedMergeSeq === seq) return;
+    if (_pubRc.mergeAnimRunning && _pubRc.mergeAnimTargetSeq === seq) return;
     if (_pubRc.playedMergeSeq === seq) return;
 
     try {
       if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         _pubRc.playedMergeSeq = seq;
+        _pubRc.mergeAnimTargetSeq = null;
         risquePublicReceiveCardFinishMergeAnim(spec.mergeFinalHandCount);
         return;
       }
@@ -1864,7 +1954,7 @@
     }
 
     risquePublicReceiveCardClearMergeAnimTimers();
-    _pubRc.playedMergeSeq = seq;
+    _pubRc.mergeAnimTargetSeq = seq;
     _pubRc.mergeAnimRunning = true;
 
     var fromHand =
@@ -1895,48 +1985,54 @@
       handPane.classList.add("risque-public-receivecard-pane--merge-target");
     }
 
-    risquePublicUpdateCardBacksContainer(handEl, fromHand);
-    risquePublicUpdateCardBacksContainer(stagingEl, 1);
+    risquePublicUpdateCardBacksContainer(handEl, fromHand, { keepEmptyVisible: true });
+    risquePublicUpdateCardBacksContainer(stagingEl, 1, { keepEmptyVisible: true });
 
     var stagingCard = stagingEl && stagingEl.querySelector(".risque-public-card-back");
     if (!split || !stagingWrap || !stagingCard) {
+      _pubRc.mergeAnimRunning = false;
+      _pubRc.mergeAnimTargetSeq = null;
       risquePublicReceiveCardFinishMergeAnim(toHand);
+      _pubRc.playedMergeSeq = seq;
       return;
     }
 
-    var hostEl = split.parentElement || document.getElementById("risque-phase-content") || document.body;
-    var hostRect = hostEl.getBoundingClientRect();
     var sRect = stagingCard.getBoundingClientRect();
     var handRect = handEl ? handEl.getBoundingClientRect() : sRect;
+    if (!handRect || handRect.width < 8) {
+      handRect = handPane ? handPane.getBoundingClientRect() : handRect;
+    }
     var w = Math.max(32, sRect.width || 48);
     var h = Math.max(48, sRect.height || 72);
-    var startX = sRect.left - hostRect.left + sRect.width / 2;
-    var startY = sRect.top - hostRect.top + sRect.height / 2;
-    var targetX = handRect.left - hostRect.left + handRect.width / 2;
-    var targetY = handRect.top - hostRect.top + handRect.height / 2;
+    var startCx = sRect.left + sRect.width / 2;
+    var startCy = sRect.top + sRect.height / 2;
+    var endCx = handRect.left + Math.max(handRect.width, w) / 2;
+    var endCy = handRect.top + Math.max(handRect.height, h) / 2;
 
     var flyer = document.createElement("img");
-    flyer.className = "risque-public-receivecard-flyer";
+    flyer.className = "risque-public-receivecard-flyer risque-public-receivecard-flyer--fixed";
     flyer.src = RISQUE_PUBLIC_CARDBACK_SRC;
     flyer.alt = "";
     flyer.decoding = "async";
     flyer.style.width = w + "px";
     flyer.style.height = h + "px";
-    flyer.style.left = startX - w / 2 + "px";
-    flyer.style.top = startY - h / 2 + "px";
-    hostEl.appendChild(flyer);
-    stagingCard.style.opacity = "0.15";
+    flyer.style.left = startCx - w / 2 + "px";
+    flyer.style.top = startCy - h / 2 + "px";
+    document.body.appendChild(flyer);
+    stagingCard.style.visibility = "hidden";
+    _pubRc.playedMergeSeq = seq;
 
-    var dx = targetX - startX;
-    var dy = targetY - startY;
+    var dx = endCx - startCx;
+    var dy = endCy - startCy;
     var done = false;
     function finishFly() {
       if (done) return;
       done = true;
       if (flyer.parentNode) flyer.parentNode.removeChild(flyer);
-      stagingCard.style.opacity = "";
+      stagingCard.style.visibility = "";
       if (stagingWrap) stagingWrap.classList.remove("risque-public-receivecard-staging-wrap--merging");
       if (handPane) handPane.classList.remove("risque-public-receivecard-pane--merge-target");
+      _pubRc.mergeAnimTargetSeq = null;
       risquePublicReceiveCardFinishMergeAnim(toHand);
     }
 
@@ -2728,12 +2824,9 @@
               document.getElementById("confirm") &&
               typeof window.risqueArtemisLocalOwnsTurnDeploy === "function" &&
               window.risqueArtemisLocalOwnsTurnDeploy(gs)));
+        /* Attack: host uses attack_live + ApplyHostAttackSpectator — mirror push must not re-sync shell mid-roll. */
         var skipHostAttackMirrorSync =
-          phHostMir === "attack" &&
-          window.risqueArtemisHost &&
-          !window.risqueArtemisNetClient &&
-          typeof window.risqueArtemisShouldHostMountAttack === "function" &&
-          window.risqueArtemisShouldHostMountAttack(gs);
+          phHostMir === "attack" && window.risqueArtemisHost && !window.risqueArtemisNetClient;
         if (
           !skipHostCardplayMirrorSync &&
           !skipHostReinforceMirrorSync &&
@@ -3677,7 +3770,42 @@
   function syncPhaseDataAttr(gs) {
     try {
       if (!document.body) return;
-      document.body.setAttribute("data-risque-phase", gs && gs.phase ? String(gs.phase) : "");
+      var phaseGs = gs;
+      if (
+        !window.risqueDisplayIsPublic &&
+        window.risqueArtemisHost &&
+        !window.risqueArtemisNetClient &&
+        window.gameState &&
+        String(window.gameState.phase || "") === "attack" &&
+        typeof window.risqueArtemisShouldHostMountAttack === "function" &&
+        !window.risqueArtemisShouldHostMountAttack(window.gameState)
+      ) {
+        phaseGs = window.gameState;
+      }
+      document.body.setAttribute("data-risque-phase", phaseGs && phaseGs.phase ? String(phaseGs.phase) : "");
+      if (
+        !window.risqueDisplayIsPublic &&
+        window.risqueArtemisHost &&
+        !window.risqueArtemisNetClient
+      ) {
+        var phHostSync = phaseGs && phaseGs.phase ? String(phaseGs.phase) : "";
+        if (
+          phHostSync !== "attack" &&
+          typeof window.risqueArtemisTeardownHostAttackSpectator === "function"
+        ) {
+          window.risqueArtemisTeardownHostAttackSpectator();
+        } else if (
+          phHostSync === "attack" &&
+          typeof window.risqueArtemisShouldHostMountAttack === "function" &&
+          window.risqueArtemisShouldHostMountAttack(phaseGs || gs) &&
+          typeof window.risqueArtemisRestoreHostAttackChrome === "function"
+        ) {
+          window.risqueArtemisRestoreHostAttackChrome();
+          if (typeof window.risqueArtemisEnsureHostActiveAttackColumn === "function") {
+            window.risqueArtemisEnsureHostActiveAttackColumn();
+          }
+        }
+      }
       if (!gs || String(gs.phase || "") !== "reinforce") {
         document.body.removeAttribute("data-risque-reinforce-slot-mode");
       }
@@ -3693,7 +3821,13 @@
         risquePublicApplyCursorMirror();
       } else {
         if (
-          document.body.classList.contains("risque-artemis-attack-spectator") &&
+          (document.body.classList.contains("risque-artemis-attack-spectator") ||
+            (window.risqueArtemisHost &&
+              !window.risqueArtemisNetClient &&
+              window.gameState &&
+              String(window.gameState.phase || "") === "attack" &&
+              typeof window.risqueArtemisShouldHostMountAttack === "function" &&
+              !window.risqueArtemisShouldHostMountAttack(window.gameState))) &&
           gs &&
           String(gs.phase || "") === "attack"
         ) {
@@ -5379,10 +5513,43 @@
       if (!basePrimary && cvPs.primary != null) basePrimary = String(cvPs.primary);
       renderPlayerSelectFlash = true;
     } else if (
+      window.risqueArtemisMode &&
+      String(gs.phase || "") === "reinforce"
+    ) {
+      var rfLocalActive =
+        !window.risqueDisplayIsPublic &&
+        typeof window.risqueArtemisIsMyTurn === "function" &&
+        window.risqueArtemisIsMyTurn(gs);
+      if (rfLocalActive) {
+        if (cv && cv.primary != null && String(cv.primary).trim() !== "") {
+          basePrimary = String(cv.primary).trim();
+        } else if (gs.currentPlayer) {
+          basePrimary = String(gs.currentPlayer).toUpperCase() + " — REINFORCE";
+        }
+        if (cv && cv.report != null) {
+          reportText = String(cv.report).trim();
+        }
+      } else {
+        if (typeof window.risqueReinforceSpectatorControlVoiceText === "function") {
+          basePrimary = String(window.risqueReinforceSpectatorControlVoiceText(gs) || "").trim();
+        }
+        if (!basePrimary && gs.currentPlayer) {
+          basePrimary = String(gs.currentPlayer).toUpperCase() + " — REINFORCE";
+        }
+        reportText =
+          gs.risqueReinforceSpectatorReport != null
+            ? String(gs.risqueReinforceSpectatorReport).trim()
+            : "";
+      }
+      reportClassName = "ucp-voice-report ucp-voice-report--reinforce-hud";
+    } else if (
       window.risqueDisplayIsPublic &&
       gs &&
       gs.risquePublicNextPlayerHandoffPrimary != null &&
-      String(gs.risquePublicNextPlayerHandoffPrimary).trim() !== ""
+      String(gs.risquePublicNextPlayerHandoffPrimary).trim() !== "" &&
+      !/^(reinforce|attack|deploy|con-deploy|cardplay|con-cardplay|income|con-income|receivecard|getcard)$/i.test(
+        String(gs.phase || "")
+      )
     ) {
       basePrimary = String(gs.risquePublicNextPlayerHandoffPrimary).trim();
       reportText =
@@ -5489,30 +5656,42 @@
       window.risqueArtemisMode &&
       (String(gs.phase || "") === "cardplay" || String(gs.phase || "") === "con-cardplay")
     ) {
-      var cpBanner =
-        gs.risquePublicCardplayRecap && gs.risquePublicCardplayRecap.primary
-          ? String(gs.risquePublicCardplayRecap.primary).trim()
-          : "";
-      var cpVoice =
-        cv && cv.primary != null ? String(cv.primary).trim() : "";
-      if (cpPub) {
-        basePrimary = cpPub;
-        reportText = cpRep;
-      } else if (cpBanner) {
-        basePrimary = cpBanner;
-      } else if (cpVoice) {
-        basePrimary = risquePublicSanitizeControlVoicePrimary(cv.primary);
-        if (!basePrimary) basePrimary = cpVoice;
-      } else if (gs.currentPlayer) {
-        basePrimary = String(gs.currentPlayer).toUpperCase() + " IS IN CARD PLAY";
+      var cardplayActiveLocal =
+        !window.risqueDisplayIsPublic &&
+        typeof window.risqueArtemisIsMyTurn === "function" &&
+        window.risqueArtemisIsMyTurn(gs);
+      if (!cardplayActiveLocal) {
+        var cpBanner =
+          gs.risquePublicCardplayRecap && gs.risquePublicCardplayRecap.primary
+            ? String(gs.risquePublicCardplayRecap.primary).trim()
+            : "";
+        var cpVoice =
+          cv && cv.primary != null ? String(cv.primary).trim() : "";
+        if (cpPub) {
+          basePrimary = cpPub;
+          reportText =
+            cpRep ||
+            (typeof risquePublicFormatCardplaySpectatorHandLine === "function"
+              ? risquePublicFormatCardplaySpectatorHandLine(gs)
+              : "");
+        } else if (cpBanner) {
+          basePrimary = cpBanner;
+        } else if (cpVoice) {
+          basePrimary = risquePublicSanitizeControlVoicePrimary(cv.primary);
+          if (!basePrimary) basePrimary = cpVoice;
+        } else if (gs.currentPlayer) {
+          basePrimary = String(gs.currentPlayer).toUpperCase() + " IS IN CARD PLAY — WAITING...";
+        }
+        if (!reportText) {
+          reportText =
+            cpRep ||
+            (typeof risquePublicFormatCardplaySpectatorHandLine === "function"
+              ? risquePublicFormatCardplaySpectatorHandLine(gs)
+              : "") ||
+            (cv && cv.report != null ? String(cv.report).trim() : "");
+        }
+        reportClassName = "ucp-voice-report ucp-voice-report--public-cardplay";
       }
-      if (!reportText) {
-        reportText =
-          cpRep ||
-          (cv && cv.report != null ? String(cv.report).trim() : "") ||
-          "WAITING...";
-      }
-      reportClassName = "ucp-voice-report ucp-voice-report--public-cardplay";
     } else if (
       window.risqueArtemisMode &&
       (window.risqueDisplayIsPublic || artemisClientSetupMirror) &&
@@ -5629,53 +5808,24 @@
       }
     }
 
-    /* Public TV: do not reveal which card was drawn — headline + hand size only (no card names). */
+    /* Public TV + ARTEMIS spectators: do not reveal which card was drawn — headline only (no card names). */
+    var rcSpecVoice = null;
     if (
-      window.risqueDisplayIsPublic &&
       gs &&
-      /^(receivecard|getcard|con-receivecard)$/i.test(String(gs.phase || ""))
+      /^(receivecard|getcard|con-receivecard)$/i.test(String(gs.phase || "")) &&
+      (window.risqueDisplayIsPublic ||
+        (typeof risqueReceiveCardSpectatorHintShouldPaint === "function" &&
+          risqueReceiveCardSpectatorHintShouldPaint(gs)))
     ) {
-      var pubRcPlayer = gs.currentPlayer ? String(gs.currentPlayer).trim() : "";
-      var specRc =
-        gs.risquePublicReceiveCardSpectator &&
-        typeof gs.risquePublicReceiveCardSpectator === "object"
-          ? gs.risquePublicReceiveCardSpectator
-          : {};
-      var pubRcN = 0;
-      try {
-        var pubRcPl = (gs.players || []).find(function (p) {
-          return p && p.name === pubRcPlayer;
-        });
-        pubRcN = pubRcPl && pubRcPl.cards ? pubRcPl.cards.length : 0;
-      } catch (ePubRc) {
-        pubRcN = 0;
-      }
-      var pubRcHandN =
-        typeof risquePublicSpectatorHandCountFromGs === "function"
-          ? risquePublicSpectatorHandCountFromGs(gs)
-          : pubRcN;
-      var rcReceived =
-        !!gs.cardAwardedThisTurn &&
-        pubRcHandN > 0 &&
-        (!specRc.showStaging || specRc.stagingMerged === true);
-      if (pubRcPlayer) {
-        if (rcReceived) {
-          var rcDisp =
-            gs.risquePublicCardplaySpectatorPlayer != null &&
-            String(gs.risquePublicCardplaySpectatorPlayer).trim() !== ""
-              ? String(gs.risquePublicCardplaySpectatorPlayer).trim()
-              : pubRcPlayer.charAt(0).toUpperCase() + pubRcPlayer.slice(1);
-          basePrimary = rcDisp.toUpperCase() + " HAS RECEIVED A CARD";
-          reportText = risquePublicFormatCardplaySpectatorHandLine(gs);
-        } else if (specRc.showStaging && (Number(specRc.stagingBackCount) > 0 || gs.cardAwardedThisTurn)) {
-          basePrimary = pubRcPlayer.toUpperCase() + " RECEIVES CARD";
-          reportText = "Card drawn — adding to hand…";
-        } else {
-          basePrimary = pubRcPlayer.toUpperCase() + " RECEIVES CARD";
-          reportText = "Waiting…";
-        }
-      }
-      reportClassName = "ucp-voice-report ucp-voice-report--public-receivecard";
+      rcSpecVoice =
+        typeof risquePublicReceiveCardSpectatorVoice === "function"
+          ? risquePublicReceiveCardSpectatorVoice(gs)
+          : null;
+    }
+    if (rcSpecVoice) {
+      basePrimary = rcSpecVoice.basePrimary;
+      reportText = rcSpecVoice.reportText;
+      reportClassName = rcSpecVoice.reportClassName;
     }
 
     /* Book + card art: headline only in voice; effect lines live in #log-text (risqueCombatLogTail). */
@@ -5725,11 +5875,37 @@
       typeof window.risqueIsAttackCampaignMapPlanning === "function" &&
       window.risqueIsAttackCampaignMapPlanning();
 
+    var skipHostVoiceMirrorForCardplayActive =
+      !window.risqueDisplayIsPublic &&
+      window.risqueArtemisMode &&
+      cpPhase &&
+      typeof window.risqueArtemisIsMyTurn === "function" &&
+      window.risqueArtemisIsMyTurn(gs);
+
+    var skipHostVoiceMirrorForCampaignInstantHud =
+      !window.risqueDisplayIsPublic &&
+      String(gs.phase || "") === "attack" &&
+      (function () {
+        var cvInstant = document.getElementById("control-voice");
+        return !!(
+          cvInstant && cvInstant.classList.contains("ucp-control-voice--campaign-instant")
+        );
+      })();
+
+    var skipHostVoiceMirrorForCampaignActive =
+      !window.risqueDisplayIsPublic &&
+      String(gs.phase || "") === "attack" &&
+      typeof window.risqueIsAttackCampaignActive === "function" &&
+      window.risqueIsAttackCampaignActive();
+
     var skipHostVoiceMirrorClobber =
       skipHostVoiceMirrorForAttackXfer ||
       skipHostVoiceMirrorForConquestCeleb ||
       skipHostVoiceMirrorForSetupDeployActive ||
-      skipHostVoiceMirrorForCampaignMapPlanning;
+      skipHostVoiceMirrorForCampaignMapPlanning ||
+      skipHostVoiceMirrorForCampaignInstantHud ||
+      skipHostVoiceMirrorForCampaignActive ||
+      skipHostVoiceMirrorForCardplayActive;
 
     var conquestCelebHtml =
       gs &&
@@ -5896,6 +6072,28 @@
       }
     }
     risqueApplyConditionTally(gs);
+    if (typeof window.risqueArtemisClearCardplaySpectatorVoiceBacks === "function") {
+      window.risqueArtemisClearCardplaySpectatorVoiceBacks();
+    }
+    if (
+      window.risqueArtemisMode &&
+      cpPhase &&
+      typeof window.risqueArtemisIsMyTurn === "function" &&
+      !window.risqueArtemisIsMyTurn(gs) &&
+      hasCardplayTvRecapContent &&
+      typeof window.risqueArtemisInjectCardplaySpectatorVoiceBacks === "function"
+    ) {
+      window.risqueArtemisInjectCardplaySpectatorVoiceBacks(gs);
+      var slotCvOnly = document.getElementById("risque-phase-content");
+      if (
+        slotCvOnly &&
+        (slotCvOnly.querySelector(".cardplay-compact-root") ||
+          slotCvOnly.querySelector(".risque-public-private-hint") ||
+          slotCvOnly.querySelector(".risque-artemis-cardplay-spectate"))
+      ) {
+        slotCvOnly.innerHTML = "";
+      }
+    }
   }
 
   window.risqueRefreshControlVoiceMirror = function (gs) {
@@ -8553,17 +8751,26 @@
 
   var RISQUE_PUBLIC_CARDBACK_SRC = "assets/images/Cards/CARDBACK.webp";
 
-  function risquePublicUpdateCardBacksContainer(container, count) {
+  function risquePublicUpdateCardBacksContainer(container, count, opts) {
     if (!container) return;
+    opts = opts || {};
     var n = Math.max(0, Math.floor(Number(count) || 0));
     var imgs = container.querySelectorAll(".risque-public-card-back");
-    if (imgs.length === n) return;
+    if (imgs.length === n && !(n <= 0 && opts.keepEmptyVisible)) return;
     container.innerHTML = "";
     if (n <= 0) {
-      container.hidden = true;
-      container.setAttribute("aria-hidden", "true");
+      if (opts.keepEmptyVisible) {
+        container.hidden = false;
+        container.removeAttribute("aria-hidden");
+        container.classList.add("risque-public-hand-backs--empty");
+      } else {
+        container.hidden = true;
+        container.setAttribute("aria-hidden", "true");
+        container.classList.remove("risque-public-hand-backs--empty");
+      }
       return;
     }
+    container.classList.remove("risque-public-hand-backs--empty");
     container.hidden = false;
     container.removeAttribute("aria-hidden");
     for (var i = 0; i < n; i += 1) {
@@ -8586,8 +8793,11 @@
       disp = nm.charAt(0).toUpperCase() + nm.slice(1);
     }
     if (!disp) disp = "Player";
+    var dispU = disp.toUpperCase();
     var n = risquePublicSpectatorHandCountFromGs(gs);
-    return disp + " has " + n + " card" + (n === 1 ? "" : "s") + " in hand.";
+    if (n <= 0) return dispU + " HAS NO CARDS IN HAND";
+    if (n === 1) return dispU + " HAS 1 CARD IN HAND";
+    return dispU + " HAS " + n + " CARDS IN HAND";
   }
   window.risquePublicFormatCardplaySpectatorHandLine = risquePublicFormatCardplaySpectatorHandLine;
   window.risquePublicSpectatorHandCountFromGs = risquePublicSpectatorHandCountFromGs;
@@ -8598,7 +8808,7 @@
    * often skip cardplay.mount(), so inject here. Hide during committed-book recap (summary/step).
    */
   function risquePublicEnsureCardplayPrivateHint(gs) {
-    if (!window.risqueDisplayIsPublic || !gs) return;
+    if (!gs) return;
     if (
       window.risqueArtemisMode &&
       typeof window.risqueArtemisIsMyTurn === "function" &&
@@ -8606,12 +8816,25 @@
     ) {
       return;
     }
+    if (window.risqueArtemisMode) {
+      var slotArtemis = document.getElementById("risque-phase-content");
+      if (slotArtemis) {
+        slotArtemis.innerHTML = "";
+      }
+      if (typeof window.risqueArtemisPaintCardplaySpectatorVoiceUi === "function") {
+        window.risqueArtemisPaintCardplaySpectatorVoiceUi(gs);
+      }
+      return;
+    }
+    if (!window.risqueDisplayIsPublic) return;
     var ph = String(gs.phase || "");
     var slot = document.getElementById("risque-phase-content");
     /* Cardplay injects this hint; mirror updates do not always replace #risque-phase-content — clear it when leaving cardplay (e.g. income reveal). */
     if (ph !== "cardplay" && ph !== "con-cardplay") {
       if (slot) {
-        var staleHint = slot.querySelector(".risque-public-private-hint");
+        var staleHint = slot.querySelector(
+          ".risque-public-private-hint:not(.risque-public-private-hint--receivecard)"
+        );
         if (staleHint) staleHint.remove();
       }
       return;
@@ -8673,27 +8896,72 @@
     risquePublicUpdateCardBacksContainer(backsEl, handBackCount);
   }
 
+  /** ARTEMIS + public TV: paint receive-card spectator backs (not the active laptop hand UI). */
+  function risqueReceiveCardSpectatorHintShouldPaint(gs) {
+    if (!gs) return false;
+    var ph = String(gs.phase || "");
+    if (!/^(receivecard|getcard|con-receivecard)$/i.test(ph)) return false;
+    if (window.risqueDisplayIsPublic) return true;
+    if (
+      window.risqueArtemisNetClient &&
+      !window.risqueArtemisHost
+    ) {
+      if (
+        typeof window.risqueArtemisClientNameMatchesCurrent === "function" &&
+        window.risqueArtemisClientNameMatchesCurrent(gs)
+      ) {
+        return false;
+      }
+      return true;
+    }
+    if (
+      window.risqueArtemisHost &&
+      !window.risqueArtemisNetClient &&
+      typeof window.risqueArtemisIsMyTurn === "function" &&
+      !window.risqueArtemisIsMyTurn(gs)
+    ) {
+      return true;
+    }
+    return false;
+  }
+  window.risqueReceiveCardSpectatorHintShouldPaint = risqueReceiveCardSpectatorHintShouldPaint;
+
   /**
    * Public TV receive-card: private hint + in-hand / staging card backs (mirrors host layout, no faces).
    */
+  function risquePublicClearReceiveCardSpectatorChrome() {
+    risquePublicReceiveCardClearMergeAnimTimers();
+    _pubRc.playedMergeSeq = null;
+    var slot = document.getElementById("risque-phase-content");
+    if (slot) {
+      var staleRc = slot.querySelector(".risque-public-private-hint--receivecard");
+      if (staleRc) staleRc.remove();
+      var legSpec = slot.querySelector(".risque-artemis-receivecard-spectate");
+      if (legSpec) legSpec.remove();
+    }
+    var cvMsg = document.querySelector("#control-voice .ucp-voice-messages");
+    if (cvMsg) {
+      cvMsg.querySelectorAll(
+        "#risque-public-receivecard-hand-backs, #risque-public-receivecard-staging-backs, #risque-public-cardplay-voice-backs"
+      ).forEach(function (el) {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      });
+    }
+    if (typeof window.risqueArtemisClearCardplaySpectatorVoiceBacks === "function") {
+      window.risqueArtemisClearCardplaySpectatorVoiceBacks();
+    }
+  }
+  window.risquePublicClearReceiveCardSpectatorChrome = risquePublicClearReceiveCardSpectatorChrome;
+
   function risquePublicEnsureReceiveCardPrivateHint(gs) {
-    var artemisHostSpectate =
-      !window.risqueDisplayIsPublic &&
-      window.risqueArtemisHost &&
-      !window.risqueArtemisNetClient &&
-      gs &&
-      typeof window.risqueArtemisIsMyTurn === "function" &&
-      !window.risqueArtemisIsMyTurn(gs);
-    if ((!window.risqueDisplayIsPublic && !artemisHostSpectate) || !gs) return;
+    if (!gs || !risqueReceiveCardSpectatorHintShouldPaint(gs)) {
+      risquePublicClearReceiveCardSpectatorChrome();
+      return;
+    }
     var ph = String(gs.phase || "");
     var slot = document.getElementById("risque-phase-content");
     if (ph !== "receivecard" && ph !== "con-receivecard" && ph !== "getcard") {
-      if (slot) {
-        var staleRc = slot.querySelector(".risque-public-private-hint--receivecard");
-        if (staleRc) staleRc.remove();
-      }
-      risquePublicReceiveCardClearMergeAnimTimers();
-      _pubRc.playedMergeSeq = null;
+      risquePublicClearReceiveCardSpectatorChrome();
       return;
     }
     if (!slot) return;
@@ -8740,16 +9008,25 @@
           : risquePublicSpectatorHandCountFromGs(gs);
       stagingBackCount = 0;
       showStaging = false;
-    } else if (mergeAnimSeq && mergeAnimSeq !== _pubRc.playedMergeSeq && !_pubRc.mergeAnimRunning) {
+    } else if (
+      mergeAnimSeq &&
+      mergeAnimSeq !== _pubRc.playedMergeSeq &&
+      !(_pubRc.mergeAnimRunning && _pubRc.mergeAnimTargetSeq === mergeAnimSeq)
+    ) {
       if (!slot.querySelector(".risque-public-private-hint--receivecard")) {
         /* fall through to build shell below */
       } else {
-        risquePublicReceiveCardPlayMergeAnim(spec);
+        risquePublicReceiveCardScheduleMergeAnim(spec);
         return;
       }
     }
     if (_pubRc.mergeAnimRunning) {
-      return;
+      if (mergeAnimSeq && mergeAnimSeq !== _pubRc.mergeAnimTargetSeq) {
+        risquePublicReceiveCardClearMergeAnimTimers();
+        _pubRc.mergeAnimTargetSeq = null;
+      } else {
+        return;
+      }
     }
     if (spec.stagingMerged === true && !mergeAnimSeq) {
       showStaging = false;
@@ -8775,14 +9052,21 @@
         "</div>" +
         "</div>";
     }
-    if (mergeAnimSeq && mergeAnimSeq !== _pubRc.playedMergeSeq) {
-      risquePublicReceiveCardPlayMergeAnim(spec);
+    if (
+      mergeAnimSeq &&
+      mergeAnimSeq !== _pubRc.playedMergeSeq &&
+      !(_pubRc.mergeAnimRunning && _pubRc.mergeAnimTargetSeq === mergeAnimSeq)
+    ) {
+      risquePublicReceiveCardScheduleMergeAnim(spec);
       return;
     }
     var leadEl = slot.querySelector(".risque-public-private-hint__lead");
     if (leadEl) leadEl.textContent = lead;
     var rcCountEl = document.getElementById("risque-public-receivecard-hand-count");
-    if (rcCountEl) rcCountEl.textContent = countText;
+    if (rcCountEl) {
+      rcCountEl.textContent =
+        showStaging && stagingBackCount > 0 && spec.stagingMerged !== true ? "" : countText;
+    }
     var handLblEl = document.getElementById("risque-public-receivecard-hand-label");
     if (handLblEl) handLblEl.textContent = handLabel;
     var stLblEl = document.getElementById("risque-public-receivecard-staging-label");
@@ -8797,11 +9081,13 @@
     }
     risquePublicUpdateCardBacksContainer(
       document.getElementById("risque-public-receivecard-hand-backs"),
-      handBackCount
+      handBackCount,
+      { keepEmptyVisible: true }
     );
     risquePublicUpdateCardBacksContainer(
       document.getElementById("risque-public-receivecard-staging-backs"),
-      showStaging ? stagingBackCount : 0
+      showStaging ? stagingBackCount : 0,
+      { keepEmptyVisible: showStaging }
     );
     if (
       mergeAnimSeq &&
@@ -8979,6 +9265,11 @@
     ) {
       window.risqueArtemisSanitizeCardplaySpectatorHandMirror(gs);
     }
+    if (String(gs.phase || "") === "cardplay" || String(gs.phase || "") === "con-cardplay") {
+      if (typeof window.risquePublicClearReceiveCardSpectatorChrome === "function") {
+        window.risquePublicClearReceiveCardSpectatorChrome();
+      }
+    }
     risquePublicEnsureCardplayRecapPanelBeforeBook(gs);
     risquePublicBookSequenceOnIncomingState(gs);
     risquePublicDeploySequenceOnIncomingState(gs);
@@ -9133,9 +9424,15 @@
     }
     risquePublicSyncCardplayStrip(gs);
     risquePublicEnsureCardplayRecapPanel(gs);
-    if (window.risqueDisplayIsPublic) {
-      risquePublicEnsureCardplayPrivateHint(gs);
+    if (risqueReceiveCardSpectatorHintShouldPaint(gs)) {
       risquePublicEnsureReceiveCardPrivateHint(gs);
+    } else if (typeof window.risquePublicClearReceiveCardSpectatorChrome === "function") {
+      risquePublicClearReceiveCardSpectatorChrome();
+    }
+    if (window.risqueDisplayIsPublic) {
+      if (!risqueReceiveCardSpectatorHintShouldPaint(gs)) {
+        risquePublicEnsureCardplayPrivateHint(gs);
+      }
       risquePublicEnsureDeployPrivateHint(gs);
       risquePublicTryScheduleIncomeGateRelease(gs);
     }
@@ -9476,6 +9773,35 @@
       }
       return true;
     }
+    if (inPh === "receivecard" || inPh === "getcard") {
+      if (
+        typeof window.risqueArtemisClientNameMatchesCurrent === "function" &&
+        !window.risqueArtemisClientNameMatchesCurrent(incomingGs || window.gameState)
+      ) {
+        return true;
+      }
+      if (!window.risqueArtemisClientPlaying) {
+        return true;
+      }
+      var mySlotRc = Number(window.risqueArtemisPlayerSlot) || 0;
+      var ctrlRc =
+        Number((incomingGs && incomingGs.artemisControlSlot) || 0) ||
+        Number(window.gameState && window.gameState.artemisControlSlot) ||
+        0;
+      if (typeof window.risqueArtemisResolveOwnerSlot === "function" && incomingGs) {
+        ctrlRc = Number(window.risqueArtemisResolveOwnerSlot(incomingGs)) || ctrlRc;
+      }
+      if (mySlotRc >= 1 && ctrlRc >= 1 && mySlotRc !== ctrlRc) {
+        return true;
+      }
+      if (
+        typeof window.risqueArtemisClientIsActivePlayer === "function" &&
+        !window.risqueArtemisClientIsActivePlayer(incomingGs || window.gameState)
+      ) {
+        return true;
+      }
+      return false;
+    }
     var mySlot = Number(window.risqueArtemisPlayerSlot) || 0;
     var ctrl =
       Number((incomingGs && incomingGs.artemisControlSlot) || 0) ||
@@ -9669,6 +9995,7 @@
   };
 
   window.risquePublicApplyVoiceAndLogMirror = risquePublicApplyVoiceAndLogMirror;
+  window.risquePublicApplyDiceAndBattleReadout = risquePublicApplyDiceAndBattleReadout;
 
   function timestamp() {
     return new Date().toISOString();
@@ -12917,7 +13244,9 @@
       window.gameState &&
       state &&
       String(window.gameState.phase || "") === "attack" &&
-      window.gameState.risqueLastDiceDisplay
+      window.gameState.risqueLastDiceDisplay &&
+      (window.gameState.risqueLastDiceDisplay.spinning === true ||
+        (Number(window.__risqueArtemisHostAttackSpinUntil) || 0) > Date.now())
     ) {
       try {
         state.risqueLastDiceDisplay = window.gameState.risqueLastDiceDisplay;
@@ -12952,8 +13281,25 @@
       typeof window.risqueArtemisShouldHostMountAttack === "function" &&
       !window.risqueArtemisShouldHostMountAttack(window.gameState)
     ) {
-      /* Host spectating client attack: live troops + dice from attack_live / player_state. */
-      state = window.gameState;
+      /* Host spectating client attack: mirror may lag — merge live map/troops from player_state. */
+      try {
+        if (Array.isArray(window.gameState.players)) {
+          state.players = JSON.parse(JSON.stringify(window.gameState.players));
+        }
+        state.attackingTerritory = window.gameState.attackingTerritory;
+        state.defendingTerritory = window.gameState.defendingTerritory;
+        state.acquiredTerritory = window.gameState.acquiredTerritory;
+        state.attackPhase = window.gameState.attackPhase;
+        if (window.gameState.risquePublicAttackSelectionLine != null) {
+          state.risquePublicAttackSelectionLine = window.gameState.risquePublicAttackSelectionLine;
+        }
+        if (window.gameState.risquePublicAttackTransferSummary != null) {
+          state.risquePublicAttackTransferSummary = window.gameState.risquePublicAttackTransferSummary;
+        }
+        delete state.risqueTransferPulse;
+      } catch (eHostAtkMap) {
+        /* ignore */
+      }
     }
     if (
       window.risqueArtemisHost &&
@@ -12963,7 +13309,32 @@
       typeof window.risqueArtemisShouldHostMountReinforce === "function" &&
       !window.risqueArtemisShouldHostMountReinforce(window.gameState)
     ) {
+      try {
+        if (Array.isArray(window.gameState.players)) {
+          state.players = JSON.parse(JSON.stringify(window.gameState.players));
+        }
+      } catch (eHostRfPl) {
+        /* ignore */
+      }
       state = window.gameState;
+      if (
+        window.gameState.risqueReinforcePreview &&
+        typeof window.gameState.risqueReinforcePreview === "object"
+      ) {
+        try {
+          state.risqueReinforcePreview = JSON.parse(
+            JSON.stringify(window.gameState.risqueReinforcePreview)
+          );
+        } catch (eHostRfPrev) {
+          state.risqueReinforcePreview = window.gameState.risqueReinforcePreview;
+        }
+      } else {
+        try {
+          delete state.risqueReinforcePreview;
+        } catch (eClrRfPrev) {
+          /* ignore */
+        }
+      }
     }
     if (
       !window.risqueDisplayIsPublic &&
@@ -13184,6 +13555,25 @@
           if (!skipHostTurnDeployMapPaint) {
             risqueArtemisPaintDeployMapFromState(state);
           }
+        } else if (
+          !window.risqueDisplayIsPublic &&
+          window.risqueArtemisMode &&
+          String(state.phase || "") === "reinforce" &&
+          window.risqueArtemisHost &&
+          !window.risqueArtemisNetClient &&
+          typeof window.risqueArtemisShouldHostMountReinforce === "function" &&
+          !window.risqueArtemisShouldHostMountReinforce(state)
+        ) {
+          try {
+            delete window.__risqueSuppressHostMapRedraw;
+          } catch (eRfSup) {
+            /* ignore */
+          }
+          if (typeof window.gameUtils.renderAll === "function") {
+            window.gameUtils.renderAll(state, null, {});
+          } else {
+            window.gameUtils.renderTerritories(null, state, {});
+          }
         } else {
           window.gameUtils.renderTerritories(null, state);
         }
@@ -13224,7 +13614,23 @@
         maybeEnsureRuntimeHud(state);
         updateDiagnostics(note);
         if (!window.risqueDisplayIsPublic) {
-          risquePublicApplyDiceAndBattleReadout(state);
+          if (
+            window.risqueArtemisHost &&
+            !window.risqueArtemisNetClient &&
+            state &&
+            String(state.phase || "") === "attack" &&
+            typeof window.risqueArtemisShouldHostMountAttack === "function" &&
+            !window.risqueArtemisShouldHostMountAttack(state) &&
+            typeof window.risqueArtemisDriveHostAttackDice === "function"
+          ) {
+            try {
+              window.risqueArtemisDriveHostAttackDice(state);
+            } catch (eHostDiceRv) {
+              /* ignore */
+            }
+          } else {
+            risquePublicApplyDiceAndBattleReadout(state);
+          }
           var rhHost = document.getElementById("runtime-hud-root");
           if (rhHost) {
             if (rhHost.classList.contains("runtime-hud-root--host-panel-cards-focus")) {
@@ -14375,6 +14781,25 @@
     }
 
     if (ph === "attack") {
+      loginMounted = false;
+      if (typeof window.risqueArtemisHideLoginPanel === "function") {
+        window.risqueArtemisHideLoginPanel();
+      }
+      try {
+        document.documentElement.classList.remove("risque-artemis-login-active");
+        document.documentElement.classList.remove("risque-artemis-login-confirmed");
+        document.body.classList.remove("risque-public-login-active");
+      } catch (eLoginClsAtk) {
+        /* ignore */
+      }
+      var legacyLoginHudAtk = document.getElementById("risque-login-hud-root");
+      if (legacyLoginHudAtk && legacyLoginHudAtk.parentNode) {
+        legacyLoginHudAtk.parentNode.removeChild(legacyLoginHudAtk);
+      }
+      var rhLoginAtk = document.getElementById("runtime-hud-root");
+      if (rhLoginAtk) {
+        rhLoginAtk.classList.remove("runtime-hud-root--login");
+      }
       phaseLabelEl.textContent = "Phase: attack";
       appEl.innerHTML = "";
       window.gameState = state;

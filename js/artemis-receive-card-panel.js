@@ -32,6 +32,21 @@
     return typeof window.risqueArtemisIsMyTurn === "function" && window.risqueArtemisIsMyTurn(gs);
   }
 
+  /** True when this laptop should show mirrored card backs (not Guido's private hand UI). */
+  function shouldSpectateReceiveCard(gs) {
+    if (!gs) return true;
+    if (window.risqueArtemisNetClient && !window.risqueArtemisHost) {
+      if (
+        typeof window.risqueArtemisClientNameMatchesCurrent === "function" &&
+        window.risqueArtemisClientNameMatchesCurrent(gs)
+      ) {
+        return false;
+      }
+      return true;
+    }
+    return !isMine(gs);
+  }
+
   function receiveCardControlsPresent() {
     var slot = document.getElementById("risque-phase-content");
     return !!(slot && slot.querySelector("#receivecard-btn-end"));
@@ -45,6 +60,53 @@
     hudRoot.classList.remove("runtime-hud-root--artemis-cardplay");
     hudRoot.classList.remove("runtime-hud-root--cardplay-panel-only");
     hudRoot.classList.remove("runtime-hud-root--artemis-compact");
+  }
+
+  function ensureArtemisReceiveCardHudClasses(gs) {
+    if (!window.risqueArtemisMode) return;
+    var rh = document.getElementById("runtime-hud-root");
+    if (!rh) return;
+    rh.classList.remove("runtime-hud-root--cardplay-panel-only");
+    rh.classList.remove("runtime-hud-root--artemis-cardplay");
+    stripSetupHudClasses();
+    rh.classList.add("runtime-hud-root--receivecard-panel-only");
+    if (window.risqueArtemisNetClient && !window.risqueArtemisHost) {
+      document.documentElement.classList.add("risque-view-host");
+      document.body.classList.add("risque-view-host");
+      document.documentElement.classList.remove("risque-view-public");
+      document.body.classList.remove("risque-view-public");
+    } else if (window.risqueArtemisHost && !window.risqueArtemisNetClient) {
+      document.documentElement.classList.add("risque-view-host");
+      document.body.classList.add("risque-view-host");
+    }
+    if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.syncPosition === "function") {
+      requestAnimationFrame(function () {
+        window.risqueRuntimeHud.syncPosition();
+      });
+    }
+    wireOmniToggles(gs);
+  }
+
+  /** Spectators (host + clients): stretch mirrored dual-pane receive-card to column foot. */
+  function ensureArtemisReceiveCardSpectatorHudClasses(gs) {
+    if (!window.risqueArtemisMode) return;
+    var uio = document.getElementById("ui-overlay");
+    if (!uio || !window.risqueRuntimeHud) return;
+    var rh = document.getElementById("runtime-hud-root");
+    if (
+      !rh ||
+      rh.classList.contains("runtime-hud-root--login") ||
+      !document.getElementById("control-voice")
+    ) {
+      if (typeof window.risqueRuntimeHud.ensure === "function") {
+        window.risqueRuntimeHud.ensure(uio);
+      }
+    }
+    ensureArtemisReceiveCardHudClasses(gs);
+    if (window.risqueArtemisNetClient && !window.risqueArtemisHost) {
+      document.documentElement.classList.remove("risque-view-public");
+      document.body.classList.remove("risque-view-public");
+    }
   }
 
   function stampReceiveCardPhaseChrome(gs) {
@@ -100,11 +162,22 @@
     spectatorHintKey = "";
     window.__risqueArtemisReceiveCardControlsLive = false;
     window.__risqueArtemisReceiveCardMountKey = "";
+    var rhClear = document.getElementById("runtime-hud-root");
+    if (rhClear) {
+      rhClear.classList.remove("runtime-hud-root--receivecard-panel-only");
+    }
+    if (typeof window.risqueArtemisClearCardplaySpectatorVoiceBacks === "function") {
+      window.risqueArtemisClearCardplaySpectatorVoiceBacks();
+    }
+    if (typeof window.risquePublicClearReceiveCardSpectatorChrome === "function") {
+      window.risquePublicClearReceiveCardSpectatorChrome();
+    }
     var slot = document.getElementById("risque-phase-content");
     if (!slot) return;
     if (
       slot.querySelector(".receivecard-compact-root") ||
-      slot.querySelector(".risque-artemis-receivecard-spectate")
+      slot.querySelector(".risque-artemis-receivecard-spectate") ||
+      slot.querySelector(".risque-public-private-hint--receivecard")
     ) {
       slot.innerHTML = "";
     }
@@ -165,7 +238,35 @@
     wireOmniToggles(gs);
     var mirrorKey = receiveCardSpectatorMirrorKey(gs);
 
-    /* Spectators (public TV + host): card backs + voice from mirrored receive-card layout. */
+    /* ARTEMIS + public TV spectators: mirrored card backs + voice (never wipe with text-only fallback). */
+    if (
+      typeof window.risqueReceiveCardSpectatorHintShouldPaint === "function" &&
+      window.risqueReceiveCardSpectatorHintShouldPaint(gs)
+    ) {
+      ensureArtemisReceiveCardSpectatorHudClasses(gs);
+      if (typeof window.risquePublicEnsureReceiveCardPrivateHint === "function") {
+        window.risquePublicEnsureReceiveCardPrivateHint(gs);
+      }
+      if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
+        window.risquePublicApplyVoiceAndLogMirror(gs);
+      }
+      spectatorHintKey = mirrorKey;
+      return;
+    }
+
+    /* Legacy text-only fallback (non-ARTEMIS / edge cases). */
+    if (window.risqueArtemisNetClient && !window.risqueArtemisHost) {
+      ensureArtemisReceiveCardSpectatorHudClasses(gs);
+      if (typeof window.risquePublicEnsureReceiveCardPrivateHint === "function") {
+        window.risquePublicEnsureReceiveCardPrivateHint(gs);
+      }
+      if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
+        window.risquePublicApplyVoiceAndLogMirror(gs);
+      }
+      spectatorHintKey = mirrorKey;
+      return;
+    }
+
     if (
       window.risqueDisplayIsPublic ||
       (window.risqueArtemisHost &&
@@ -173,6 +274,7 @@
         typeof window.risqueArtemisIsMyTurn === "function" &&
         !window.risqueArtemisIsMyTurn(gs))
     ) {
+      ensureArtemisReceiveCardSpectatorHudClasses(gs);
       if (typeof window.risquePublicEnsureReceiveCardPrivateHint === "function") {
         window.risquePublicEnsureReceiveCardPrivateHint(gs);
       }
@@ -264,7 +366,7 @@
     var ctrl = ownerSlot(gs);
     var mountKey = String(ctrl) + ":" + up;
     if (receiveCardMountedFor === mountKey && receiveCardControlsPresent()) {
-      stripSetupHudClasses();
+      ensureArtemisReceiveCardHudClasses(gs);
       stampReceiveCardPhaseChrome(gs);
       if (typeof window.risqueArtemisEnsureReceiveCardInteractive === "function") {
         window.risqueArtemisEnsureReceiveCardInteractive(gs);
@@ -289,7 +391,7 @@
         }
       }
     });
-    stripSetupHudClasses();
+    ensureArtemisReceiveCardHudClasses(gs);
     if (!receiveCardControlsPresent() && !window.__risqueReceiveCardInitialized) {
       receiveCardMountedFor = "";
       window.risquePhases.receivecard.mount(stageHost, {
@@ -305,7 +407,6 @@
     if (typeof window.risqueArtemisEnsureReceiveCardInteractive === "function") {
       window.risqueArtemisEnsureReceiveCardInteractive(gs);
     }
-    wireOmniToggles(gs);
     window.__risqueArtemisReceiveCardControlsLive = receiveCardControlsPresent();
   }
 
@@ -363,7 +464,7 @@
     window.gameState = gs;
     var mine = isMine(gs);
 
-    if (!mine) {
+    if (shouldSpectateReceiveCard(gs)) {
       clearReceiveCardControls();
       if (window.risqueArtemisNetClient) {
         exitClientPlayMode();

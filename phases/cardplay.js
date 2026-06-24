@@ -2274,12 +2274,20 @@
               stEmpty.refs.length === 1
                 ? "Card below — CONFIRM when ready, or RST."
                 : "Plays below — CONFIRM when ready, or RST.";
+            noCardsMessage.hidden = false;
             return;
           }
         }
+        if (window.risqueArtemisMode) {
+          noCardsMessage.textContent = "";
+          noCardsMessage.hidden = true;
+          return;
+        }
         noCardsMessage.textContent = "No cards in hand.";
+        noCardsMessage.hidden = false;
         return;
       }
+      noCardsMessage.hidden = false;
       if (isBookSelectionMode) {
         if (processingBook) {
           noCardsMessage.textContent = "Processing book…";
@@ -4110,8 +4118,11 @@
         var nm = String(window.gameState.currentPlayer || "Player").trim();
         if (!nm) return;
         var disp = nm.charAt(0).toUpperCase() + nm.slice(1);
-        window.gameState.risquePublicCardplayPrimary = disp.toUpperCase() + " IS IN CARD PLAY";
-        window.gameState.risquePublicCardplayReport = "WAITING...";
+        window.gameState.risquePublicCardplayPrimary = disp.toUpperCase() + " IS IN CARD PLAY — WAITING...";
+        window.gameState.risquePublicCardplayReport =
+          typeof window.risquePublicFormatCardplaySpectatorHandLine === "function"
+            ? window.risquePublicFormatCardplaySpectatorHandLine(window.gameState)
+            : "";
         delete window.gameState.risquePublicCardplayBookCards;
       }
       try {

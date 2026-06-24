@@ -979,6 +979,13 @@ function relayAttackLiveToSpectators(senderClientId, senderSlot, st) {
       players: st.players,
     },
   };
+  const hostWs =
+    session.hostClientId && session.hostClientId !== senderClientId
+      ? clients.get(session.hostClientId)
+      : null;
+  if (hostWs && hostWs.readyState === hostWs.OPEN) {
+    sendJson(hostWs, out);
+  }
   roster.forEach((_meta, cid) => {
     if (cid === senderClientId) return;
     const ws = clients.get(cid);

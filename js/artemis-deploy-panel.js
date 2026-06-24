@@ -253,14 +253,14 @@
       return true;
     }
     if (window.selectedTerritory != null && String(window.selectedTerritory).trim() !== "") {
-      if (!deployTerritoryOwnedByCurrent(gs, window.selectedTerritory)) return true;
-      /* Spectators mirror the deployer's selection — never reset live +N draft for that. */
+      /* Host/client spectators: stale local selection must not wipe mirrored +N draft. */
       if (
         typeof window.risqueArtemisIsMyTurn === "function" &&
         !window.risqueArtemisIsMyTurn(gs)
       ) {
         return false;
       }
+      if (!deployTerritoryOwnedByCurrent(gs, window.selectedTerritory)) return true;
     }
     var pinned = String(window.__risqueArtemisPinnedDeployWaitLine || "").trim();
     if (pinned && /^WAITING FOR .+ TO DEPLOY$/i.test(pinned)) {
@@ -493,6 +493,24 @@
   }
 
   window.risqueArtemisStampDeployHandoffSyncMarkers = stampDeployHandoffSyncMarkers;
+
+  /** Host turn-deploy spectator: clear local session on handoff but keep incoming mirror draft (+N). */
+  function resetHostDeploySpectatorHandoff(gs) {
+    if (!gs) return;
+    var draftPreserve = null;
+    if (gs.risqueDeployMirrorDraft && typeof gs.risqueDeployMirrorDraft === "object") {
+      try {
+        draftPreserve = JSON.parse(JSON.stringify(gs.risqueDeployMirrorDraft));
+      } catch (eDraft) {
+        draftPreserve = gs.risqueDeployMirrorDraft;
+      }
+    }
+    resetDeployTurnSession(gs);
+    if (draftPreserve) {
+      gs.risqueDeployMirrorDraft = draftPreserve;
+    }
+    stampDeployHandoffSyncMarkers(gs);
+  }
 
   function stampHandoffSpectatorChrome(chromeGs) {
     if (!chromeGs) return chromeGs;
@@ -968,7 +986,29 @@
     applyDeploySpectatorControlVoice(gs);
   };
 
+  function hostSpectatesDeploy(gs) {
+    return (
+      window.risqueArtemisHost &&
+      !window.risqueArtemisNetClient &&
+      gs &&
+      String(gs.phase || "") === "deploy" &&
+      typeof window.risqueArtemisIsMyTurn === "function" &&
+      !window.risqueArtemisIsMyTurn(gs)
+    );
+  }
+  window.risqueArtemisHostSpectatesDeploy = hostSpectatesDeploy;
+
+  function clearHostSpectatorMapRedrawSuppress() {
+    if (!window.risqueArtemisHost || window.risqueArtemisNetClient) return;
+    try {
+      delete window.__risqueSuppressHostMapRedraw;
+    } catch (eSup) {
+      /* ignore */
+    }
+  }
+
   function paintDeploySpectatorMap(gs) {
+    clearHostSpectatorMapRedrawSuppress();
     if (typeof window.risqueArtemisPaintDeployMapFromState === "function") {
       window.risqueArtemisPaintDeployMapFromState(gs);
       if (window.gameUtils && typeof window.gameUtils.renderStats === "function") {
@@ -1018,7 +1058,10 @@
       }
     }
     paintDeploySpectatorMap(gs);
-    if (artemisClientSpectatesDeploy(gs) && typeof stampDeployHandoffSyncMarkers === "function") {
+    if (
+      (artemisClientSpectatesDeploy(gs) || hostSpectatesDeploy(gs)) &&
+      typeof stampDeployHandoffSyncMarkers === "function"
+    ) {
       stampDeployHandoffSyncMarkers(gs);
     }
   }
@@ -1121,6 +1164,8 @@
     ) {
       window.__risqueArtemisTurnDeployControlsLive = false;
       window.__risqueArtemisTurnDeployLocalEdit = false;
+      window.selectedTerritory = null;
+      window.deployedTroops = {};
     }
     if (hostTurnDeployLocalOwnsLiveState(gs)) {
       return;
@@ -1149,6 +1194,10 @@
           hostDock.hidden = true;
         }
       }
+    } else if (hostSpectatesDeploy(gs)) {
+      if (deploySpectatorHandoffChanged(gs)) {
+        resetHostDeploySpectatorHandoff(gs);
+      }
     } else if (
       typeof window.risqueArtemisDeployTurnSessionNeedsReset === "function" &&
       window.risqueArtemisDeployTurnSessionNeedsReset(gs)
@@ -1157,6 +1206,13 @@
     }
 
     document.documentElement.classList.remove("risque-artemis-my-turn");
+
+    if (
+      hostSpectatesDeploy(gs) &&
+      typeof window.risqueArtemisClearTurnDeploySpectatorHint === "function"
+    ) {
+      window.risqueArtemisClearTurnDeploySpectatorHint();
+    }
 
     delete gs.risqueDeploySuppressPublicSpectator;
     delete gs.risqueDeployUseFrozenPublicMirror;
@@ -1208,6 +1264,9 @@
       window.risqueSyncMapRoundIndicatorFromState(gs);
     }
     applyDeploySpectatorControlVoice(gs);
+    if (hostSpectatesDeploy(gs)) {
+      stampDeployHandoffSyncMarkers(gs);
+    }
   };
 
   function deployingPlayerRecord(gs) {
@@ -1259,14 +1318,19 @@
     if (!gs || String(gs.phase || "") !== "deploy") return;
     var spectatorWatching =
       typeof window.risqueArtemisIsMyTurn === "function" && !window.risqueArtemisIsMyTurn(gs);
-    if (
+    var hostWatching = hostSpectatesDeploy(gs);
+    if (hostWatching) {
+      if (deploySpectatorHandoffChanged(gs)) {
+        resetHostDeploySpectatorHandoff(gs);
+      }
+    } else if (
       deployTurnSessionNeedsReset(gs) &&
       (!spectatorWatching || deploySpectatorHandoffChanged(gs))
     ) {
       resetDeployTurnSession(gs);
     }
     paintDeploySpectatorMap(gs);
-    if (artemisClientSpectatesDeploy(gs)) {
+    if (artemisClientSpectatesDeploy(gs) || hostWatching) {
       stampDeployHandoffSyncMarkers(gs);
     }
     if (typeof window.risqueArtemisApplyDeployVoiceFromState === "function" && isMine(gs)) {

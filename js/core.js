@@ -2384,6 +2384,74 @@ window.gameUtils = {
           satG.appendChild(satTxt);
           svg.appendChild(satG);
         }
+        const rpMove =
+          gameState &&
+          String(gameState.phase) === 'reinforce' &&
+          gameState.risqueReinforcePreview &&
+          playerName === gameState.currentPlayer
+            ? gameState.risqueReinforcePreview
+            : null;
+        let reinforceMoveAmt = 0;
+        if (rpMove) {
+          if (rpMove.destination === label) {
+            if (rpMove.mode === 'balanced' && typeof rpMove.destinationTroops === 'number') {
+              const liveT = (function () {
+                for (const pl of gameState.players) {
+                  const tt = pl.territories.find(t => t.name === label);
+                  if (tt) return Number(tt.troops) || 0;
+                }
+                return 0;
+              })();
+              reinforceMoveAmt = Math.max(0, Number(rpMove.destinationTroops) - liveT);
+            } else {
+              const amt = Number(rpMove.amount);
+              if (Number.isFinite(amt) && amt >= 1) reinforceMoveAmt = amt;
+            }
+          } else if (rpMove.source === label) {
+            const amt = Number(rpMove.amount);
+            if (Number.isFinite(amt) && amt >= 1) reinforceMoveAmt = amt;
+          }
+        }
+        if (reinforceMoveAmt > 0) {
+          const rfDeltaLabel = '+' + String(reinforceMoveAmt);
+          const rfSatFont = 21;
+          const rfPadX = Math.max(4, Math.round(rfSatFont * 0.28));
+          const rfPadY = Math.max(1, Math.round(rfSatFont * 0.06));
+          const rfCharW = rfSatFont * 0.58;
+          const rfCharSlots = Math.max(4, rfDeltaLabel.length);
+          const rfRectW = Math.round(rfPadX * 2 + rfCharSlots * rfCharW);
+          const rfRectH = Math.round(rfSatFont * 1.05 + rfPadY * 2);
+          const rfRx = 2;
+          const rfNumHalfH = 11;
+          const rfGapAboveTroops = 3;
+          const rfShiftRight = Math.max(7, Math.round(displayBaseR * 0.26));
+          const rfBottomY = territory.y - rfNumHalfH - rfGapAboveTroops;
+          const rfSatCx = territory.x + rfShiftRight;
+          const rfSatCy = rfBottomY - rfRectH / 2;
+          const rfSatG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          rfSatG.setAttributeNS(null, 'class', 'territory-deploy-satellite territory-reinforce-satellite');
+          rfSatG.setAttributeNS(null, 'data-label', label);
+          rfSatG.setAttributeNS(null, 'aria-hidden', 'true');
+          const rfSatBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rfSatBg.setAttributeNS(null, 'x', String(rfSatCx - rfRectW / 2));
+          rfSatBg.setAttributeNS(null, 'y', String(rfSatCy - rfRectH / 2));
+          rfSatBg.setAttributeNS(null, 'width', String(rfRectW));
+          rfSatBg.setAttributeNS(null, 'height', String(rfRectH));
+          rfSatBg.setAttributeNS(null, 'rx', String(rfRx));
+          rfSatBg.setAttributeNS(null, 'ry', String(rfRx));
+          const rfSatTxt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          rfSatTxt.setAttributeNS(null, 'x', String(rfSatCx));
+          rfSatTxt.setAttributeNS(null, 'y', String(rfSatCy));
+          rfSatTxt.setAttributeNS(null, 'text-anchor', 'middle');
+          rfSatTxt.setAttributeNS(null, 'dominant-baseline', 'central');
+          rfSatTxt.setAttributeNS(null, 'font-size', String(rfSatFont));
+          rfSatTxt.setAttributeNS(null, 'font-family', 'Arial, sans-serif');
+          rfSatTxt.setAttributeNS(null, 'font-weight', 'bold');
+          rfSatTxt.textContent = rfDeltaLabel;
+          rfSatG.appendChild(rfSatBg);
+          rfSatG.appendChild(rfSatTxt);
+          svg.appendChild(rfSatG);
+        }
         const hitRadius = useGlobalTerritoryHandler
           ? Math.ceil(markerOutlineRadiusFor(displayBaseR) + MARKER_OUTLINE_STROKE_W / 2 + 10)
           : displayBaseR + 4;

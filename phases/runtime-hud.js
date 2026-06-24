@@ -473,6 +473,7 @@
     if (rh) {
       rh.classList.remove("runtime-hud-root--cardplay-tight");
       rh.classList.remove("runtime-hud-root--cardplay-panel-only");
+      rh.classList.remove("runtime-hud-root--receivecard-panel-only");
     }
   }
 
@@ -577,6 +578,27 @@
   /**
    * Keep #log-text bottom inside the 1920×1080 board overlay with 20px logical px buffer; may shrink + scroll.
    */
+  function hostAttackCampaignColumnActive() {
+    var cv = document.getElementById("control-voice");
+    return !!(
+      document.body &&
+      String(document.body.getAttribute("data-risque-phase") || "") === "attack" &&
+      cv &&
+      cv.classList.contains("ucp-control-voice--campaign-instant")
+    );
+  }
+
+  function hostIncomeBreakdownColumnActive() {
+    var ph = document.body && String(document.body.getAttribute("data-risque-phase") || "");
+    if (ph !== "income" && ph !== "con-income") return false;
+    var cv = document.getElementById("control-voice");
+    return !!(
+      cv &&
+      (cv.querySelector("#control-voice-text.ucp-voice-text--public-income-stack") ||
+        cv.querySelector(".risque-public-income-voice"))
+    );
+  }
+
   function clampCombatLogToCanvasBottom() {
     var logText = document.getElementById("log-text");
     var overlay = document.querySelector(".ui-overlay");
@@ -585,7 +607,10 @@
     if (
       root &&
       (root.classList.contains("runtime-hud-root--login") ||
-        root.classList.contains("runtime-hud-root--setup"))
+        root.classList.contains("runtime-hud-root--setup") ||
+        (document.body && document.body.classList.contains("risque-artemis-attack-spectator")) ||
+        hostAttackCampaignColumnActive() ||
+        hostIncomeBreakdownColumnActive())
     ) {
       logText.style.maxHeight = "";
       return;
@@ -650,6 +675,54 @@
       root.style.maxHeight = "none";
       /* Shorthand: overflow-x hidden + overflow-y visible computes visible→auto (scrollbar). */
       root.style.overflow = "visible";
+    } else if (
+      document.body &&
+      document.body.classList.contains("risque-artemis-attack-spectator")
+    ) {
+      /* Guido TV during client attack: no log clamp / column scrollbar. */
+      root.style.bottom = "";
+      root.style.maxHeight = "none";
+      root.style.overflowY = "visible";
+      root.style.overflowX = "hidden";
+      root.style.overflow = "";
+      var logAtkSpec = document.getElementById("log-text");
+      if (logAtkSpec) logAtkSpec.style.maxHeight = "";
+    } else if (hostAttackCampaignColumnActive()) {
+      /* Guido active campaign: tall CV (L1/L3 leave row) — column grows, no log clamp squeeze. */
+      root.style.bottom = "";
+      root.style.maxHeight = "none";
+      root.style.overflowY = "visible";
+      root.style.overflowX = "hidden";
+      root.style.overflow = "";
+      var logCamp = document.getElementById("log-text");
+      if (logCamp) logCamp.style.maxHeight = "";
+    } else if (hostIncomeBreakdownColumnActive()) {
+      /* Income breakdown: CV may use up to half the column — no log clamp / inner scroll. */
+      root.style.bottom = "";
+      root.style.maxHeight = "none";
+      root.style.overflowY = "visible";
+      root.style.overflowX = "hidden";
+      root.style.overflow = "";
+      var logInc = document.getElementById("log-text");
+      if (logInc) logInc.style.maxHeight = "";
+    } else if (root.classList.contains("runtime-hud-root--receivecard-panel-only")) {
+      root.style.bottom = "30px";
+      root.style.maxHeight = "none";
+      root.style.overflow = "hidden";
+      root.style.overflowY = "hidden";
+      root.style.overflowX = "hidden";
+    } else if (
+      document.body &&
+      /^(receivecard|getcard|con-receivecard)$/i.test(
+        String(document.body.getAttribute("data-risque-phase") || "")
+      )
+    ) {
+      /* Dual-pane receive card: pin column 30px above canvas foot; no log clamp shrink. */
+      root.style.bottom = "30px";
+      root.style.maxHeight = "none";
+      root.style.overflow = "hidden";
+      root.style.overflowY = "hidden";
+      root.style.overflowX = "hidden";
     } else {
       root.style.maxHeight = "";
       root.style.overflow = "";

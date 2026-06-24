@@ -1036,8 +1036,11 @@
     var nm = String(gs.currentPlayer || "Player").trim();
     if (!nm) return;
     var disp = nm.charAt(0).toUpperCase() + nm.slice(1);
-    gs.risquePublicCardplayPrimary = disp.toUpperCase() + " IS IN CARD PLAY";
-    gs.risquePublicCardplayReport = "WAITING...";
+    gs.risquePublicCardplayPrimary = disp.toUpperCase() + " IS IN CARD PLAY — WAITING...";
+    gs.risquePublicCardplayReport =
+      typeof window.risquePublicFormatCardplaySpectatorHandLine === "function"
+        ? window.risquePublicFormatCardplaySpectatorHandLine(gs)
+        : "";
     delete gs.risquePublicCardplayBookCards;
   };
 
@@ -1052,6 +1055,14 @@
     var ph = String(gs.phase || "");
     if (ph !== "cardplay" && ph !== "con-cardplay") return false;
     if (artemisClientIsActivePlayer(gs)) return false;
+
+    if (typeof window.risquePublicClearReceiveCardSpectatorChrome === "function") {
+      window.risquePublicClearReceiveCardSpectatorChrome();
+    }
+    var rhClear = document.getElementById("runtime-hud-root");
+    if (rhClear) {
+      rhClear.classList.remove("runtime-hud-root--receivecard-panel-only");
+    }
 
     if (typeof window.risqueArtemisHideLoginPanel === "function") {
       window.risqueArtemisHideLoginPanel();
@@ -1092,7 +1103,11 @@
         banner = "CARD PLAY-" + String(gs.currentPlayer).trim().toUpperCase();
       }
       if (typeof window.risqueRuntimeHud.ensureSetupUnifiedHud === "function") {
-        window.risqueRuntimeHud.ensureSetupUnifiedHud(uio, banner, { force: true });
+        window.risqueRuntimeHud.ensureSetupUnifiedHud(
+          uio,
+          banner,
+          loginHud || !document.getElementById("control-voice") ? { force: true } : undefined
+        );
       } else if (typeof window.risqueRuntimeHud.ensureSetupHud === "function") {
         window.risqueRuntimeHud.ensureSetupHud(uio, banner);
       }
@@ -1115,11 +1130,15 @@
     var primary =
       gs.risquePublicCardplayPrimary != null
         ? String(gs.risquePublicCardplayPrimary).trim()
-        : nameU + " IS IN CARD PLAY";
+        : nameU + " IS IN CARD PLAY — WAITING...";
     var report =
-      gs.risquePublicCardplayReport != null ? String(gs.risquePublicCardplayReport).trim() : "WAITING...";
+      gs.risquePublicCardplayReport != null
+        ? String(gs.risquePublicCardplayReport).trim()
+        : typeof window.risquePublicFormatCardplaySpectatorHandLine === "function"
+          ? window.risquePublicFormatCardplaySpectatorHandLine(gs)
+          : "";
     if (!primary) {
-      primary = nameU + " IS IN CARD PLAY";
+      primary = nameU + " IS IN CARD PLAY — WAITING...";
     }
 
     if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.setControlVoiceText === "function") {
@@ -1151,12 +1170,11 @@
     }
 
     var slot = document.getElementById("risque-phase-content");
-    if (slot && !slot.querySelector(".risque-artemis-cardplay-spectate")) {
-      if (slot.querySelector(".cardplay-compact-root")) {
-        slot.innerHTML = "";
-      }
-      slot.innerHTML =
-        '<div class="risque-artemis-cardplay-spectate risque-public-private-hint" role="status" aria-hidden="true"></div>';
+    if (slot) {
+      slot.innerHTML = "";
+    }
+    if (typeof window.risqueArtemisClearCardplaySpectatorVoiceBacks === "function") {
+      window.risqueArtemisClearCardplaySpectatorVoiceBacks();
     }
 
     if (typeof window.risqueArtemisEnsureHudTogglesVisible === "function") {
@@ -1567,8 +1585,10 @@
       }
       if (
         ph === "attack" &&
-        typeof window.risqueIsAttackCampaignMapPlanning === "function" &&
-        window.risqueIsAttackCampaignMapPlanning()
+        ((typeof window.risqueIsAttackCampaignMapPlanning === "function" &&
+          window.risqueIsAttackCampaignMapPlanning()) ||
+          (typeof window.risqueIsAttackCampaignActive === "function" &&
+            window.risqueIsAttackCampaignActive()))
       ) {
         return;
       }
@@ -1678,6 +1698,24 @@
     if (!window.risqueArtemisMode || !gs) return;
     var ph = String(gs.phase || "");
     if (ph === "login") return;
+    if (ph !== "login" && window.risqueArtemisNetClient && !window.risqueArtemisHost) {
+      if (typeof window.risqueArtemisHideLoginPanel === "function") {
+        window.risqueArtemisHideLoginPanel();
+      }
+      try {
+        document.documentElement.classList.remove("risque-artemis-login-active");
+        document.documentElement.classList.remove("risque-artemis-login-confirmed");
+        document.body.classList.remove("risque-public-login-active");
+      } catch (eHideLogin) {
+        /* ignore */
+      }
+      if (window.risqueArtemisLobbyStarted) {
+        var legacyLoginHud = document.getElementById("risque-login-hud-root");
+        if (legacyLoginHud && legacyLoginHud.parentNode) {
+          legacyLoginHud.parentNode.removeChild(legacyLoginHud);
+        }
+      }
+    }
     if (ph === "welcome") {
       artemisStampOmniHudDocumentClasses(gs);
       var uioWelcome = document.getElementById("ui-overlay");
@@ -1712,6 +1750,21 @@
       typeof window.risqueArtemisIsMyTurn === "function" &&
       !window.risqueArtemisIsMyTurn(gs);
     if (artemisUsesAttackHudLayout(ph) || hostAttackSpectator) {
+      var rhAtkSpec = document.getElementById("runtime-hud-root");
+      if (rhAtkSpec) {
+        rhAtkSpec.classList.remove("runtime-hud-root--setup");
+        rhAtkSpec.classList.remove("runtime-hud-root--artemis-compact");
+        rhAtkSpec.classList.remove("runtime-hud-root--artemis-cardplay");
+        rhAtkSpec.classList.remove("runtime-hud-root--cardplay-panel-only");
+      }
+      if (hostAttackSpectator) {
+        try {
+          document.body.classList.add("risque-artemis-attack-spectator");
+          document.body.setAttribute("data-risque-show-public-dice", "1");
+        } catch (eAtkSpecCls) {
+          /* ignore */
+        }
+      }
       if (typeof window.risqueWireArtemisHudTogglesOnce === "function") {
         window.risqueWireArtemisHudTogglesOnce();
       }
@@ -1728,6 +1781,22 @@
     }
     var uio = document.getElementById("ui-overlay");
     if (!uio || !window.risqueRuntimeHud) return;
+    if (window.risqueArtemisLobbyStarted && ph !== "login" && ph !== "welcome") {
+      if (typeof window.risqueArtemisHideLoginPanel === "function") {
+        window.risqueArtemisHideLoginPanel();
+      }
+      try {
+        document.documentElement.classList.remove("risque-artemis-login-active");
+        document.documentElement.classList.remove("risque-artemis-login-confirmed");
+        document.body.classList.remove("risque-public-login-active");
+      } catch (eClrLoginOmni) {
+        /* ignore */
+      }
+      var legacyLoginHudOmni = document.getElementById("risque-login-hud-root");
+      if (legacyLoginHudOmni && legacyLoginHudOmni.parentNode) {
+        legacyLoginHudOmni.parentNode.removeChild(legacyLoginHudOmni);
+      }
+    }
     var hudRoot = document.getElementById("runtime-hud-root");
     var loginHud = !!(hudRoot && hudRoot.classList.contains("runtime-hud-root--login"));
     var setupHud = !!(hudRoot && hudRoot.classList.contains("runtime-hud-root--setup"));
@@ -1738,13 +1807,32 @@
       !setupHud ||
       !document.getElementById("control-voice") ||
       !togglesOk;
-    if (needsSetup) {
+    var hasOmniShell =
+      hudRoot &&
+      document.getElementById("control-voice") &&
+      document.getElementById("hud-main-panel") &&
+      togglesOk;
+    if (needsSetup && hasOmniShell && !loginHud) {
+      hudRoot.classList.remove("runtime-hud-root--login");
+      hudRoot.classList.add("runtime-hud-root--setup");
+      hudRoot.classList.add("runtime-hud-root--artemis-compact");
+      if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.updateTurnBannerFromState === "function") {
+        window.risqueRuntimeHud.updateTurnBannerFromState(gs);
+      }
+    } else if (needsSetup) {
+      if (window.risqueArtemisLobbyStarted && ph !== "login" && ph !== "welcome") {
+        if (hudRoot) {
+          hudRoot.classList.remove("runtime-hud-root--login");
+        }
+      } else {
       var banner = artemisHudBannerForPhase(ph, gs);
-      var mustForce = loginHud || !setupHud || !document.getElementById("control-voice") || !togglesOk;
+      var mustForce =
+        loginHud || !document.getElementById("control-voice") || !document.getElementById("hud-main-panel") || !togglesOk;
       if (typeof window.risqueRuntimeHud.ensureSetupUnifiedHud === "function") {
         window.risqueRuntimeHud.ensureSetupUnifiedHud(uio, banner, mustForce ? { force: true } : undefined);
       } else if (typeof window.risqueRuntimeHud.ensureSetupHud === "function") {
         window.risqueRuntimeHud.ensureSetupHud(uio, banner);
+      }
       }
     }
     hudRoot = document.getElementById("runtime-hud-root");
@@ -3005,6 +3093,13 @@
       var advSeq = Number(push.artemisDeployTurnAdvance.controlSeq) || 0;
       if (localSeq > 0 && advSeq > 0 && advSeq < localSeq) {
         delete push.artemisDeployTurnAdvance;
+      }
+    }
+    if (push) {
+      try {
+        delete push.risqueTransferPulse;
+      } catch (eClrPushPulse) {
+        /* ignore */
       }
     }
     return push;

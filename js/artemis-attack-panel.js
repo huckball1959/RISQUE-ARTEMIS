@@ -87,8 +87,45 @@
     hudRoot.classList.remove("runtime-hud-root--setup");
     hudRoot.classList.remove("runtime-hud-root--artemis-cardplay");
     hudRoot.classList.remove("runtime-hud-root--cardplay-panel-only");
+    hudRoot.classList.remove("runtime-hud-root--receivecard-panel-only");
     hudRoot.classList.remove("runtime-hud-root--artemis-compact");
   }
+
+  /** True when HUD must be rebuilt — never rebuild just because setup class is present. */
+  function attackSpectatorHudNeedsRebuild(hudRoot) {
+    if (!hudRoot) return true;
+    if (hudRoot.classList.contains("runtime-hud-root--login")) return true;
+    if (!document.getElementById("control-voice")) return true;
+    if (!document.getElementById("attacker-dice-text-0")) return true;
+    return false;
+  }
+
+  /** Unhide dice + toolbar chrome (e.g. after income spectator teardown). */
+  function restoreHostAttackChromeVisibility() {
+    var atkChrome = document.getElementById("hud-attack-chrome");
+    if (!atkChrome) return;
+    atkChrome.removeAttribute("hidden");
+    atkChrome.setAttribute("aria-hidden", "false");
+    atkChrome.style.removeProperty("display");
+  }
+  window.risqueArtemisRestoreHostAttackChrome = restoreHostAttackChromeVisibility;
+
+  /** Guido spectating client attack: full attack HUD column (not setup shell — that breaks campaign on host turn). */
+  function ensureHostAttackSpectatorFullAttackHud() {
+    stripSetupHudClasses();
+    restoreHostAttackChromeVisibility();
+  }
+
+  /** Active host attack / campaign: strip spectator + setup shells so CV can grow (L1/L3 leave row). */
+  window.risqueArtemisEnsureHostActiveAttackColumn = function () {
+    if (!window.risqueArtemisHost || window.risqueArtemisNetClient) return;
+    setHostAttackSpectatorBodyClass(false);
+    stripSetupHudClasses();
+    ensureHostAttackSpectatorFullAttackHud();
+    if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.syncPosition === "function") {
+      window.risqueRuntimeHud.syncPosition();
+    }
+  };
 
   function wireOmniToggles(gs) {
     if (typeof window.risqueWireArtemisHudTogglesOnce === "function") {
@@ -105,29 +142,29 @@
     }
   }
 
+  function rebuildAttackSpectatorHud(uio) {
+    if (!uio || !window.risqueRuntimeHud) return;
+    if (typeof window.risqueRuntimeHud.ensure === "function") {
+      window.risqueRuntimeHud.ensure(uio);
+    } else if (typeof window.risqueRuntimeHud.ensureSetupUnifiedHud === "function") {
+      window.risqueRuntimeHud.ensureSetupUnifiedHud(uio, "ATTACK", { force: true });
+    }
+  }
+
   function ensureHostAttackSpectatorChrome(gs) {
     if (!window.risqueArtemisHost || window.risqueArtemisNetClient || !gs) return;
     var uio = document.getElementById("ui-overlay");
     if (!uio || !window.risqueRuntimeHud) return;
-    stripSetupHudClasses();
+    setHostAttackSpectatorBodyClass(true);
     var hudRoot = document.getElementById("runtime-hud-root");
-    if (
-      !hudRoot ||
-      hudRoot.classList.contains("runtime-hud-root--setup") ||
-      hudRoot.classList.contains("runtime-hud-root--login") ||
-      !document.getElementById("attacker-dice-text-0")
-    ) {
-      if (typeof window.risqueRuntimeHud.ensure === "function") {
-        window.risqueRuntimeHud.ensure(uio);
-      }
+    if (attackSpectatorHudNeedsRebuild(hudRoot)) {
+      rebuildAttackSpectatorHud(uio);
     }
-    stripSetupHudClasses();
-    hudRoot = document.getElementById("runtime-hud-root");
-    if (hudRoot) {
-      hudRoot.classList.remove("runtime-hud-root--artemis-compact");
-    }
+    ensureHostAttackSpectatorFullAttackHud();
     try {
-      document.body.setAttribute("data-risque-phase", "attack");
+      if (String(gs.phase || "") === "attack") {
+        document.body.setAttribute("data-risque-phase", "attack");
+      }
     } catch (ePh) {
       /* ignore */
     }
@@ -151,6 +188,52 @@
       }
     }
   }
+
+  function clearHostAttackSpectatorDiceTimers() {
+    if (hostAttackDiceRevealTimer) {
+      clearTimeout(hostAttackDiceRevealTimer);
+      hostAttackDiceRevealTimer = null;
+    }
+    if (hostAttackDicePaintTimer) {
+      clearInterval(hostAttackDicePaintTimer);
+      hostAttackDicePaintTimer = null;
+    }
+    clearHostAttackSpinGrace();
+  }
+
+  function resetHostAttackSpectatorDiceDom() {
+    var i;
+    for (i = 0; i < 3; i += 1) {
+      var atkDie = document.getElementById("attacker-dice-" + i);
+      var atkText = document.getElementById("attacker-dice-text-" + i);
+      if (atkDie) {
+        atkDie.classList.remove("dice-rolling", "active-attacker");
+      }
+      if (atkText) {
+        atkText.classList.remove("dice-text-hidden", "dice-text-visible");
+        atkText.textContent = "-";
+      }
+    }
+    for (i = 0; i < 2; i += 1) {
+      var defDie = document.getElementById("defender-dice-" + i);
+      var defText = document.getElementById("defender-dice-text-" + i);
+      if (defDie) {
+        defDie.classList.remove("dice-rolling", "active-defender");
+      }
+      if (defText) {
+        defText.classList.remove("dice-text-hidden", "dice-text-visible");
+        defText.textContent = "-";
+      }
+    }
+  }
+
+  /** Drop attack-spectator dice when host leaves client attack (income/cardplay/deploy/…). */
+  window.risqueArtemisTeardownHostAttackSpectator = function () {
+    if (!window.risqueArtemisHost || window.risqueArtemisNetClient) return;
+    setHostAttackSpectatorBodyClass(false);
+    clearHostAttackSpectatorDiceTimers();
+    resetHostAttackSpectatorDiceDom();
+  };
 
   function setHostAttackSpectatorBodyClass(on) {
     try {
@@ -179,6 +262,7 @@
       window.risqueArtemisShouldAttackChromeBeInteractive(gs)
     ) {
       setHostAttackSpectatorBodyClass(false);
+      stripSetupHudClasses();
       return;
     }
     window.gameState = gs;
@@ -200,6 +284,12 @@
 
   function paintHostAttackSpectatorMap(gs) {
     if (!gs || !window.gameUtils) return;
+    /* Host never runs the transfer pulse ticker — stale pulse from client player_state freezes mid-hop counts (003/001). */
+    try {
+      delete gs.risqueTransferPulse;
+    } catch (eClrPulse) {
+      /* ignore */
+    }
     try {
       if (typeof window.gameUtils.renderAll === "function") {
         window.gameUtils.renderAll(gs, null, {});
@@ -217,6 +307,183 @@
   }
 
   /** Host (Guido) spectating a client attack: dice row + map + voice from attack_live / player_state. */
+  var hostAttackDicePaintTimer = null;
+  var hostAttackDiceRevealTimer = null;
+  /** Match client singleRollRevealTimer (~500ms) in phases/attack.js */
+  var HOST_ATTACK_DICE_SPIN_MS = 520;
+
+  function clearHostAttackSpinGrace() {
+    window.__risqueArtemisHostAttackSpinUntil = 0;
+  }
+
+  function hostIsAttackSpectator(gs) {
+    if (!window.risqueArtemisHost || window.risqueArtemisNetClient || !gs) return false;
+    if (String(gs.phase || "") !== "attack") return false;
+    if (
+      typeof window.risqueArtemisShouldHostMountAttack === "function" &&
+      window.risqueArtemisShouldHostMountAttack(gs)
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  function hostAttackDiceFingerprint(m) {
+    if (!m || typeof m !== "object") return "";
+    if (m.spinning === true) {
+      return "spin:" + String(m.attackerDiceUsed) + ":" + String(m.defenderDiceCount);
+    }
+    return "done:" + (m.attackerRolls || []).join(",") + "|" + (m.defenderRolls || []).join(",");
+  }
+
+  function markHostAttackSpinGrace(ms) {
+    window.__risqueArtemisHostAttackSpinUntil =
+      Date.now() + (Number(ms) || HOST_ATTACK_DICE_SPIN_MS);
+  }
+
+  function cloneGsDiceSpinOnly(gs) {
+    var m = gs && gs.risqueLastDiceDisplay;
+    if (!m) return gs;
+    var out;
+    try {
+      out = JSON.parse(JSON.stringify(gs));
+    } catch (eClone) {
+      return gs;
+    }
+    out.risqueLastDiceDisplay = {
+      spinning: true,
+      attackerDiceUsed: m.attackerDiceUsed,
+      defenderDiceCount: m.defenderDiceCount
+    };
+    return out;
+  }
+
+  function hostAttackDiceSpinActive(gs) {
+    var m = gs && gs.risqueLastDiceDisplay;
+    var spinUntil = Number(window.__risqueArtemisHostAttackSpinUntil) || 0;
+    return !!(m && m.spinning === true) || spinUntil > Date.now();
+  }
+
+  function scheduleHostAttackDiceReveal(gsReveal) {
+    if (hostAttackDiceRevealTimer) {
+      clearTimeout(hostAttackDiceRevealTimer);
+      hostAttackDiceRevealTimer = null;
+    }
+    hostAttackDiceRevealTimer = setTimeout(function () {
+      hostAttackDiceRevealTimer = null;
+      clearHostAttackSpinGrace();
+      if (hostAttackDicePaintTimer) {
+        clearInterval(hostAttackDicePaintTimer);
+        hostAttackDicePaintTimer = null;
+      }
+      var live = gsReveal || window.gameState;
+      if (live && typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
+        window.risquePublicApplyDiceAndBattleReadout(live);
+      }
+      paintHostAttackSpectatorMap(live);
+    }, HOST_ATTACK_DICE_SPIN_MS);
+  }
+
+  function scheduleHostAttackDicePaint(gs) {
+    if (!window.risqueArtemisHost || window.risqueArtemisNetClient) return;
+    if (hostAttackDicePaintTimer) {
+      clearInterval(hostAttackDicePaintTimer);
+      hostAttackDicePaintTimer = null;
+    }
+    function paintHostDiceOnce() {
+      var live = window.gameState || gs;
+      if (!live || String(live.phase || "") !== "attack") {
+        if (hostAttackDicePaintTimer) {
+          clearInterval(hostAttackDicePaintTimer);
+          hostAttackDicePaintTimer = null;
+        }
+        return;
+      }
+      var paintGs = live;
+      if (
+        hostAttackDiceSpinActive(live) &&
+        live.risqueLastDiceDisplay &&
+        live.risqueLastDiceDisplay.spinning !== true
+      ) {
+        paintGs = cloneGsDiceSpinOnly(live);
+      }
+      if (typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
+        window.risquePublicApplyDiceAndBattleReadout(paintGs);
+      }
+      if (!hostAttackDiceSpinActive(live)) {
+        if (hostAttackDicePaintTimer) {
+          clearInterval(hostAttackDicePaintTimer);
+          hostAttackDicePaintTimer = null;
+        }
+      }
+    }
+    paintHostDiceOnce();
+    if (hostAttackDiceSpinActive(gs || window.gameState)) {
+      hostAttackDicePaintTimer = setInterval(paintHostDiceOnce, 80);
+      setTimeout(function () {
+        if (hostAttackDicePaintTimer) {
+          clearInterval(hostAttackDicePaintTimer);
+          hostAttackDicePaintTimer = null;
+        }
+        paintHostDiceOnce();
+      }, HOST_ATTACK_DICE_SPIN_MS + 80);
+    }
+  }
+
+  /** Ensure attack dice chrome is visible; short spin when mirror omits spinning:true. */
+  function driveHostAttackDice(gs) {
+    if (!hostIsAttackSpectator(gs)) return;
+    ensureHostAttackSpectatorChrome(gs);
+    if (typeof window.risqueArtemisReassertHostAttackSpectator === "function") {
+      window.risqueArtemisReassertHostAttackSpectator(gs);
+    }
+    var hudRoot = document.getElementById("runtime-hud-root");
+    if (attackSpectatorHudNeedsRebuild(hudRoot)) {
+      var uio = document.getElementById("ui-overlay");
+      rebuildAttackSpectatorHud(uio);
+      ensureHostAttackSpectatorFullAttackHud();
+    }
+    var m = gs.risqueLastDiceDisplay;
+    if (!m) {
+      clearHostAttackSpinGrace();
+      if (typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
+        window.risquePublicApplyDiceAndBattleReadout(gs);
+      }
+      return;
+    }
+    var fp = hostAttackDiceFingerprint(m);
+    var prev = window.__risqueArtemisHostDiceFp || "";
+    if (m.spinning === true) {
+      markHostAttackSpinGrace(HOST_ATTACK_DICE_SPIN_MS);
+      window.__risqueArtemisHostDiceFp = fp;
+      if (typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
+        window.risquePublicApplyDiceAndBattleReadout(gs);
+      }
+      scheduleHostAttackDicePaint(gs);
+      scheduleHostAttackDiceReveal(gs);
+      return;
+    }
+    if (fp.indexOf("done:") === 0 && fp !== prev && m.attackerRolls) {
+      markHostAttackSpinGrace(HOST_ATTACK_DICE_SPIN_MS);
+      window.__risqueArtemisHostDiceFp = fp;
+      var spinOnly = cloneGsDiceSpinOnly(gs);
+      if (typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
+        window.risquePublicApplyDiceAndBattleReadout(spinOnly);
+      }
+      scheduleHostAttackDicePaint(spinOnly);
+      scheduleHostAttackDiceReveal(gs);
+      return;
+    }
+    clearHostAttackSpinGrace();
+    window.__risqueArtemisHostDiceFp = fp;
+    if (typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
+      window.risquePublicApplyDiceAndBattleReadout(gs);
+    }
+  }
+
+  window.risqueArtemisScheduleHostAttackDicePaint = scheduleHostAttackDicePaint;
+  window.risqueArtemisDriveHostAttackDice = driveHostAttackDice;
+
   window.risqueArtemisApplyHostAttackSpectator = function (gs) {
     if (!window.risqueArtemisHost || window.risqueArtemisNetClient || !gs) return;
     if (String(gs.phase || "") !== "attack") return;
@@ -231,18 +498,14 @@
     window.risqueArtemisReassertHostAttackSpectator(gs);
     ensureAttackSpectatorHud(gs);
     paintHostAttackSpectatorMap(gs);
-    if (typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
-      window.risquePublicApplyDiceAndBattleReadout(gs);
-    }
+    driveHostAttackDice(gs);
     if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
       window.risquePublicApplyVoiceAndLogMirror(gs);
     }
     requestAnimationFrame(function () {
-      if (typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
-        window.risquePublicApplyDiceAndBattleReadout(gs);
-      }
+      driveHostAttackDice(window.gameState || gs);
       if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
-        window.risquePublicApplyVoiceAndLogMirror(gs);
+        window.risquePublicApplyVoiceAndLogMirror(window.gameState || gs);
       }
     });
   };
@@ -251,22 +514,20 @@
     var uio = document.getElementById("ui-overlay");
     if (!uio || !window.risqueRuntimeHud) return;
     window.gameState = gs;
+    var hostTv = window.risqueArtemisHost && !window.risqueArtemisNetClient;
     var hudRoot = document.getElementById("runtime-hud-root");
-    if (
-      !hudRoot ||
-      hudRoot.classList.contains("runtime-hud-root--setup") ||
-      hudRoot.classList.contains("runtime-hud-root--login") ||
-      !attackChromePresent()
-    ) {
-      if (typeof window.risqueRuntimeHud.ensure === "function") {
-        window.risqueRuntimeHud.ensure(uio);
-      }
+    if (attackSpectatorHudNeedsRebuild(hudRoot)) {
+      rebuildAttackSpectatorHud(uio);
     }
-    stripSetupHudClasses();
-    var atkChrome = document.getElementById("hud-attack-chrome");
-    if (atkChrome) {
-      atkChrome.removeAttribute("hidden");
-      atkChrome.setAttribute("aria-hidden", "false");
+    if (hostTv) {
+      ensureHostAttackSpectatorFullAttackHud();
+    } else {
+      stripSetupHudClasses();
+      restoreHostAttackChromeVisibility();
+      var atkChrome = document.getElementById("hud-attack-chrome");
+      if (atkChrome) {
+        atkChrome.setAttribute("aria-hidden", "false");
+      }
     }
     if (typeof window.risqueRuntimeHud.setAttackChromeInteractive === "function") {
       window.risqueRuntimeHud.setAttackChromeInteractive(false);
@@ -278,10 +539,9 @@
     if (typeof window.risquePublicApplyVoiceAndLogMirror === "function") {
       window.risquePublicApplyVoiceAndLogMirror(gs);
     }
-    if (typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
-      window.risquePublicApplyDiceAndBattleReadout(gs);
-    }
+    driveHostAttackDice(gs);
     requestAnimationFrame(function () {
+      driveHostAttackDice(window.gameState || gs);
       if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.syncPosition === "function") {
         window.risqueRuntimeHud.syncPosition();
       }
@@ -294,6 +554,7 @@
     var ctrl = ownerSlot(gs);
     var mountKey = String(ctrl) + ":" + up;
     if (attackMountedFor === mountKey && attackChromePresent()) {
+      setHostAttackSpectatorBodyClass(false);
       stripSetupHudClasses();
       if (typeof window.risqueRuntimeHud.setAttackChromeInteractive === "function") {
         window.risqueRuntimeHud.setAttackChromeInteractive(true);
@@ -306,6 +567,10 @@
     }
     attackMountedFor = mountKey;
     window.gameState = gs;
+    setHostAttackSpectatorBodyClass(false);
+    if (typeof window.risqueArtemisRestoreHostAttackChrome === "function") {
+      window.risqueArtemisRestoreHostAttackChrome();
+    }
     document.body.classList.add("risque-setup-fullstage");
     var stageHost = document.getElementById("stage-host") || document.body;
     if (typeof window.risquePhases.attack.mount === "function") {
@@ -374,7 +639,17 @@
       attackMountedFor = "";
       mountRealAttack(gs);
     } else {
+      if (typeof window.risqueArtemisRestoreHostAttackChrome === "function") {
+        window.risqueArtemisRestoreHostAttackChrome();
+      }
       stripSetupHudClasses();
+      if (
+        window.risqueArtemisHost &&
+        !window.risqueArtemisNetClient &&
+        typeof window.risqueArtemisEnsureHostActiveAttackColumn === "function"
+      ) {
+        window.risqueArtemisEnsureHostActiveAttackColumn();
+      }
       if (typeof window.risqueRuntimeHud.setAttackChromeInteractive === "function") {
         window.risqueRuntimeHud.setAttackChromeInteractive(true);
       }
@@ -392,6 +667,23 @@
     if (!gs || String(gs.phase || "") !== "attack") {
       attackMountedFor = "";
       return;
+    }
+
+    if (window.risqueArtemisNetClient && !window.risqueArtemisHost && window.risqueArtemisLobbyStarted) {
+      if (typeof window.risqueArtemisHideLoginPanel === "function") {
+        window.risqueArtemisHideLoginPanel();
+      }
+      try {
+        document.documentElement.classList.remove("risque-artemis-login-active");
+        document.documentElement.classList.remove("risque-artemis-login-confirmed");
+        document.body.classList.remove("risque-public-login-active");
+      } catch (eClrAtkLogin) {
+        /* ignore */
+      }
+      var legLoginAtk = document.getElementById("risque-login-hud-root");
+      if (legLoginAtk && legLoginAtk.parentNode) {
+        legLoginAtk.parentNode.removeChild(legLoginAtk);
+      }
     }
 
     try {
@@ -473,6 +765,7 @@
       window.risqueRuntimeHud.setAttackChromeInteractive(false);
     }
     ensureAttackSpectatorHud(gs);
+    driveHostAttackDice(gs);
     if (typeof window.risqueArtemisSyncMyTurnClass === "function") {
       window.risqueArtemisSyncMyTurnClass(gs);
     }

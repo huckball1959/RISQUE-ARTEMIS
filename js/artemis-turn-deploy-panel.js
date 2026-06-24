@@ -142,7 +142,20 @@
     if (slot) slot.innerHTML = "";
   }
 
+  function clearTurnDeploySpectatorHint() {
+    var slot = document.getElementById("risque-phase-content");
+    if (slot && slot.querySelector(".risque-artemis-turn-deploy-spectate")) {
+      slot.innerHTML = "";
+    }
+    spectatorHintKey = "";
+  }
+
   function mountSpectatorHint(gs) {
+    /* ARTEMIS: control voice already says who is deploying — no duplicate hint under CV (host Guido). */
+    if (window.risqueArtemisMode) {
+      clearTurnDeploySpectatorHint();
+      return;
+    }
     var slot = document.getElementById("risque-phase-content");
     if (!slot) return;
     var name = gs && gs.currentPlayer ? String(gs.currentPlayer) : "?";
@@ -158,6 +171,8 @@
       name.toUpperCase() +
       "</strong> to deploy income troops.</p></div>";
   }
+
+  window.risqueArtemisClearTurnDeploySpectatorHint = clearTurnDeploySpectatorHint;
 
   function mountRealTurnDeploy(gs) {
     if (!gs || !window.risquePhases || !window.risquePhases.deploy) return;

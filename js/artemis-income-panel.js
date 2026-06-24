@@ -279,6 +279,9 @@
     if (!rh.classList.contains("runtime-hud-root--artemis-compact")) {
       rh.classList.add("runtime-hud-root--artemis-compact");
     }
+    if (typeof window.risqueArtemisClearCardplaySpectatorVoiceBacks === "function") {
+      window.risqueArtemisClearCardplaySpectatorVoiceBacks();
+    }
     var cv = document.getElementById("control-voice");
     if (cv) {
       cv.classList.add("ucp-control-voice");

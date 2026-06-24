@@ -303,6 +303,34 @@ function reinforcePrettyTerritory(id) {
     .join(' ');
 }
 
+function reinforceSpectatorMirrorReport() {
+  if (!reinforceCurrentPlayer || !selectedSource) return '';
+  return (
+    reinforceCurrentPlayer.name +
+    ' has selected ' +
+    reinforcePrettyTerritory(selectedSource) +
+    ' to reinforce from.'
+  );
+}
+
+function reinforceSyncSpectatorMirrorFields() {
+  if (!window.gameState) return;
+  const line = reinforceSpectatorMirrorReport();
+  if (line) {
+    window.gameState.risqueReinforceSpectatorReport = line;
+  } else {
+    try {
+      delete window.gameState.risqueReinforceSpectatorReport;
+    } catch (eClrRfRep) {
+      /* ignore */
+    }
+  }
+}
+
+function reinforceSyncSpectatorReport() {
+  reinforceSyncSpectatorMirrorFields();
+}
+
 function reinforceControlVoiceReport() {
   if (moveMade) return 'Reinforcement finished — continuing…';
   if (reinforceSplitPending) {
@@ -410,14 +438,18 @@ function reinforceShowPrompt(message, buttons = [], options = null, report = '')
 
 function reinforceSyncPublicVoice(opts) {
   if (window.risqueDisplayIsPublic || !reinforceCurrentPlayer) return;
-  const report =
+  reinforceSyncSpectatorMirrorFields();
+  const ownerReport =
     opts && opts.reportOverride != null && String(opts.reportOverride).trim() !== ''
       ? String(opts.reportOverride)
       : reinforceControlVoiceReport();
+  const mirrorReport =
+    reinforceSpectatorMirrorReport() ||
+    (moveMade ? ownerReport : '');
   if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.setControlVoiceText === 'function') {
     window.risqueRuntimeHud.setControlVoiceText(
       `${reinforceCurrentPlayer.name.toUpperCase()} — REINFORCE`,
-      report,
+      mirrorReport,
       { force: true, reportClass: 'ucp-voice-report--reinforce-hud' }
     );
   }
@@ -487,11 +519,18 @@ function refreshReinforceCompactHud() {
       moveMade ||
       (!(selectedSource || selectedDestination) && !troopPrompt && !splitConfirm);
   }
+  var troopRow = document.getElementById('reinforce-row-troop');
+  var troopRowOpen =
+    troopRow && !troopRow.hidden && troopRow.getAttribute('hidden') !== 'hidden';
   if (troopPrompt || splitConfirm) {
-    if (r1) r1.disabled = false;
-    if (cm) cm.disabled = false;
+    if (cm && troopRowOpen) {
+      cm.disabled = !(selectedSource && selectedDestination);
+    }
   } else if (r1) {
     r1.disabled = !(selectedSource && selectedDestination);
+  }
+  if (cm && !troopRowOpen) {
+    cm.disabled = true;
   }
   if (protect) {
     protect.disabled = !(selectedSource && selectedDestination);
@@ -669,6 +708,7 @@ window.risqueReinforceHostApplyPrompt = function (buttons) {
     r1.onclick = function () {
       confirmReinforceMove();
     };
+    r1.disabled = true;
     wireTroopNumRow(false);
     if (a1) {
       a1.onclick = null;
@@ -1000,6 +1040,7 @@ function resetReinforceSelection() {
   if (window.gameState && window.gameState.risqueReinforcePreview) {
     delete window.gameState.risqueReinforcePreview;
   }
+  reinforceSyncSpectatorReport();
   window.gameUtils.renderTerritories(null, window.gameState);
   if (typeof window.risquePersistHostGameState === 'function') {
     window.risquePersistHostGameState();
@@ -1335,6 +1376,7 @@ function handleReinforceTerritoryClick(label, owner, troops) {
     selectedSource = label;
     sourceTerritory = reinforceCurrentPlayer.territories.find(t => t.name === label);
     troopsToMove = 1;
+    reinforceSyncSpectatorReport();
     if (typeof window.risqueAppendGameLog === 'function') {
       window.risqueAppendGameLog(
         `${reinforceCurrentPlayer.name}: reinforcing from ${reinforcePrettyTerritory(label)}.`,
@@ -1410,7 +1452,15 @@ function initReinforcePhase() {
       return;
     }
     gameState.phase = 'reinforce';
+    try {
+      delete gameState.risquePublicNextPlayerHandoffPrimary;
+      delete gameState.risquePublicNextPlayerHandoffReport;
+      delete gameState.risqueReinforceSpectatorReport;
+    } catch (eClrRfHandoff) {
+      /* ignore */
+    }
     moveMade = false;
+    window.__risqueReinforceTroopPromptActive = false;
     selectedSource = null;
     selectedDestination = null;
     sourceTerritory = null;
@@ -1455,6 +1505,19 @@ function initReinforcePhase() {
     resetReinforceSelection();
     captureReinforcePublicBoardSnapshot();
     reinforceSaveState();
+    reinforcePushMirror();
+    if (
+      window.risqueArtemisMode &&
+      window.risqueArtemisNetClient &&
+      !window.risqueArtemisHost &&
+      typeof window.risqueArtemisFlushClientStatePush === 'function'
+    ) {
+      try {
+        window.risqueArtemisFlushClientStatePush(window.gameState);
+      } catch (eRfInitPush) {
+        /* ignore */
+      }
+    }
     reinforceLog('Reinforcement initialized', { player: window.gameState.currentPlayer });
     if (typeof window.risqueRedrawAerialBridgeOverlay === "function") {
       requestAnimationFrame(function () {
@@ -1587,7 +1650,7 @@ window.initReinforcePhase = initReinforcePhase;
           '<div class="reinforce-troops-holder" id="reinforce-troops-holder" hidden aria-hidden="true"></div>' +
           "</div>" +
           '<div class="reinforce-row reinforce-row--confirm-only">' +
-          '<button type="button" id="reinforce-btn-r1third" class="reinforce-btn-compact reinforce-btn-compact--full-width">CONFIRM</button>' +
+          '<button type="button" id="reinforce-btn-r1third" class="reinforce-btn-compact reinforce-btn-compact--full-width" disabled>CONFIRM</button>' +
           "</div>" +
           '<div class="reinforce-troop-prompt" id="reinforce-row-troop" hidden>' +
           '<div class="reinforce-row reinforce-row--troop-split">' +

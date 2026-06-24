@@ -2703,7 +2703,17 @@ function completeTroopTransferFromPending(additional) {
   window.gameState.risquePublicAttackTransferSummary = `${player.name} transfers ${totalToDest} troops from ${prettyTerritoryName(
     attacking.name
   )} to ${prettyTerritoryName(acquired.name)}.`;
-  if (typeof window.risqueMirrorPushGameState === 'function') {
+  if (
+    window.risqueArtemisMode &&
+    window.risqueArtemisNetClient &&
+    !window.risqueArtemisHost &&
+    typeof window.risqueArtemisFlushClientStatePush === 'function'
+  ) {
+    window.risqueArtemisFlushClientStatePush(window.gameState);
+  }
+  if (typeof window.risqueFlushMirrorPush === 'function') {
+    window.risqueFlushMirrorPush();
+  } else if (typeof window.risqueMirrorPushGameState === 'function') {
     window.risqueMirrorPushGameState();
   }
   saveGameState();
@@ -3899,6 +3909,13 @@ function clearAttackCampaignPlanningAfterRun() {
   isPauseCampaignRunning = false;
   campaignQDevMode = false;
   clearInstantCampaignWarpath();
+  if (window.gameState) {
+    try {
+      delete window.gameState.risqueTransferPulse;
+    } catch (eClrCampPulse) {
+      /* ignore */
+    }
+  }
   const cv = document.getElementById('control-voice');
   if (cv) cv.classList.remove('ucp-control-voice--campaign-instant');
   const vt = document.getElementById('control-voice-text');
@@ -3962,6 +3979,13 @@ function applyPostCampaignOutcomeAndIdlePrompt(primary, report, reportClass) {
     window.risqueRuntimeHud.setAttackChromeInteractive(true);
   }
   updateBattlePanelReadout();
+  if (window.gameState) {
+    try {
+      delete window.gameState.risqueTransferPulse;
+    } catch (eClrPostCampPulse) {
+      /* ignore */
+    }
+  }
   renderAfterCampaignWarpathSync();
   try {
     saveGameState();
@@ -4057,6 +4081,9 @@ function buildQDevCampaignStaticVoiceHtml() {
 }
 
 function paintQDevCampaignHud(reportLine, mirrorOpts) {
+  if (typeof window.risqueArtemisEnsureHostActiveAttackColumn === "function") {
+    window.risqueArtemisEnsureHostActiveAttackColumn();
+  }
   clearControlVoiceSlotsAndExtras();
   const vt = document.getElementById('control-voice-text');
   const vr = document.getElementById('control-voice-report');
@@ -4074,6 +4101,7 @@ function paintQDevCampaignHud(reportLine, mirrorOpts) {
   }
   if (cv) cv.classList.add('ucp-control-voice--campaign-instant');
   scrollCampaignVoiceToTop();
+  wireInstantCampaignActionButtons();
   try {
     if (window.gameState) {
       const r = reportLine != null && String(reportLine) !== '' ? String(reportLine) : '';
@@ -4133,10 +4161,10 @@ function buildInstantStaticVoiceHtml() {
     campaignMode !== 'instant_committed'
       ? ' disabled'
       : '';
+  const resetDisabled = runInProgress ? ' disabled' : '';
   const leaveVal = Math.max(1, Math.min(99, instantCampaignGarrison));
   const leaveDisabled =
     campaignMode === 'instant_results' || campaignMode === 'cond_await_condition' || runInProgress ? ' disabled' : '';
-  const resetDisabled = runInProgress ? ' disabled' : '';
   return (
     '<div class="campaign-instant-hud-static">' +
     '<div class="campaign-instant-framed">' +
@@ -4190,11 +4218,15 @@ function paintInstantCampaignHud(reportLine, mirrorOpts) {
     paintQDevCampaignHud(reportLine, mirrorOpts);
     return;
   }
+  if (typeof window.risqueArtemisEnsureHostActiveAttackColumn === "function") {
+    window.risqueArtemisEnsureHostActiveAttackColumn();
+  }
   clearControlVoiceSlotsAndExtras();
   const vt = document.getElementById('control-voice-text');
   const vr = document.getElementById('control-voice-report');
   const cv = document.getElementById('control-voice');
   const opts = mirrorOpts != null && typeof mirrorOpts === 'object' ? mirrorOpts : null;
+  const runInProgress = !!isPauseCampaignRunning;
   if (vt) {
     vt.classList.add('campaign-instant-voice');
     vt.innerHTML = buildInstantStaticVoiceHtml();
@@ -4207,6 +4239,8 @@ function paintInstantCampaignHud(reportLine, mirrorOpts) {
   }
   if (cv) cv.classList.add('ucp-control-voice--campaign-instant');
   scrollCampaignVoiceToTop();
+  wireInstantCampaignLeaveInput();
+  wireInstantCampaignActionButtons();
   try {
     if (window.gameState) {
       const r = reportLine != null && String(reportLine) !== '' ? String(reportLine) : '';
@@ -4234,7 +4268,6 @@ function paintInstantCampaignHud(reportLine, mirrorOpts) {
   } catch (eCampVoice) {
     /* ignore */
   }
-  wireInstantCampaignLeaveInput();
   if (
     window.risqueRuntimeHud &&
     typeof window.risqueRuntimeHud.clampCombatLogToCanvasBottom === 'function'
@@ -4293,6 +4326,18 @@ function syncInstantCampaignGarrisonFromUi() {
   instantCampaignGarrison = Math.max(1, Math.min(99, n));
   campaignPreferredGarrison = instantCampaignGarrison;
   leaveIn.value = String(instantCampaignGarrison);
+}
+
+function wireInstantCampaignActionButtons() {
+  if (!isCommitRunCampaignType()) return;
+  document.querySelectorAll('[data-instant-campaign-action]').forEach(function (btn) {
+    btn.onclick = function (e) {
+      if (btn.disabled) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onControlVoiceInstantCampaignClick(e);
+    };
+  });
 }
 
 function wireInstantCampaignLeaveInput() {
@@ -4437,6 +4482,13 @@ function syncCampaignWarpathMirror() {
 }
 
 function renderAfterCampaignWarpathSync() {
+  if (window.gameState) {
+    try {
+      delete window.gameState.risqueTransferPulse;
+    } catch (eClrPulse) {
+      /* ignore */
+    }
+  }
   syncCampaignWarpathMirror();
   if (window.gameUtils && window.gameState) {
     window.gameUtils.renderTerritories(null, window.gameState);
@@ -7089,6 +7141,18 @@ window.initAttackPhase = initAttackPhase;
       window.risqueRuntimeHud.ensure(uiOverlay);
       window.risqueRuntimeHud.clearPhaseSlot();
       window.risqueRuntimeHud.setAttackChromeInteractive(artemisAttackInteractive);
+      if (artemisAttackInteractive) {
+        if (typeof window.risqueArtemisRestoreHostAttackChrome === "function") {
+          window.risqueArtemisRestoreHostAttackChrome();
+        }
+        if (
+          window.risqueArtemisHost &&
+          !window.risqueArtemisNetClient &&
+          typeof window.risqueArtemisEnsureHostActiveAttackColumn === "function"
+        ) {
+          window.risqueArtemisEnsureHostActiveAttackColumn();
+        }
+      }
       if (!artemisAttackInteractive && typeof window.risqueArtemisReassertHostAttackSpectator === 'function') {
         window.risqueArtemisReassertHostAttackSpectator(window.gameState);
       }

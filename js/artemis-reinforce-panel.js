@@ -177,8 +177,25 @@
     }
   }
 
+  function clearHostSpectatorMapRedrawSuppress() {
+    if (!window.risqueArtemisHost || window.risqueArtemisNetClient) return;
+    try {
+      delete window.__risqueSuppressHostMapRedraw;
+    } catch (eSup) {
+      /* ignore */
+    }
+  }
+
+  function reinforceSpectatorControlVoiceText(gs) {
+    if (!gs) return "";
+    var name = gs.currentPlayer ? String(gs.currentPlayer).toUpperCase() : "NEXT";
+    return name + " — REINFORCE";
+  }
+  window.risqueReinforceSpectatorControlVoiceText = reinforceSpectatorControlVoiceText;
+
   function paintHostReinforceSpectatorMap(gs) {
     if (!gs || !window.gameUtils) return;
+    clearHostSpectatorMapRedrawSuppress();
     try {
       if (typeof window.gameUtils.renderAll === "function") {
         window.gameUtils.renderAll(gs, null, {});

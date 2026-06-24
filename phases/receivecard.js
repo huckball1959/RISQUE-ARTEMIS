@@ -72,6 +72,8 @@
     }
   }
 
+  var __risqueReceiveCardMergeAnimSeq = 0;
+
   /** Mirror in-hand + staging layout for public TV (card backs only, no card names). */
   function refreshReceiveCardPublicSpectatorMirror(opts) {
     opts = opts || {};
@@ -108,9 +110,10 @@
     var stagingMergedFlag = false;
 
     if (
-      (window.__risqueReceiveCardStagingMerged || opts.forceMergeAnim === true) &&
-      stagingShowsNewDraw &&
-      nHand >= 1
+      (opts.forceMergeAnim === true && nHand >= 1) ||
+      ((window.__risqueReceiveCardStagingMerged || opts.forceMergeAnim === true) &&
+        stagingShowsNewDraw &&
+        nHand >= 1)
     ) {
       if (opts.forceMergeAnim === true || window.__risqueReceiveCardStagingMerged) {
         handBackCount = Math.max(0, nHand - 1);
@@ -118,7 +121,8 @@
         showStaging = true;
         mergeAnimFromHand = Math.max(0, nHand - 1);
         mergeFinalHandCount = nHand;
-        mergeAnimSeq = Date.now();
+        __risqueReceiveCardMergeAnimSeq += 1;
+        mergeAnimSeq = __risqueReceiveCardMergeAnimSeq;
         stagingMergedFlag = false;
       } else {
         handBackCount = nHand;
@@ -273,6 +277,13 @@
     return "TOTAL CARDS IN HAND = " + n;
   }
 
+  function receiveCardShouldShowHandCountInVoice() {
+    if (window.__risqueReceiveCardStagingMergeNeeded && !window.__risqueReceiveCardStagingMerged) {
+      return false;
+    }
+    return true;
+  }
+
   function receiveCardSyncBookPill() {
     var pill = document.getElementById("receivecard-book-pill");
     if (!pill) return;
@@ -301,9 +312,10 @@
       t = "";
     }
     var totalLine = receiveCardHandCountLine();
-    var report = totalLine;
+    var showCount = receiveCardShouldShowHandCountInVoice();
+    var report = showCount ? totalLine : "";
     if (t) {
-      report = t + "\n\n" + totalLine;
+      report = showCount ? t + "\n\n" + totalLine : t;
     }
     var el = receiveCardQueryEl("receivecard-compact-message");
     if (el) {
@@ -533,6 +545,15 @@
     window.__risqueReceiveCardStagingMerged = true;
     window.__risqueReceiveCardStagingMergeNeeded = false;
     refreshReceiveCardPublicSpectatorMirror({ forceMergeAnim: true });
+    requestAnimationFrame(function () {
+      if (typeof window.risqueFlushMirrorPush === "function") {
+        try {
+          window.risqueFlushMirrorPush();
+        } catch (eRcMirRaf) {
+          /* ignore */
+        }
+      }
+    });
     var btn = document.getElementById("receivecard-btn-end");
     if (btn) {
       btn.disabled = true;

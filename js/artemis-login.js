@@ -237,6 +237,7 @@
 
   function showQuickLoginSplash() {
     if (!window.risqueArtemisFastBoot) return;
+    if (isPastArtemisLoginPhase()) return;
     var fixed = myFixedProfile();
     if (!fixed) return;
     if (!document.body) {
@@ -272,6 +273,10 @@
   }
 
   function showEntryForm() {
+    if (isPastArtemisLoginPhase()) {
+      hidePanel();
+      return;
+    }
     if (window.risqueArtemisFastBoot && myFixedProfile()) {
       showQuickLoginSplash();
       return;

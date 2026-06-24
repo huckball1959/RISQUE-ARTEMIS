@@ -1322,6 +1322,17 @@
       } catch (eDice) {
         gs.risqueLastDiceDisplay = patch.risqueLastDiceDisplay;
       }
+      if (msg.seq != null) {
+        window.__risqueArtemisLastAttackLiveSeq = Number(msg.seq) || 0;
+        try {
+          gs.risqueLastDiceDisplay.artemisAttackLiveSeq = window.__risqueArtemisLastAttackLiveSeq;
+        } catch (eDiceSeq) {
+          /* ignore */
+        }
+      }
+      if (gs.risqueLastDiceDisplay.spinning === true) {
+        artemisMarkHostAttackSpinGrace(520);
+      }
     }
     if (patch.risqueAttackOutcomePrimary != null) {
       gs.risqueAttackOutcomePrimary = patch.risqueAttackOutcomePrimary;
@@ -1374,6 +1385,11 @@
       });
     }
     try {
+      delete gs.risqueTransferPulse;
+    } catch (eClrPulse) {
+      /* ignore */
+    }
+    try {
       localStorage.setItem("gameState", JSON.stringify(gs));
     } catch (eLs) {
       /* ignore */
@@ -1412,19 +1428,6 @@
           }
         }
       });
-      if (typeof window.risqueFlushMirrorPush === "function") {
-        try {
-          window.risqueFlushMirrorPush();
-        } catch (eHostAtkMir) {
-          /* ignore */
-        }
-      } else if (typeof window.risqueMirrorPushGameState === "function") {
-        try {
-          window.risqueMirrorPushGameState();
-        } catch (eHostAtkMir2) {
-          /* ignore */
-        }
-      }
       return;
     }
     if (typeof window.risqueArtemisSyncPortableAttack === "function") {
@@ -2777,7 +2780,19 @@
       window.risqueRuntimeHud.updateTurnBannerFromState(gs);
     }
     if (String(gs.phase || "") === "attack") {
-      if (typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
+      if (
+        window.risqueArtemisHost &&
+        !window.risqueArtemisNetClient &&
+        typeof window.risqueArtemisShouldHostMountAttack === "function" &&
+        !window.risqueArtemisShouldHostMountAttack(gs) &&
+        typeof window.risqueArtemisDriveHostAttackDice === "function"
+      ) {
+        try {
+          window.risqueArtemisDriveHostAttackDice(gs);
+        } catch (eHostDiceDrv) {
+          /* ignore */
+        }
+      } else if (typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
         try {
           window.risquePublicApplyDiceAndBattleReadout(gs);
         } catch (eHostDice) {
@@ -2790,6 +2805,16 @@
         } catch (eHostAtkVoice) {
           /* ignore */
         }
+      }
+    } else if (
+      window.risqueArtemisHost &&
+      !window.risqueArtemisNetClient &&
+      typeof window.risqueArtemisTeardownHostAttackSpectator === "function"
+    ) {
+      try {
+        window.risqueArtemisTeardownHostAttackSpectator();
+      } catch (eHostAtkTeardown) {
+        /* ignore */
       }
     }
     if (String(gs.phase || "") === "reinforce") {
@@ -2813,6 +2838,41 @@
     }
   }
 
+  function artemisCloneAttackLiveField(val) {
+    if (val == null) return val;
+    try {
+      return JSON.parse(JSON.stringify(val));
+    } catch (eClone) {
+      return val;
+    }
+  }
+
+  function artemisMarkHostAttackSpinGrace(ms) {
+    window.__risqueArtemisHostAttackSpinUntil = Date.now() + (Number(ms) || 520);
+  }
+
+  /** Host spectating client attack: never let stale player_state clobber a live spin from attack_live. */
+  function artemisMergePreferLiveAttackDice(gsIncoming, live) {
+    if (!gsIncoming || !live) return;
+    var inc = gsIncoming.risqueLastDiceDisplay;
+    var liv = live.risqueLastDiceDisplay;
+    if (!liv || typeof liv !== "object") return;
+    if (!inc || typeof inc !== "object") {
+      gsIncoming.risqueLastDiceDisplay = artemisCloneAttackLiveField(liv);
+      return;
+    }
+    if (liv.spinning === true && inc.spinning !== true) {
+      gsIncoming.risqueLastDiceDisplay = artemisCloneAttackLiveField(liv);
+      return;
+    }
+    var liveSeq = Number(window.__risqueArtemisLastAttackLiveSeq) || 0;
+    var incSeq = Number(inc.artemisAttackLiveSeq) || 0;
+    var livSeq = Number(liv.artemisAttackLiveSeq) || 0;
+    if (liveSeq > 0 && livSeq >= liveSeq && livSeq > incSeq) {
+      gsIncoming.risqueLastDiceDisplay = artemisCloneAttackLiveField(liv);
+    }
+  }
+
   function artemisPreserveHostAttackSpectatorLive(gsIncoming) {
     if (!window.risqueArtemisHost || window.risqueArtemisNetClient || !gsIncoming) return;
     if (String(gsIncoming.phase || "") !== "attack") return;
@@ -2824,8 +2884,8 @@
     ) {
       return;
     }
+    artemisMergePreferLiveAttackDice(gsIncoming, live);
     var keys = [
-      "risqueLastDiceDisplay",
       "risqueBattleHudReadout",
       "risqueControlVoice",
       "risqueAttackOutcomePrimary",
@@ -2836,12 +2896,11 @@
     keys.forEach(function (key) {
       if (gsIncoming[key] != null) return;
       if (live[key] == null) return;
-      try {
-        gsIncoming[key] = JSON.parse(JSON.stringify(live[key]));
-      } catch (eClone) {
-        gsIncoming[key] = live[key];
-      }
+      gsIncoming[key] = artemisCloneAttackLiveField(live[key]);
     });
+    if (gsIncoming.risqueLastDiceDisplay == null && live.risqueLastDiceDisplay != null) {
+      gsIncoming.risqueLastDiceDisplay = artemisCloneAttackLiveField(live.risqueLastDiceDisplay);
+    }
   }
 
   function finalizeHostClientState(gs, turnAdvance) {
@@ -2943,6 +3002,19 @@
       }
     }
     artemisPreserveHostAttackSpectatorLive(gs);
+    if (
+      String(gs.phase || "") === "attack" &&
+      window.risqueArtemisHost &&
+      !window.risqueArtemisNetClient &&
+      typeof window.risqueArtemisShouldHostMountAttack === "function" &&
+      !window.risqueArtemisShouldHostMountAttack(gs)
+    ) {
+      try {
+        delete gs.risqueTransferPulse;
+      } catch (eClrHostPulse) {
+        /* ignore */
+      }
+    }
     if (typeof window.risqueHostReplaceShellGameState === "function") {
       window.risqueHostReplaceShellGameState(gs);
     } else {
@@ -3034,6 +3106,12 @@
             }
           }
         } else if (
+          !turnAdvance &&
+          (String(gs.phase || "") === "attack" || String(gs.phase || "") === "reinforce") &&
+          typeof window.risqueFlushMirrorPush === "function"
+        ) {
+          window.risqueFlushMirrorPush();
+        } else if (
           String(gs.phase || "") === "deploy" &&
           !turnAdvance &&
           typeof window.risqueScheduleMirrorPush === "function"
@@ -3060,6 +3138,19 @@
         window.risqueArtemisApplyHostAttackSpectator(gs);
       } catch (eHostAtkFin) {
         /* ignore */
+      }
+      if (typeof window.risqueArtemisScheduleHostAttackDicePaint === "function") {
+        try {
+          window.risqueArtemisScheduleHostAttackDicePaint(gs);
+        } catch (eHostDiceFin) {
+          /* ignore */
+        }
+      } else if (typeof window.risqueArtemisDriveHostAttackDice === "function") {
+        try {
+          window.risqueArtemisDriveHostAttackDice(gs);
+        } catch (eHostDiceDrvFin) {
+          /* ignore */
+        }
       }
     }
     artemisHostForceVisualSync(gs);
@@ -4206,11 +4297,31 @@
           if (typeof window.risqueArtemisReconcileClientPlayMode === "function") {
             window.risqueArtemisReconcileClientPlayMode(item.state);
           }
+          if (
+            typeof window.risquePublicEnsureReceiveCardPrivateHint === "function"
+          ) {
+            try {
+              window.risquePublicEnsureReceiveCardPrivateHint(item.state);
+            } catch (eRcHintMirPre) {
+              /* ignore */
+            }
+          }
           if (typeof window.risqueArtemisSyncPortableReceiveCard === "function") {
             window.risqueArtemisSyncPortableReceiveCard(item.state);
           }
           if (typeof window.risqueArtemisEnsureHudTogglesVisible === "function") {
             window.risqueArtemisEnsureHudTogglesVisible();
+          }
+        }
+        if (
+          (ph === "receivecard" || ph === "getcard") &&
+          typeof window.risquePublicEnsureReceiveCardPrivateHint === "function" &&
+          !mirrorApplied
+        ) {
+          try {
+            window.risquePublicEnsureReceiveCardPrivateHint(item.state);
+          } catch (eRcHintMir) {
+            /* ignore */
           }
         }
         if (ph === "income" || ph === "con-income") {
