@@ -3190,7 +3190,7 @@ body.risque-view-host[data-risque-phase="con-income"] #risque-phase-content .inc
   padding: 10px 20px;
   box-sizing: border-box;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 14px;
+  font-size: 21px;
   font-weight: 800;
   text-align: center;
   background: #00ff00 !important;
@@ -3275,7 +3275,7 @@ body.risque-view-host .risque-phase-content .deploy1-deploy-actions.deploy1-depl
   min-width: 0;
   min-height: 32px !important;
   padding: 3px 2px !important;
-  font-size: 17px;
+  font-size: 25px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.02em;
@@ -3296,7 +3296,7 @@ body.risque-view-host .risque-phase-content .deploy1-action-btn-protect-all:hove
 }
 
 body.risque-view-host .risque-phase-content .deploy1-deploy-actions.deploy1-deploy-actions--hud-row .deploy1-action-btn-protect-all {
-  font-size: 11px;
+  font-size: 16px;
   letter-spacing: 0;
   padding: 3px 1px !important;
 }
@@ -7556,7 +7556,7 @@ body.risque-view-host[data-risque-phase="receivecard"] .receivecard-compact-acti
 body.risque-view-host[data-risque-phase="receivecard"] .receivecard-hand-staging-split .receivecard-hand-stack,
 body.risque-view-host[data-risque-phase="receivecard"] .receivecard-hand-staging-split .receivecard-staging-wrap {
   flex: 1 1 0;
-  min-height: min(240px, 28vh);
+  min-height: 0;
   max-height: calc((100% - 12px) / 2);
   display: flex;
   flex-direction: column;
@@ -7756,16 +7756,16 @@ html.risque-artemis-client.risque-artemis-my-turn.risque-view-host body[data-ris
 html.risque-artemis-client.risque-artemis-my-turn.risque-view-host body[data-risque-phase="getcard"] .receivecard-hand-staging-split .receivecard-staging-wrap,
 #runtime-hud-root.runtime-hud-root--receivecard-panel-only .receivecard-hand-staging-split .receivecard-hand-stack,
 #runtime-hud-root.runtime-hud-root--receivecard-panel-only .receivecard-hand-staging-split .receivecard-staging-wrap {
-  flex: 0 1 auto !important;
+  flex: 1 1 0 !important;
   min-height: 0 !important;
-  max-height: calc((100% - 42px) / 2) !important;
+  max-height: calc((100% - 12px) / 2) !important;
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
 }
 
 #runtime-hud-root.runtime-hud-root--receivecard-panel-only .receivecard-hand-staging-split .receivecard-staging-wrap {
-  margin-top: auto !important;
+  margin-top: 0 !important;
 }
 
 #runtime-hud-root.runtime-hud-root--receivecard-panel-only
@@ -7803,17 +7803,17 @@ html.risque-artemis-client.risque-artemis-my-turn.risque-view-host body[data-ris
 }
 
 #runtime-hud-root.runtime-hud-root--receivecard-panel-only .risque-public-receivecard-pane {
-  flex: 0 1 auto !important;
+  flex: 1 1 0 !important;
   min-height: 0 !important;
-  max-height: calc((100% - 42px) / 2) !important;
+  max-height: calc((100% - 12px) / 2) !important;
   overflow: hidden !important;
 }
 
 #runtime-hud-root.runtime-hud-root--receivecard-panel-only .risque-public-receivecard-staging-wrap {
-  flex: 0 1 auto !important;
+  flex: 1 1 0 !important;
   min-height: 0 !important;
-  margin-top: auto !important;
-  max-height: calc((100% - 42px) / 2) !important;
+  margin-top: 0 !important;
+  max-height: calc((100% - 12px) / 2) !important;
   overflow: hidden !important;
 }
 
@@ -9923,7 +9923,8 @@ html.risque-artemis-host.risque-view-host
   min-height: min(260px, 30vh);
 }
 
-/* Host staging: lower shelf grows while upper pane is still empty (cards stay in lower window only). */
+/* Host staging: keep both panes balanced even before the card flies into the upper pane —
+ * avoids the lower window ballooning then snapping back once the upper content lands. */
 html.risque-artemis-host.risque-view-host
   #runtime-hud-root.runtime-hud-root--host-cardplay-recap
   .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
@@ -9932,9 +9933,9 @@ body.risque-view-host
   #runtime-hud-root.runtime-hud-root--host-cardplay-recap
   .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
   .risque-public-cp-shelf-lower {
-  flex: 1 1 auto;
-  min-height: min(400px, 50vh);
-  max-height: min(78vh, 620px);
+  flex: 1 1 0;
+  min-height: min(260px, 30vh);
+  max-height: none;
 }
 
 html.risque-artemis-host.risque-view-host
@@ -9945,20 +9946,23 @@ body.risque-view-host
   #runtime-hud-root.runtime-hud-root--host-cardplay-recap
   .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
   .risque-public-cp-shelf-upper {
-  flex: 0 0 min(72px, 10vh);
-  max-height: min(72px, 10vh);
-  min-height: 0;
+  flex: 1 1 0;
+  min-height: min(260px, 30vh);
+  max-height: none;
 }
 
+/* Observers: keep both windows at a balanced 50/50 from first paint, even while the upper pane is
+ * still empty (before the card flies up). Avoids the lower window opening oversized then resizing
+ * mid-animation. */
 .risque-view-public .runtime-hud-root--public-cardplay-recap
   .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
   .risque-public-cp-shelf-lower,
 html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-recap
   .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
   .risque-public-cp-shelf-lower {
-  flex: 1 1 auto;
-  min-height: min(360px, 46vh);
-  max-height: min(72vh, 560px);
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: calc((100% - var(--risque-cp-shelf-pane-gap, 12px)) / 2 - 10px);
 }
 
 .risque-view-public .runtime-hud-root--public-cardplay-recap
@@ -9967,9 +9971,9 @@ html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-rec
 html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-recap
   .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
   .risque-public-cp-shelf-upper {
-  flex: 0 0 min(72px, 10vh);
-  max-height: min(72px, 10vh);
+  flex: 1 1 0;
   min-height: 0;
+  max-height: calc((100% - var(--risque-cp-shelf-pane-gap, 12px)) / 2 - 10px);
 }
 
 html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-lower,
@@ -12225,7 +12229,7 @@ html.risque-artemis-client.risque-artemis-my-turn .risque-artemis-deploy-dock #d
   min-height: 40px;
   padding: 10px 20px;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 14px;
+  font-size: 21px;
   font-weight: 800;
   background: #00ff00 !important;
   color: #000 !important;
@@ -12246,7 +12250,7 @@ body.risque-view-host .risque-artemis-deploy-dock .deploy1-deploy-actions.deploy
   min-width: 0;
   min-height: 32px !important;
   padding: 6px 4px !important;
-  font-size: 12px !important;
+  font-size: 18px !important;
 }
 
 /* ARTEMIS unified control panel: phase title → toggles → voice → phase slot */

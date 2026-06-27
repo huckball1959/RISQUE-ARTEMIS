@@ -955,6 +955,52 @@
       return groups;
     }
 
+    /** ARTEMIS client: stamp control + push full state so host can mirror recap to spectators. */
+    function artemisPushCardplayRecapToHost(gs) {
+      if (!window.risqueArtemisMode || !window.risqueArtemisNetClient || !gs) return false;
+      if (typeof window.risqueArtemisForceControlSlotFromCurrentPlayer === "function") {
+        window.risqueArtemisForceControlSlotFromCurrentPlayer(gs);
+      } else if (typeof window.risqueArtemisStampControlSlot === "function") {
+        window.risqueArtemisStampControlSlot(gs);
+      }
+      window.gameState = gs;
+      try {
+        localStorage.setItem("gameState", JSON.stringify(gs));
+      } catch (eLsRecap) {
+        /* ignore */
+      }
+      var pushed = false;
+      if (typeof window.risqueArtemisFlushClientStatePush === "function") {
+        try {
+          window.risqueArtemisFlushClientStatePush(gs);
+          pushed = true;
+        } catch (eFlushRecap) {
+          /* ignore */
+        }
+      }
+      if (!pushed && typeof window.risqueArtemisOnClientStatePush === "function") {
+        try {
+          window.risqueArtemisOnClientStatePush(gs);
+          pushed = true;
+        } catch (ePushRecap) {
+          /* ignore */
+        }
+      }
+      if (typeof window.risqueArtemisDiag === "function") {
+        window.risqueArtemisDiag(
+          "cardplay_host_recap_push",
+          "P" + (window.risqueArtemisPlayerSlot || "?") + " cardplay recap → host",
+          {
+            phase: gs.phase,
+            pushed: pushed,
+            currentPlayer: gs.currentPlayer,
+            recapSeq: gs.risquePublicCardplayRecapAckRequiredSeq
+          }
+        );
+      }
+      return pushed;
+    }
+
     /** ARTEMIS client: host must receive income phase or mirror keeps forcing cardplay. */
     function artemisPushLeaveCardplayToHost(gs, reason) {
       if (!window.risqueArtemisMode || !window.risqueArtemisNetClient || !gs) return false;
@@ -4227,6 +4273,7 @@
       if (typeof window.risqueMirrorPushGameState === "function") {
         window.risqueMirrorPushGameState();
       }
+      artemisPushCardplayRecapToHost(window.gameState);
       if (typeof window.risqueHostSyncCardplayTvRecapUi === "function") {
         try {
           window.risqueHostSyncCardplayTvRecapUi(window.gameState);

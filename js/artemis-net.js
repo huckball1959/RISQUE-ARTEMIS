@@ -1384,6 +1384,48 @@
         }
       });
     }
+    /* Real-time capture: a dice win flips the territory to the attacker with the minimum (auto-moved)
+     * troops immediately so observers see the occupation as it happens. The attacker's *additional*
+     * transfer is intentionally withheld until CONFIRM — pin the captured territory to the min count
+     * and the source to its post-capture snapshot so the troop-slider preview never leaks. */
+    if (
+      String(gs.attackPhase || "") === "pending_transfer" &&
+      gs.acquiredTerritory &&
+      gs.acquiredTerritory.name &&
+      gs.currentPlayer &&
+      Array.isArray(gs.players)
+    ) {
+      var cpNameLive = normDeployName(gs.currentPlayer);
+      var acqNameLive = String(gs.acquiredTerritory.name);
+      var acqMinTroops = Math.max(1, Math.floor(Number(gs.acquiredTerritory.troops) || 1));
+      var atkOwnerLive = gs.players.find(function (p) {
+        return normDeployName(p && p.name) === cpNameLive;
+      });
+      if (atkOwnerLive && Array.isArray(atkOwnerLive.territories)) {
+        gs.players.forEach(function (p) {
+          if (!p || normDeployName(p.name) === cpNameLive || !Array.isArray(p.territories)) return;
+          p.territories = p.territories.filter(function (t) {
+            return !(t && t.name === acqNameLive);
+          });
+        });
+        var ownTerrLive = atkOwnerLive.territories.find(function (t) {
+          return t && t.name === acqNameLive;
+        });
+        if (ownTerrLive) {
+          ownTerrLive.troops = acqMinTroops;
+        } else {
+          atkOwnerLive.territories.push({ name: acqNameLive, troops: acqMinTroops });
+        }
+        if (gs.attackingTerritory && gs.attackingTerritory.name) {
+          var srcTerrLive = atkOwnerLive.territories.find(function (t) {
+            return t && t.name === gs.attackingTerritory.name;
+          });
+          if (srcTerrLive) {
+            srcTerrLive.troops = Math.max(0, Math.floor(Number(gs.attackingTerritory.troops) || 0));
+          }
+        }
+      }
+    }
     try {
       delete gs.risqueTransferPulse;
     } catch (eClrPulse) {
@@ -2180,6 +2222,9 @@
       );
     }
     if (syncOpt && window.risqueArtemisNetClient && !window.risqueArtemisHost) {
+      if (typeof window.risqueNavigateGameHtmlSoft === "function" && window.risqueNavigateGameHtmlSoft(url)) {
+        return true;
+      }
       try {
         if (window.history && typeof window.history.replaceState === "function") {
           window.history.replaceState(null, "", url);
@@ -3086,10 +3131,20 @@
           gs.risquePublicIncomeBreakdown &&
           gs.risquePublicIncomeBreakdown.total != null &&
           !hostHadIncomeBreakdown;
+        var hostHadCardplayRecap = !!(
+          window.gameState && window.gameState.risquePublicCardplayRecapAckRequiredSeq != null
+        );
+        var hostRecapSeq = Number(window.gameState && window.gameState.risquePublicCardplayRecapAckRequiredSeq) || 0;
+        var incomingRecapSeq = Number(gs.risquePublicCardplayRecapAckRequiredSeq) || 0;
+        var cardplayRecapPublish =
+          (String(gs.phase || "") === "cardplay" || String(gs.phase || "") === "con-cardplay") &&
+          incomingRecapSeq > 0 &&
+          (!hostHadCardplayRecap || incomingRecapSeq > hostRecapSeq);
         if (
           (turnAdvance ||
             phaseFinish ||
             cardplayToIncome ||
+            cardplayRecapPublish ||
             incomeToDeploy ||
             deployToAttack ||
             incomeBreakdownCatchUp) &&
@@ -3526,19 +3581,18 @@
       !turnAdvance &&
       hostPhaseEarly === "cardplay" &&
       String(gs.phase || "") === "cardplay" &&
-      artemisPresetCardplayActive(window.gameState)
+      artemisPresetCardplayActive(window.gameState) &&
+      !hostSenderIsActiveDeployer(window.gameState, senderSlot)
     ) {
       var hostCtrl = Number(window.gameState && window.gameState.artemisControlSlot) || 0;
-      if (hostCtrl >= 1 && senderSlot >= 1 && senderSlot !== hostCtrl) {
-        try {
-          console.warn(
-            "[ARTEMIS] reject preset cardplay player_state from P" + senderSlot + " (active P" + hostCtrl + ")"
-          );
-        } catch (eRejPreset) {
-          /* ignore */
-        }
-        return;
+      try {
+        console.warn(
+          "[ARTEMIS] reject preset cardplay player_state from P" + senderSlot + " (active P" + hostCtrl + ")"
+        );
+      } catch (eRejPreset) {
+        /* ignore */
       }
+      return;
     }
     if (
       !turnAdvance &&
@@ -3567,7 +3621,7 @@
       if (
         inCards === 0 &&
         (hostCards > 0 || artemisPresetCardplayActive(window.gameState)) &&
-        Number(senderSlot) !== Number(window.gameState && window.gameState.artemisControlSlot)
+        !hostSenderIsActiveDeployer(window.gameState, senderSlot)
       ) {
         try {
           console.warn(

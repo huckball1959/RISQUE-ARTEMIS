@@ -544,6 +544,9 @@
     receiveCardApplyStagingMergeUi();
     window.__risqueReceiveCardStagingMerged = true;
     window.__risqueReceiveCardStagingMergeNeeded = false;
+    /* Card has now flown into the hand — reveal the updated "TOTAL CARDS IN HAND = N" tally in the
+     * Control Voice (suppressed on arrival until the merge happens). */
+    receiveCardSetMessage("");
     refreshReceiveCardPublicSpectatorMirror({ forceMergeAnim: true });
     requestAnimationFrame(function () {
       if (typeof window.risqueFlushMirrorPush === "function") {
@@ -1063,8 +1066,14 @@
       !gs.cardAwardedThisTurn &&
       !conquestElimReview;
 
+    /* Defer the actual Control-Voice line until the staging-merge flags are set below, so the
+     * "TOTAL CARDS IN HAND = N" tally stays suppressed until the card flies up (merge). Setting the
+     * message here would read the post-draw total prematurely on arrival, before the fly-up. */
+    var rcVoiceMsg = null;
+    var rcVoiceMsgSet = false;
     if (conquestElimReview) {
-      receiveCardSetMessage("");
+      rcVoiceMsg = "";
+      rcVoiceMsgSet = true;
       drawnThisStep = null;
     } else if (eligible) {
       drawnThisStep = receiveCardDrawCard();
@@ -1075,9 +1084,11 @@
         currentPlayer.cardCount = currentPlayer.cards.length;
         gs.cardAwardedThisTurn = true;
         gs.lastCardDrawn = drawnThisStep.name;
-        receiveCardSetMessage("New card: " + drawnThisStep.name.replace(/_/g, " ").toUpperCase());
+        rcVoiceMsg = "New card: " + drawnThisStep.name.replace(/_/g, " ").toUpperCase();
+        rcVoiceMsgSet = true;
       } else {
-        receiveCardSetMessage("No unique cards available.");
+        rcVoiceMsg = "No unique cards available.";
+        rcVoiceMsgSet = true;
         gs.cardAwardedThisTurn = true;
         drawnThisStep = null;
       }
@@ -1085,16 +1096,20 @@
       var priorDraw = receiveCardCanonicalTerritoryCardName(gs.lastCardDrawn);
       if (priorDraw) {
         drawnThisStep = { name: priorDraw, id: null };
-        receiveCardSetMessage("New card: " + priorDraw.replace(/_/g, " ").toUpperCase());
+        rcVoiceMsg = "New card: " + priorDraw.replace(/_/g, " ").toUpperCase();
+        rcVoiceMsgSet = true;
       }
     } else {
-      receiveCardSetMessage(
-        "You did not earn a new deck card this turn (capture at least one territory to earn one)."
-      );
+      rcVoiceMsg = "You did not earn a new deck card this turn (capture at least one territory to earn one).";
+      rcVoiceMsgSet = true;
     }
 
     window.__risqueReceiveCardStagingMerged = false;
     window.__risqueReceiveCardStagingMergeNeeded = !!drawnThisStep;
+
+    if (rcVoiceMsgSet) {
+      receiveCardSetMessage(rcVoiceMsg);
+    }
 
     var nHand = currentPlayer.cards.length;
     var lastCard = nHand > 0 ? currentPlayer.cards[nHand - 1] : null;

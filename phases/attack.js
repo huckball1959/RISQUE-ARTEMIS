@@ -2416,7 +2416,37 @@ function applyBattleRoundAfterRoll(snap, opts) {
       }
     }
 
+    /* Campaign trail's FINAL acquired territory: do not auto-lock the troop transfer. Hand the attacker
+     * the normal manual transfer slider (instant + step) so they choose how many troops occupy it.
+     * Silent Q-dev runs keep the auto leave-1 behaviour. Computed before the auto-transfer block so the
+     * shared pending_transfer path below can run for this hop instead. */
+    let pauseFinalManualTransfer = false;
     if (opts.campaignAutoTransfer) {
+      const lastPathLen = opts.campaignPathLength;
+      const lastHopIdx = opts.campaignHopIndex;
+      const isFinalCampaignHop =
+        typeof lastPathLen === 'number' &&
+        typeof lastHopIdx === 'number' &&
+        lastPathLen >= 2 &&
+        lastHopIdx === lastPathLen - 2;
+      pauseFinalManualTransfer =
+        isFinalCampaignHop && !campaignQDevMode && !opts.qDevTransferAllButOne;
+    }
+
+    if (pauseFinalManualTransfer) {
+      /* Reset campaign planning so the control voice + map return to normal attack/transfer mode
+       * (risqueIsAttackCampaignActive must be false for the transfer prompt to paint), and re-enable
+       * the attack chrome that the automated campaign run had locked. */
+      clearAttackCampaignPlanningAfterRun();
+      if (
+        window.risqueRuntimeHud &&
+        typeof window.risqueRuntimeHud.setAttackChromeInteractive === 'function'
+      ) {
+        window.risqueRuntimeHud.setAttackChromeInteractive(true);
+      }
+    }
+
+    if (opts.campaignAutoTransfer && !pauseFinalManualTransfer) {
       const pathLen = opts.campaignPathLength;
       const hopIdx = opts.campaignHopIndex;
       const isLastCampaignHop =
@@ -2473,6 +2503,11 @@ function applyBattleRoundAfterRoll(snap, opts) {
     saveGameState();
     window.gameUtils.renderTerritories(null, window.gameState);
     window.gameUtils.renderStats(window.gameState);
+    /* Relay the post-capture board (territory now owned by attacker with min troops) to spectators
+     * immediately. The earlier pushArtemisClientAttackLiveMirror() at the dice resolve fires before
+     * ownership transfers, so without this push observers would not see the capture until the
+     * attacker confirms the troop transfer. */
+    pushArtemisClientAttackLiveMirror();
     const eliminated = checkPlayerElimination(opponent);
     if (eliminated) {
       window.gameState.risqueInstantBlitzTransferUi = false;
@@ -2496,11 +2531,17 @@ function applyBattleRoundAfterRoll(snap, opts) {
         window.risqueMirrorPushGameState();
       }
       initTroopTransfer();
-      return finishApplyBattleRound({ conquered: true });
+      return finishApplyBattleRound({
+        conquered: true,
+        campaignFinalManualTransfer: pauseFinalManualTransfer
+      });
     }
     initTroopTransfer();
     checkWinCondition();
-    return finishApplyBattleRound({ conquered: true });
+    return finishApplyBattleRound({
+      conquered: true,
+      campaignFinalManualTransfer: pauseFinalManualTransfer
+    });
   }
 
   if (typeof window.risqueReplayRecordBattle === 'function') {
@@ -4732,6 +4773,8 @@ async function runInstantCampaignExecution() {
   attackChainFromCampaign = false;
   const outcomes = [];
   let stopped = null;
+  /** Set when the final campaign hop hands off to the manual troop-transfer slider (no auto-lock). */
+  let finalManualTransfer = false;
   /** Territory key for public TV "stopped at …" line (instant campaign only). */
   let instantMirrorStopAt = null;
   /** Territory where the attacking stack sits for INSTANT COND conditional-stop voice ("Campaign stopped in …"). */
@@ -4859,6 +4902,9 @@ async function runInstantCampaignExecution() {
       }
       if (res.conquered) {
         conquered = true;
+        if (res.campaignFinalManualTransfer) {
+          finalManualTransfer = true;
+        }
         if (
           window.gameState &&
           (window.gameState.risqueCampaignInterruptedByElimination === true ||
@@ -4948,6 +4994,29 @@ async function runInstantCampaignExecution() {
 
   clearConditionCountdownMirror();
   pushConditionCountdownRefresh();
+
+  if (finalManualTransfer) {
+    /* Final campaign territory reached: the manual troop-transfer slider is already painted (campaign
+     * planning state reset inside applyBattleRoundAfterRoll). Skip the success banner / idle prompt so
+     * the attacker can choose the troop split, then CONFIRM resumes normal attack flow. */
+    campaignInstantLastOutcomes = outcomes.slice();
+    campaignInstantLastStopped = null;
+    outcomes.forEach(o => prependCombatLog(`Campaign: ${o}`, 'system'));
+    prependCombatLog(
+      'Campaign: final territory captured — choose how many troops to move, then CONFIRM.',
+      'system'
+    );
+    campaignTrace('instant:final_manual_transfer', {});
+    if (!window.risqueDisplayIsPublic && typeof window.risqueReplayEnsureLatestBoardFrame === 'function') {
+      try {
+        window.risqueReplayEnsureLatestBoardFrame(window.gameState);
+      } catch (eEnsureCampFM) {
+        /* ignore */
+      }
+    }
+    return;
+  }
+
   attacker = null;
   defender = null;
   updateBattlePanelReadout();
@@ -5306,6 +5375,8 @@ function pauseCampaignRevealAndApply(snap, revealGen) {
   if (!attacker || !defender) return;
   revealDiceFromSnap(snap);
   const cpPause = campaignCommittedPath;
+  const finalHopFromLabel = attacker && attacker.label ? attacker.label : '';
+  const finalHopToLabel = defender && defender.label ? defender.label : '';
   const res = applyBattleRoundAfterRoll(snap, {
     campaignAutoTransfer: true,
     campaignLeaveBehind: pauseCampaignLeaveBehind,
@@ -5314,6 +5385,25 @@ function pauseCampaignRevealAndApply(snap, revealGen) {
     skipBattleVoice: true,
     skipLossFlash: false
   });
+  if (res && res.campaignFinalManualTransfer) {
+    /* Final campaign territory captured: the manual troop-transfer slider is already painted (campaign
+     * planning state reset inside applyBattleRoundAfterRoll). Stop the step run without the success
+     * banner so the attacker chooses the troop split; CONFIRM resumes normal attack flow. */
+    clearPauseCampaignGapTimers();
+    pauseCampaignOutcomes.push(
+      `Won ${prettyTerritoryName(finalHopFromLabel)} → ${prettyTerritoryName(finalHopToLabel)} in ${pauseCampaignRoundsThisHop} combat round(s).`
+    );
+    campaignInstantLastOutcomes = pauseCampaignOutcomes.slice();
+    pauseCampaignOutcomes.forEach(o => prependCombatLog(`Campaign: ${o}`, 'system'));
+    prependCombatLog(
+      'Campaign Step: final territory captured — choose how many troops to move, then CONFIRM.',
+      'system'
+    );
+    campaignTrace('pause:final_manual_transfer', { from: finalHopFromLabel, to: finalHopToLabel });
+    updateBattlePanelReadout();
+    syncAttackStepControlsVisibility();
+    return;
+  }
   if (campaignType === 'cond' && campaignCondFromPauseRow && campaignCondThreshold != null) {
     syncConditionCountdownMirror();
   }

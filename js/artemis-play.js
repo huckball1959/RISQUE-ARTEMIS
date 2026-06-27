@@ -124,7 +124,8 @@
       var p = gs.players.find(function (x) {
         return normName(x.name) === up;
       });
-      if (p && p.playerOrder) return Number(p.playerOrder);
+      /* ARTEMIS: playerOrder is turn position, not laptop roster slot (P1 host can deploy second). */
+      if (!window.risqueArtemisMode && p && p.playerOrder) return Number(p.playerOrder);
       var idx = gs.players.indexOf(p);
       if (idx >= 0) return idx + 1;
     }
@@ -595,6 +596,19 @@
     return Number(window.risqueArtemisPlayerSlot) || 0;
   }
 
+  function hostSessionName() {
+    bindIdentityFromRoster(window.gameState);
+    var nm = window.risqueArtemisPlayerName;
+    if (!nm) {
+      try {
+        nm = sessionStorage.getItem("risqueArtemisPlayerName");
+      } catch (eHostNm) {
+        /* ignore */
+      }
+    }
+    return nm ? normName(nm) : "";
+  }
+
   window.risqueArtemisIsMyTurn = function (gs) {
     gs = gs || window.gameState;
     if (!gs || !gs.currentPlayer) return false;
@@ -603,6 +617,17 @@
     if (window.risqueArtemisHost && !window.risqueArtemisNetClient) {
       var phHost = String(gs.phase || "");
       if (phHost === "deploy") {
+        var hostNmDeploy = hostSessionName();
+        if (hostNmDeploy && hostNmDeploy === normName(gs.currentPlayer)) {
+          window.risqueArtemisDeployHandoffPending = 0;
+          window.risqueArtemisDeployPushLocked = false;
+          if (typeof window.risqueArtemisForceControlSlotFromCurrentPlayer === "function") {
+            window.risqueArtemisForceControlSlotFromCurrentPlayer(gs);
+          } else if (typeof window.risqueArtemisStampControlSlot === "function") {
+            window.risqueArtemisStampControlSlot(gs);
+          }
+          return true;
+        }
         if (
           typeof window.risqueArtemisIsSetupDeploy === "function" &&
           window.risqueArtemisIsSetupDeploy(gs)
@@ -616,6 +641,11 @@
           var hostLocal = myLocalSlot();
           var hostActive = artemisHostTurnDeployActiveSlot(gs);
           if (hostLocal >= 1 && hostActive === hostLocal) {
+            window.risqueArtemisDeployHandoffPending = 0;
+            window.risqueArtemisDeployPushLocked = false;
+            return true;
+          }
+          if (hostLocal >= 1 && artemisLocalSlotOwnsCurrentPlayer(gs, hostLocal)) {
             window.risqueArtemisDeployHandoffPending = 0;
             window.risqueArtemisDeployPushLocked = false;
             return true;
@@ -634,6 +664,11 @@
           var hostLocalTurn = myLocalSlot();
           var hostActiveTurn = artemisHostTurnDeployActiveSlot(gs);
           if (hostLocalTurn >= 1 && hostActiveTurn === hostLocalTurn) {
+            window.risqueArtemisDeployHandoffPending = 0;
+            window.risqueArtemisDeployPushLocked = false;
+            return true;
+          }
+          if (hostLocalTurn >= 1 && artemisLocalSlotOwnsCurrentPlayer(gs, hostLocalTurn)) {
             window.risqueArtemisDeployHandoffPending = 0;
             window.risqueArtemisDeployPushLocked = false;
             return true;

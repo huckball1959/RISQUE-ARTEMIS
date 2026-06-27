@@ -2191,7 +2191,9 @@
     }
     try {
       if (
-        !window.risqueDisplayIsPublic &&
+        (typeof risqueArtemisSoftNavAllowed === "function"
+          ? risqueArtemisSoftNavAllowed()
+          : !window.risqueDisplayIsPublic) &&
         typeof window.risqueNavigateGameHtmlSoft === "function" &&
         window.risqueNavigateGameHtmlSoft(url)
       ) {
@@ -9693,6 +9695,14 @@
         if (!window.risqueArtemisClientPlaying) {
           return true;
         }
+        return false;
+      }
+      if (
+        typeof window.risqueArtemisClientStickyCardplayOwns === "function" &&
+        window.risqueArtemisClientStickyCardplayOwns(localCp || incomingGs) &&
+        window.risqueArtemisClientPlaying
+      ) {
+        return false;
       }
       if (mySlotCp >= 1 && ctrlCp >= 1 && mySlotCp === ctrlCp) {
         if (
@@ -14360,8 +14370,15 @@
     return loaded;
   }
 
+  /** ARTEMIS client laptops use risqueDisplayIsPublic but must soft-nav to keep fullscreen. */
+  function risqueArtemisSoftNavAllowed() {
+    if (!window.risqueDisplayIsPublic) return true;
+    return !!(window.risqueArtemisNetClient && !window.risqueArtemisHost);
+  }
+  window.risqueArtemisSoftNavAllowed = risqueArtemisSoftNavAllowed;
+
   function risqueNavigateGameHtmlSoft(nextUrl) {
-    if (!nextUrl || window.risqueDisplayIsPublic) return false;
+    if (!nextUrl || !risqueArtemisSoftNavAllowed()) return false;
     var parsed;
     try {
       parsed = new URL(nextUrl, window.location.href);
@@ -18165,6 +18182,76 @@
       e.preventDefault();
       e.stopPropagation();
       triggerHostQuickSave("keyboard");
+    },
+    true
+  );
+
+  function isRuntimeShortcutBlockedTarget(t) {
+    var tag = t && t.tagName ? String(t.tagName).toLowerCase() : "";
+    return tag === "input" || tag === "textarea" || tag === "select" || (t && t.isContentEditable);
+  }
+
+  function artemisDevReload(sourceLabel) {
+    var gs = window.gameState || state || {};
+    var ph = String((gs && gs.phase) || forcedPhase || "").trim();
+    if (!ph || ph === "getcard") ph = ph === "getcard" ? "receivecard" : "login";
+    try {
+      if (window.risqueArtemisHost) {
+        sessionStorage.setItem("risqueArtemisLobbyBoot", "1");
+      }
+      if (window.risqueArtemisMode || window.risqueArtemisNetClient || window.risqueArtemisHost) {
+        sessionStorage.setItem("risqueArtemisLobbySessionStarted", "1");
+      }
+      sessionStorage.setItem(
+        "risqueArtemisDevReload",
+        JSON.stringify({ at: Date.now(), phase: ph, source: sourceLabel || "keyboard" })
+      );
+    } catch (eSessDevReload) {
+      /* ignore */
+    }
+    try {
+      if (gs && gs.phase && !window.risqueDisplayIsPublic) {
+        saveState(gs);
+      }
+    } catch (eSaveDevReload) {
+      /* ignore */
+    }
+    var u;
+    try {
+      u = new URL(window.location.href);
+    } catch (eUrlDevReload) {
+      window.location.reload();
+      return;
+    }
+    if (!window.risqueDisplayIsPublic || window.risqueArtemisNetClient) {
+      u.searchParams.set("phase", ph);
+      if (ph === "deploy") {
+        try {
+          u.searchParams.set("kind", resolveDeployKindForHost());
+        } catch (eKindDevReload) {
+          /* keep existing deploy kind if present */
+        }
+      } else {
+        u.searchParams.delete("kind");
+      }
+    }
+    u.searchParams.set("artemisDevReload", String(Date.now()));
+    window.location.href = u.toString();
+  }
+
+  window.risqueArtemisDevReload = artemisDevReload;
+
+  document.addEventListener(
+    "keydown",
+    function (e) {
+      if (e.repeat) return;
+      if (!e.ctrlKey || !e.shiftKey || e.altKey) return;
+      var key = String(e.key || "").toLowerCase();
+      if (key !== "l") return;
+      if (isRuntimeShortcutBlockedTarget(e.target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      artemisDevReload("keyboard");
     },
     true
   );
