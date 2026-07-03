@@ -357,6 +357,74 @@
   }
   setInterval(recapLayoutProbe, 1200);
 
+  /* m319 — active-attacker control-voice probe. Mictor (active client) sees her dice but no battle
+   * outcome text ("MICTOR LOSES 2"), while spectators show it fine. applyBattleRoundAfterRoll +
+   * showPrompt both write the outcome into #control-voice-text on the active client, so something is
+   * clearing/repainting it afterward. Sample the voice DOM + outcome fields on change while the active
+   * client is in attack, so we can see the value get set and then wiped. */
+  function measureAttackVoice() {
+    try {
+      function vbox(el) {
+        if (!el) return null;
+        var cs = window.getComputedStyle(el);
+        var rect = el.getBoundingClientRect();
+        return {
+          text: String(el.textContent || "").slice(0, 80),
+          html: String(el.innerHTML || "").slice(0, 120),
+          disp: cs.display,
+          vis: cs.visibility,
+          op: cs.opacity,
+          h: Math.round(rect.height),
+          w: Math.round(rect.width),
+        };
+      }
+      var gs = window.gameState || {};
+      var cvEl = document.getElementById("control-voice");
+      var cvCs = cvEl ? window.getComputedStyle(cvEl) : null;
+      return {
+        phase: String(gs.phase || ""),
+        attackPhase: String(gs.attackPhase || ""),
+        htmlClass: document.documentElement.className,
+        bodyPhaseAttr: String(document.body.getAttribute("data-risque-phase") || ""),
+        cvClass: cvEl ? cvEl.className : "(no #control-voice)",
+        cvMinHeight: cvCs ? cvCs.minHeight : "",
+        cvHeightCss: cvCs ? cvCs.height : "",
+        outcomePrimary: gs.risqueAttackOutcomePrimary != null ? String(gs.risqueAttackOutcomePrimary) : "",
+        outcomeReport: gs.risqueAttackOutcomeReport != null ? String(gs.risqueAttackOutcomeReport) : "",
+        cvControlVoice: gs.risqueControlVoice || null,
+        campaignActive:
+          typeof window.risqueIsAttackCampaignActive === "function" && window.risqueIsAttackCampaignActive(),
+        voice: vbox(cvEl),
+        voiceText: vbox(document.getElementById("control-voice-text")),
+        voiceReport: vbox(document.getElementById("control-voice-report")),
+        displayIsPublic: !!window.risqueDisplayIsPublic,
+      };
+    } catch (e) {
+      return { err: String(e) };
+    }
+  }
+  var lastAttackVoiceKey = "";
+  function attackVoiceProbe() {
+    if (!window.risqueArtemisMode || window.risqueArtemisHost) return;
+    var gs = window.gameState;
+    if (!gs || String(gs.phase || "") !== "attack") return;
+    var mine =
+      (typeof window.risqueArtemisIsMyTurn === "function" && window.risqueArtemisIsMyTurn(gs)) ||
+      (typeof window.risqueArtemisClientNameMatchesCurrent === "function" &&
+        window.risqueArtemisClientNameMatchesCurrent(gs));
+    if (!mine) return;
+    var info = measureAttackVoice();
+    var key = JSON.stringify(info);
+    if (key === lastAttackVoiceKey) return;
+    lastAttackVoiceKey = key;
+    sendDiag({
+      kind: "attack_voice_probe",
+      summary: "P" + slotLabel() + " active-attacker control voice",
+      detail: info,
+    });
+  }
+  setInterval(attackVoiceProbe, 400);
+
   function receiveCardHandNames(gs) {
     if (!gs || !gs.players || !gs.currentPlayer) return [];
     var cp = String(gs.currentPlayer || "");

@@ -1670,6 +1670,49 @@
     }
   };
 
+  /**
+   * Deploy owner voice chrome (artemis-deploy-panel.js) stamps INLINE height/min/max-height + font
+   * vars on #control-voice with !important. Inline !important beats any stylesheet !important, so if
+   * that stamp survives a phase change it forces the CV to deploy's 168px in attack/income/etc — which
+   * looked like a broken CSS fix (a fresh mock game passes deploy→attack and inherited the stamp; a
+   * reload straight into ?phase=attack never got stamped, so it looked correct). Clear the stamp the
+   * moment we're no longer in deploy so the phase's own CSS wins on first render. Scoped to the
+   * deploy-owner marker class so we never touch unrelated inline styles.
+   */
+  function artemisClearDeployOwnerVoiceStamp() {
+    var cv = document.getElementById("control-voice");
+    if (!cv || !cv.classList.contains("ucp-control-voice--artemis-deploy-owner")) return;
+    cv.classList.remove("ucp-control-voice--artemis-deploy-owner");
+    ["height", "min-height", "max-height", "--risque-voice-font-size", "--risque-voice-report-size"].forEach(
+      function (prop) {
+        try {
+          cv.style.removeProperty(prop);
+        } catch (eCvProp) {
+          /* ignore */
+        }
+      }
+    );
+    ["control-voice-text", "control-voice-report"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      ["font-family", "font-size", "font-weight", "line-height", "display"].forEach(function (prop) {
+        try {
+          el.style.removeProperty(prop);
+        } catch (eTxtProp) {
+          /* ignore */
+        }
+      });
+    });
+    var msgs = cv.querySelector ? cv.querySelector(".ucp-voice-messages") : null;
+    if (msgs) {
+      try {
+        msgs.style.removeProperty("font-size");
+      } catch (eMsgProp) {
+        /* ignore */
+      }
+    }
+  }
+
   function artemisStampOmniHudDocumentClasses(gs) {
     if (!window.risqueArtemisMode) return;
     var ph = gs ? String(gs.phase || "") : "";
@@ -1679,6 +1722,9 @@
       } catch (ePhAttr) {
         /* ignore */
       }
+    }
+    if (ph && ph !== "deploy") {
+      artemisClearDeployOwnerVoiceStamp();
     }
     if (window.risqueArtemisHost) {
       document.documentElement.classList.add("risque-artemis-host");

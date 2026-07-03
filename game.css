@@ -11603,6 +11603,51 @@ html.risque-artemis-client .risque-artemis-top-bar {
   background: rgba(0, 0, 0, 0.35);
 }
 
+/* m325 — host-only: reload game.css without restarting the game (top bar button). */
+html.risque-artemis-host .risque-artemis-refresh-look-btn {
+  border-color: rgba(74, 222, 128, 0.75);
+  background: rgba(20, 83, 45, 0.55);
+  color: #ecfdf5;
+}
+
+html.risque-artemis-host .risque-artemis-refresh-look-btn:hover {
+  background: rgba(22, 101, 52, 0.85);
+}
+
+html.risque-artemis-client .risque-artemis-refresh-look-btn,
+html:not(.risque-artemis-host) .risque-artemis-refresh-look-btn {
+  display: none !important;
+}
+
+.risque-artemis-refresh-look-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 2147483645;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-family: system-ui, Segoe UI, Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #ecfdf5;
+  background: #14532d;
+  border: 1px solid #22c55e;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.risque-artemis-refresh-look-toast[data-kind="err"] {
+  color: #fffbeb;
+  background: #713f12;
+  border-color: #f59e0b;
+}
+
+.risque-artemis-refresh-look-toast[hidden] {
+  display: none !important;
+}
+
 html.risque-artemis-host body.runtime-page,
 html.risque-artemis-client body.runtime-page {
   padding-top: var(--risque-artemis-bar-h) !important;
@@ -14564,4 +14609,103 @@ html.risque-artemis-client #runtime-hud-root.runtime-hud-root--host-cardplay-rec
 html.risque-artemis-host.risque-view-host #runtime-hud-root.runtime-hud-root--public-cardplay-recap .risque-public-cp-shelf-upper .risque-public-book-voice-card-img {
   max-width: 240px !important;
   max-height: min(40vh, 320px) !important;
+}
+
+/* ===================================================================================================
+ * m318 — Mictor active-player recap window height fix.
+ * Ground truth from m317 `cardplay_recap_layout`: Mictor's cards were already comparable, but her two
+ * windows were short because `#hud-main-panel` measured only ~311px tall and computed `flex: 0 0 auto`.
+ * The later generic ARTEMIS cardplay rule (`html.risque-artemis-client .runtime-hud-root--artemis-cardplay
+ * #hud-main-panel`) beat the earlier host-recap fill rule. Nooch's spectator panel measured `flex: 1 1 0`
+ * and ~634px tall, which is why the spectator windows looked correct. Put the active-client recap panel
+ * back into the flex-fill path and let overlay/shelf/panes consume the available column height.
+ * =================================================================================================== */
+html.risque-artemis-client.risque-view-host.risque-artemis-my-turn
+  #runtime-hud-root.runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only.runtime-hud-root--host-cardplay-recap
+  #hud-main-panel {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  height: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding: 8px !important;
+}
+
+html.risque-artemis-client.risque-view-host.risque-artemis-my-turn
+  #runtime-hud-root.runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only.runtime-hud-root--host-cardplay-recap
+  #hud-main-panel
+  .risque-public-cardplay-recap-overlay--in-panel,
+html.risque-artemis-client.risque-view-host.risque-artemis-my-turn
+  #runtime-hud-root.runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only.runtime-hud-root--host-cardplay-recap
+  #hud-main-panel
+  .risque-public-cardplay-recap-panel--shelf {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+/* ===================================================================================================
+ * m320 — Active attacker (Mictor) never saw the battle-result readout ("MICTOR LOSES 2",
+ * "MICTOR AND NOOCH EACH LOSE 1", etc.). Ground truth from the m319 `attack_voice_probe`:
+ * the outcome IS produced on the active client — `risqueAttackOutcomePrimary` was set and
+ * `#control-voice-text` held `<strong>MICTOR AND NOOCH EACH LOSE 1.</strong><br>Refer to the buttons
+ * above…` (h≈40, visible) — but its container `#control-voice` measured only ~80px tall with
+ * `overflow: hidden`. On the active attacker the voice box also holds the injected ATTACKER DICE
+ * dropdown (`#control-voice-extras`) + the condition tally, which consume the visible 80px, so the
+ * outcome text renders BELOW the fold and is clipped away. Spectators (Guido host + Nooch) have no
+ * dropdown/tally in their voice box, so their result shows fine — matching what the user observed.
+ * The base `.ucp-control-voice` is 180px (which would fit), but an attack-context override squeezes
+ * the client's box; restore enough height for the active attacker only (spectator clients lack
+ * `risque-artemis-my-turn`) and let the inner stack breathe. The extra height comes from the slack
+ * above the card-earned window (`#risque-host-deck-earned-visual`) at the foot of the HUD column.
+ * =================================================================================================== */
+/* m322 — m320 (min-height 200px, overflow hidden) was almost right: result was visible but the last
+ * line was truncated. m321 tried overflow:visible which made the text overlap — reverted. Keep the
+ * clean fixed-taller box with overflow:hidden, just stretch it further (fixed 280px) so the full stack
+ * (ATTACKER DICE dropdown + condition tally + up-to-2-line outcome + dice report) fits. The taller box
+ * shoves the slot strip / dev row / combat log / card-earned window down the flex column into slack. */
+/* m323 — the m320/321/322 rules never applied: they required `html.risque-artemis-my-turn`, which is
+ * NOT on <html> during a client's active ATTACK (probe showed #control-voice still ~89px despite
+ * min-height:280 !important + flex-shrink:0 — a matched rule would force ≥280). Drop the my-turn
+ * requirement; `html.risque-artemis-client body[data-risque-phase="attack"]` reliably matches the
+ * active attacker (and spectator clients, which is harmless — a taller CV just shows the mirrored line).
+ * m324 — host (Guido) active attacker has the same cramped CV. The host uses `html.risque-artemis-host`
+ * (not -client), so it wasn't covered. Add it, but exclude the host attack-spectator view
+ * (`body.risque-artemis-attack-spectator`, added only when host && attack && !my-turn) so we only grow
+ * the box when Guido is actually attacking, not when spectating another player's attack. */
+html.risque-artemis-client
+  body[data-risque-phase="attack"]
+  #control-voice.ucp-control-voice,
+html.risque-artemis-host
+  body[data-risque-phase="attack"]:not(.risque-artemis-attack-spectator)
+  #control-voice.ucp-control-voice {
+  height: 280px !important;
+  min-height: 280px !important;
+  max-height: 280px !important;
+  overflow: hidden !important;
+  flex-shrink: 0 !important;
+}
+
+html.risque-artemis-client
+  body[data-risque-phase="attack"]
+  #control-voice.ucp-control-voice
+  .ucp-voice-body,
+html.risque-artemis-client
+  body[data-risque-phase="attack"]
+  #control-voice.ucp-control-voice
+  .ucp-voice-messages,
+html.risque-artemis-host
+  body[data-risque-phase="attack"]:not(.risque-artemis-attack-spectator)
+  #control-voice.ucp-control-voice
+  .ucp-voice-body,
+html.risque-artemis-host
+  body[data-risque-phase="attack"]:not(.risque-artemis-attack-spectator)
+  #control-voice.ucp-control-voice
+  .ucp-voice-messages {
+  min-height: 0 !important;
+  overflow: hidden !important;
+  justify-content: flex-start !important;
 }
