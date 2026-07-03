@@ -171,7 +171,12 @@
       }
     }
 
-    if (typeof window.risqueArtemisShowRigPickerAfterStart === "function") {
+    if (
+      typeof window.risqueArtemisIsRigSetupLocked === "function" &&
+      window.risqueArtemisIsRigSetupLocked()
+    ) {
+      runWelcomeBeatThenFirstCard();
+    } else if (typeof window.risqueArtemisShowRigPickerAfterStart === "function") {
       window.risqueArtemisShowRigPickerAfterStart(runWelcomeBeatThenFirstCard);
     } else {
       runWelcomeBeatThenFirstCard();

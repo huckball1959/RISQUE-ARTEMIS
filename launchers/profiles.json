@@ -1,264 +1,181 @@
 {
-
-  "cacheVersion": "m218",
-
+  "cacheVersion": "m317",
   "note": "Single source of truth for join URLs. Edit params here only — clients use /join/<key> and always get the latest build.",
-
   "profiles": {
-
     "host": {
-
       "label": "Guido — Host (normal game)",
-
       "short": "Host P1",
-
       "role": "host",
-
       "slot": 1,
-
       "params": {
-
         "v": "m255",
-
         "artemisMockPhases": "0",
-
         "artemisMockCardplay": "0",
-
         "artemisMockIncome": "0",
-
         "phase": "login",
-
         "loginLegacyNext": "game.html?phase=playerSelect&selectKind=firstCard",
-
         "loginLoadRedirect": "game.html?phase=playerSelect&selectKind=firstCard"
-
       }
-
     },
-
     "p2": {
-
       "label": "Mictor — Player 2",
-
       "short": "MICTOR P2",
-
       "role": "client",
-
       "slot": 2,
-
       "name": "MICTOR",
-
       "params": {
-
         "v": "m255",
-
         "artemisMockPhases": "0",
-
         "artemisMockCardplay": "0",
-
         "artemisMockIncome": "0"
-
       }
-
     },
-
     "p3": {
-
       "label": "Nooch — Player 3",
-
       "short": "NOOCH P3",
-
       "role": "client",
-
       "slot": 3,
-
       "name": "NOOCH",
-
       "params": {
-
         "v": "m255",
-
         "artemisMockPhases": "0",
-
         "artemisMockCardplay": "0",
-
         "artemisMockIncome": "0"
-
       }
-
     },
-
-    "host-cycle": {
-
-      "label": "Guido — Cycle probe host",
-
-      "short": "Host cycle probe",
-
+    "host-cardplay-test": {
+      "label": "Guido — Cardplay test host",
+      "short": "Host cardplay test",
       "role": "host",
-
       "slot": 1,
-
       "params": {
-
-        "v": "cycle2",
-
-        "artemisCycleProbe": "1",
-
+        "v": "m317",
+        "artemisAutoSave": "cards",
         "artemisMockPhases": "0",
-
+        "artemisMockCardplay": "0",
+        "artemisMockIncome": "0",
         "phase": "login",
-
-        "loginLegacyNext": "game.html?phase=login",
-
-        "loginLoadRedirect": "game.html?phase=login"
-
+        "loginLegacyNext": "game.html?phase=cardplay&legacyNext=income.html",
+        "loginLoadRedirect": "game.html?phase=cardplay&legacyNext=income.html"
       }
-
     },
-
-    "p2-cycle": {
-
-      "label": "Mictor — Cycle probe",
-
-      "short": "MICTOR cycle",
-
+    "p2-cardplay-test": {
+      "label": "Mictor — Cardplay test",
+      "short": "MICTOR cardplay test",
       "role": "client",
-
       "slot": 2,
-
       "name": "MICTOR",
-
       "params": {
-
-        "v": "cycle2",
-
-        "artemisCycleProbe": "1",
-
-        "artemisMockPhases": "0"
-
+        "v": "m317",
+        "artemisAutoSave": "cards",
+        "artemisMockPhases": "0",
+        "artemisMockCardplay": "0",
+        "artemisMockIncome": "0"
       }
-
     },
-
-    "p3-cycle": {
-
-      "label": "Nooch — Cycle probe",
-
-      "short": "NOOCH cycle",
-
+    "p3-cardplay-test": {
+      "label": "Nooch — Cardplay test",
+      "short": "NOOCH cardplay test",
       "role": "client",
-
       "slot": 3,
-
       "name": "NOOCH",
-
       "params": {
-
+        "v": "m317",
+        "artemisAutoSave": "cards",
+        "artemisMockPhases": "0",
+        "artemisMockCardplay": "0",
+        "artemisMockIncome": "0"
+      }
+    },
+    "host-cycle": {
+      "label": "Guido — Cycle probe host",
+      "short": "Host cycle probe",
+      "role": "host",
+      "slot": 1,
+      "params": {
         "v": "cycle2",
-
         "artemisCycleProbe": "1",
-
-        "artemisMockPhases": "0"
-
+        "artemisMockPhases": "0",
+        "phase": "login",
+        "loginLegacyNext": "game.html?phase=login",
+        "loginLoadRedirect": "game.html?phase=login"
       }
-
     },
-
-    "p2-probe": {
-
-      "label": "Mictor — Turn probe",
-
-      "short": "MICTOR turn probe",
-
-      "path": "artemis-probe/probe.html",
-
+    "p2-cycle": {
+      "label": "Mictor — Cycle probe",
+      "short": "MICTOR cycle",
       "role": "client",
-
       "slot": 2,
-
+      "name": "MICTOR",
       "params": {
-
-        "artemis": "client",
-
-        "slot": "2"
-
+        "v": "cycle2",
+        "artemisCycleProbe": "1",
+        "artemisMockPhases": "0"
       }
-
     },
-
-    "p3-probe": {
-
-      "label": "Nooch — Turn probe",
-
-      "short": "NOOCH turn probe",
-
-      "path": "artemis-probe/probe.html",
-
+    "p3-cycle": {
+      "label": "Nooch — Cycle probe",
+      "short": "NOOCH cycle",
       "role": "client",
-
       "slot": 3,
-
+      "name": "NOOCH",
       "params": {
-
-        "artemis": "client",
-
-        "slot": "3"
-
+        "v": "cycle2",
+        "artemisCycleProbe": "1",
+        "artemisMockPhases": "0"
       }
-
+    },
+    "p2-probe": {
+      "label": "Mictor — Turn probe",
+      "short": "MICTOR turn probe",
+      "path": "artemis-probe/probe.html",
+      "role": "client",
+      "slot": 2,
+      "params": {
+        "artemis": "client",
+        "slot": "2"
+      }
+    },
+    "p3-probe": {
+      "label": "Nooch — Turn probe",
+      "short": "NOOCH turn probe",
+      "path": "artemis-probe/probe.html",
+      "role": "client",
+      "slot": 3,
+      "params": {
+        "artemis": "client",
+        "slot": "3"
+      }
     }
-
   },
-
   "aliases": {
-
     "guido": "host",
-
     "mictor": "p2",
-
     "nooch": "p3",
-
     "1": "host",
-
     "2": "p2",
-
     "3": "p3"
-
   },
-
   "modeMap": {
-
     "normal": {
-
       "host": "host",
-
       "p2": "p2",
-
       "p3": "p3"
-
     },
-
+    "cardplay-test": {
+      "host": "host-cardplay-test",
+      "p2": "p2-cardplay-test",
+      "p3": "p3-cardplay-test"
+    },
     "cycle": {
-
       "host": "host-cycle",
-
       "p2": "p2-cycle",
-
       "p3": "p3-cycle"
-
     },
-
     "turn-probe": {
-
       "host": "host",
-
       "p2": "p2-probe",
-
       "p3": "p3-probe"
-
     }
-
   }
-
 }
-

@@ -9253,6 +9253,80 @@
 
   function risquePublicMirrorGameStateApply(gs) {
     if (!gs) return;
+    /* Hard regression guard (m297, confirmed by m296 diagnostics): a client's own committed cardplay
+     * — a played book/card that reduced its hand, set `bookPlayedThisTurn`, and bumped the recap seq
+     * — was being wholesale-reverted at income by a STALE pre-play mirror still carrying the old
+     * hand. The branchy mirror-apply decision can let such a mirror through (e.g. on a control-slot
+     * mismatch) ahead of the owner protection. This is the single chokepoint where `window.gameState`
+     * is replaced, so veto the regression here regardless of how we arrived. */
+    if (
+      window.risqueArtemisNetClient &&
+      !window.risqueArtemisHost &&
+      !window.__risqueArtemisLeavingCardplay &&
+      window.gameState &&
+      (String(gs.phase || "") === "cardplay" || String(gs.phase || "") === "con-cardplay") &&
+      (String(window.gameState.phase || "") === "cardplay" ||
+        String(window.gameState.phase || "") === "con-cardplay") &&
+      typeof window.risqueArtemisClientNameMatchesCurrent === "function" &&
+      window.risqueArtemisClientNameMatchesCurrent(window.gameState) &&
+      window.risqueArtemisClientNameMatchesCurrent(gs)
+    ) {
+      var curNmReg = String(window.gameState.currentPlayer || "")
+        .trim()
+        .toLowerCase();
+      var findCurReg = function (st) {
+        return (st && Array.isArray(st.players) ? st.players : []).find(function (p) {
+          return (
+            p &&
+            String(p.name || "")
+              .trim()
+              .toLowerCase() === curNmReg
+          );
+        });
+      };
+      var lpReg = findCurReg(window.gameState);
+      var ipReg = findCurReg(gs);
+      var localHandReg = lpReg
+        ? Array.isArray(lpReg.cards)
+          ? lpReg.cards.length
+          : Number(lpReg.cardCount) || 0
+        : 0;
+      var inHandReg = ipReg
+        ? Array.isArray(ipReg.cards)
+          ? ipReg.cards.length
+          : Number(ipReg.cardCount) || 0
+        : 0;
+      var localBookPlayedReg = !!window.gameState.bookPlayedThisTurn;
+      var inBookPlayedReg = !!gs.bookPlayedThisTurn;
+      var localRecapSeqReg = Number(window.gameState.risquePublicCardplayRecapAckRequiredSeq) || 0;
+      var inRecapSeqReg = Number(gs.risquePublicCardplayRecapAckRequiredSeq) || 0;
+      var regressesReg =
+        inHandReg > localHandReg ||
+        (localBookPlayedReg && !inBookPlayedReg) ||
+        (localRecapSeqReg > 0 && inRecapSeqReg < localRecapSeqReg);
+      if (regressesReg) {
+        if (typeof window.risqueArtemisDiag === "function") {
+          try {
+            window.risqueArtemisDiag(
+              "cardplay-apply-regress-block",
+              "Blocked stale pre-play mirror from rewinding active client's committed cardplay",
+              {
+                currentPlayer: window.gameState.currentPlayer,
+                localHand: localHandReg,
+                inHand: inHandReg,
+                localBookPlayed: localBookPlayedReg,
+                inBookPlayed: inBookPlayedReg,
+                localRecapSeq: localRecapSeqReg,
+                inRecapSeq: inRecapSeqReg
+              }
+            );
+          } catch (eRegDiag) {
+            /* ignore */
+          }
+        }
+        return;
+      }
+    }
     if (String(gs.phase || "") !== "playerSelect") {
       if (typeof window.risqueArtemisClearSetupPlayerSelectArtifacts === "function") {
         window.risqueArtemisClearSetupPlayerSelectArtifacts(gs);
@@ -9280,6 +9354,101 @@
       window.__risqueCampaignWarpathLabels = Array.isArray(gs.risquePublicCampaignWarpathLabels)
         ? gs.risquePublicCampaignWarpathLabels.slice()
         : [];
+    }
+    /* m298 own-hand preservation + trace. The m297 veto above only fires when BOTH the local and
+     * incoming phase are cardplay. But the observed revert arrives during the cardplay→income
+     * handoff: the host re-broadcasts an income (or pre-commit cardplay) mirror that still carries
+     * the active player's PRE-book hand, and m297's phase gate lets it through. For the active net
+     * client whose turn it still is, never let an incoming mirror ADD cards back onto our own
+     * committed hand — patch our own player entry to the local committed copy instead of vetoing
+     * the whole mirror (income carries data we still need). Also emit a trace of every such apply
+     * so the exact revert path is visible in the log. */
+    if (
+      window.risqueArtemisNetClient &&
+      !window.risqueArtemisHost &&
+      window.gameState &&
+      Array.isArray(gs.players) &&
+      Array.isArray(window.gameState.players) &&
+      typeof window.risqueArtemisClientNameMatchesCurrent === "function" &&
+      window.risqueArtemisClientNameMatchesCurrent(window.gameState)
+    ) {
+      var ph0Own = String(window.gameState.phase || "");
+      var ph1Own = String(gs.phase || "");
+      var phOwnGuarded = function (ph) {
+        return (
+          ph === "cardplay" ||
+          ph === "con-cardplay" ||
+          ph === "income" ||
+          ph === "con-income"
+        );
+      };
+      var committedPlayOwn =
+        !!window.gameState.bookPlayedThisTurn ||
+        (Number(window.gameState.risquePublicCardplayRecapAckRequiredSeq) || 0) > 0;
+      if (phOwnGuarded(ph0Own) && phOwnGuarded(ph1Own) && committedPlayOwn) {
+        var meNmOwn = String(window.gameState.currentPlayer || "")
+          .trim()
+          .toLowerCase();
+        var findMeOwn = function (st) {
+          return (st && Array.isArray(st.players) ? st.players : []).find(function (p) {
+            return (
+              p &&
+              String(p.name || "")
+                .trim()
+                .toLowerCase() === meNmOwn
+            );
+          });
+        };
+        var lpOwn = findMeOwn(window.gameState);
+        var inpOwn = findMeOwn(gs);
+        if (lpOwn && inpOwn) {
+          var lcOwn = Array.isArray(lpOwn.cards) ? lpOwn.cards.length : Number(lpOwn.cardCount) || 0;
+          var icOwn = Array.isArray(inpOwn.cards) ? inpOwn.cards.length : Number(inpOwn.cardCount) || 0;
+          if (icOwn > lcOwn) {
+            try {
+              inpOwn.cards = JSON.parse(JSON.stringify(Array.isArray(lpOwn.cards) ? lpOwn.cards : []));
+            } catch (eCloneOwn) {
+              inpOwn.cards = Array.isArray(lpOwn.cards) ? lpOwn.cards.slice() : [];
+            }
+            inpOwn.cardCount = inpOwn.cards.length;
+            if (lpOwn.bookValue != null) inpOwn.bookValue = lpOwn.bookValue;
+            if (window.gameState.bookPlayedThisTurn) gs.bookPlayedThisTurn = true;
+            if (typeof window.risqueArtemisDiag === "function") {
+              try {
+                window.risqueArtemisDiag(
+                  "cardplay-apply-handpreserve",
+                  "Preserved active client's committed hand against a regressing mirror",
+                  {
+                    currentPlayer: window.gameState.currentPlayer,
+                    localPhase: ph0Own,
+                    incomingPhase: ph1Own,
+                    localHand: lcOwn,
+                    incomingHand: icOwn
+                  }
+                );
+              } catch (ePreserveDiag) {
+                /* ignore */
+              }
+            }
+          } else if (typeof window.risqueArtemisDiag === "function") {
+            try {
+              window.risqueArtemisDiag(
+                "cardplay-apply-trace",
+                "Active client mirror apply (own hand not regressing)",
+                {
+                  currentPlayer: window.gameState.currentPlayer,
+                  localPhase: ph0Own,
+                  incomingPhase: ph1Own,
+                  localHand: lcOwn,
+                  incomingHand: icOwn
+                }
+              );
+            } catch (eTraceDiag) {
+              /* ignore */
+            }
+          }
+        }
+      }
     }
     window.gameState = gs;
     /* Keep boot `state` in sync so a late refreshVisuals() rAF cannot wipe mirror-only fields (e.g. name-roulette flash). */
@@ -9671,6 +9840,35 @@
         if (lpCp !== ipCp || (icCp > 0 && lcCp !== icCp)) {
           return true;
         }
+      }
+      /* Confirmed root cause (m295 diag `cardplay-mirror-clobber-risk`): during a client's OWN
+       * cardplay turn, `risqueArtemisClientPlaying` can transiently drop to false (panel re-mount
+       * churn), and the branches below then apply the host's frozen pre-play mirror — restoring the
+       * cards just played (book/wildcard "never leaves hand", staging↔hand "bounce"). Turn-advance
+       * away from us is already handled by the currentPlayer/control-slot mismatch check above, so
+       * if the incoming mirror still names US as the current player we own cardplay: never clobber
+       * our locally-removed hand, regardless of the flaky playing/controls flags. */
+      if (
+        typeof window.risqueArtemisClientNameMatchesCurrent === "function" &&
+        window.risqueArtemisClientNameMatchesCurrent(incomingGs || localCp) &&
+        !window.__risqueArtemisLeavingCardplay
+      ) {
+        if (!window.risqueArtemisClientPlaying && typeof window.risqueArtemisDiag === "function") {
+          var protSeqCp = Number((incomingGs && incomingGs.risqueArtemisControlSeq) || 0);
+          if (window.__risqueCardplayProtectLoggedSeq !== protSeqCp) {
+            window.__risqueCardplayProtectLoggedSeq = protSeqCp;
+            try {
+              window.risqueArtemisDiag(
+                "cardplay-mirror-protect",
+                "Active-name client kept its own cardplay hand (ignored host mirror) despite risqueArtemisClientPlaying=false",
+                { currentPlayer: incomingGs && incomingGs.currentPlayer, controlSeq: protSeqCp }
+              );
+            } catch (eProtDiag) {
+              /* ignore */
+            }
+          }
+        }
+        return false;
       }
       if (
         typeof window.risqueArtemisCardplayControlsPresent === "function" &&
@@ -18241,20 +18439,106 @@
 
   window.risqueArtemisDevReload = artemisDevReload;
 
+  /* Dev mock-save loader (Ctrl+Shift+J): fetch a saved gameState JSON (default cards.json at the
+   * game root), write it to localStorage, then reuse the dev-reload path so the live networked
+   * session reloads straight into the saved phase. Trigger on each machine that should adopt the
+   * mock (host first, then the active player). The save deliberately carries NO preset id, so it
+   * behaves exactly like a normally-dealt game (no preset-cardplay host reject path). */
+  function artemisLoadMockSave(fileOpt) {
+    var url = String(fileOpt || "cards.json");
+    try {
+      fetch(url, { cache: "no-store" })
+        .then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then(function (gs) {
+          if (!gs || typeof gs !== "object" || !Array.isArray(gs.players)) {
+            throw new Error("not a valid gameState");
+          }
+          try {
+            localStorage.setItem("gameState", JSON.stringify(gs));
+          } catch (eLsMock) {
+            /* ignore */
+          }
+          window.gameState = gs;
+          if (typeof window.risqueArtemisDiag === "function") {
+            try {
+              window.risqueArtemisDiag("mock-save-loaded", "Loaded mock save " + url, {
+                phase: gs.phase,
+                round: gs.round,
+                currentPlayer: gs.currentPlayer
+              });
+            } catch (eDiagMock) {
+              /* ignore */
+            }
+          }
+          artemisDevReload("mock-save");
+        })
+        .catch(function (err) {
+          var msg = err && err.message ? err.message : String(err);
+          try {
+            console.error("[ARTEMIS] mock save load failed:", msg);
+          } catch (eLogMock) {
+            /* ignore */
+          }
+          try {
+            alert("Could not load " + url + ": " + msg);
+          } catch (eAlertMock) {
+            /* ignore */
+          }
+        });
+    } catch (eFetchMock) {
+      try {
+        alert("Could not load " + url + ": " + (eFetchMock && eFetchMock.message));
+      } catch (eAlert2Mock) {
+        /* ignore */
+      }
+    }
+  }
+  window.risqueArtemisLoadMockSave = artemisLoadMockSave;
+
   document.addEventListener(
     "keydown",
     function (e) {
       if (e.repeat) return;
       if (!e.ctrlKey || !e.shiftKey || e.altKey) return;
       var key = String(e.key || "").toLowerCase();
-      if (key !== "l") return;
-      if (isRuntimeShortcutBlockedTarget(e.target)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      artemisDevReload("keyboard");
+      if (key === "l") {
+        if (isRuntimeShortcutBlockedTarget(e.target)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        artemisDevReload("keyboard");
+        return;
+      }
+      if (key === "j") {
+        if (isRuntimeShortcutBlockedTarget(e.target)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        artemisLoadMockSave("cards.json");
+      }
     },
     true
   );
+
+  /* One-shot build marker so logs unambiguously show which build is live on each machine
+   * (we have repeatedly been unsure whether a fix was actually loaded). */
+  if (typeof window.risqueArtemisDiag === "function" && !window.__risqueArtemisBuildMarkerLogged) {
+    window.__risqueArtemisBuildMarkerLogged = true;
+    try {
+      var buildMetaEl = document.querySelector('meta[name="risque-artemis-build"]');
+      window.risqueArtemisDiag(
+        "artemis-build-loaded",
+        "game-shell build loaded",
+        {
+          build: buildMetaEl ? buildMetaEl.getAttribute("content") : "(unknown)",
+          shell: "m299-cardplay-auto-save-boot"
+        }
+      );
+    } catch (eBuildMarker) {
+      /* ignore */
+    }
+  }
 
   var btnReload = document.getElementById("btnReload");
   if (btnReload) {

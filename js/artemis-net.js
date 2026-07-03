@@ -3618,10 +3618,23 @@
           ip && Array.isArray(ip.cards) ? ip.cards.length : 0
         );
       }
+      /* A genuine end-of-cardplay commit from the active player (e.g. trading the last cards into a
+       * book) legitimately empties the hand. Recognize it by a fresh, higher recap seq for the same
+       * current player and never reject it — otherwise the host keeps the stale pre-book hand and
+       * re-broadcasts it, so the played cards never leave the hand. */
+      var hostRecapSeqGuard =
+        Number(window.gameState && window.gameState.risquePublicCardplayRecapAckRequiredSeq) || 0;
+      var inRecapSeqGuard = Number(gs && gs.risquePublicCardplayRecapAckRequiredSeq) || 0;
+      var activePlayerRecapCommit =
+        inRecapSeqGuard > 0 &&
+        inRecapSeqGuard > hostRecapSeqGuard &&
+        !!curNm &&
+        normDeployName(gs && gs.currentPlayer) === normDeployName(curNm);
       if (
         inCards === 0 &&
         (hostCards > 0 || artemisPresetCardplayActive(window.gameState)) &&
-        !hostSenderIsActiveDeployer(window.gameState, senderSlot)
+        !hostSenderIsActiveDeployer(window.gameState, senderSlot) &&
+        !activePlayerRecapCommit
       ) {
         try {
           console.warn(
@@ -3630,7 +3643,65 @@
         } catch (eRejCp) {
           /* ignore */
         }
+        if (typeof window.risqueArtemisDiag === "function") {
+          try {
+            window.risqueArtemisDiag(
+              "cardplay-guard-reject",
+              "Host rejected empty-hand cardplay push from P" + senderSlot,
+              {
+                senderSlot: senderSlot,
+                currentPlayer: curNm,
+                inCards: inCards,
+                hostCards: hostCards,
+                inRecapSeq: inRecapSeqGuard,
+                hostRecapSeq: hostRecapSeqGuard
+              }
+            );
+          } catch (eDiagRejCp) {
+            /* ignore */
+          }
+        }
         return;
+      }
+      if (
+        inCards === 0 &&
+        activePlayerRecapCommit &&
+        typeof window.risqueArtemisDiag === "function"
+      ) {
+        try {
+          window.risqueArtemisDiag(
+            "cardplay-guard-allow",
+            "Host accepted empty-hand cardplay recap commit from P" + senderSlot,
+            {
+              senderSlot: senderSlot,
+              currentPlayer: curNm,
+              inRecapSeq: inRecapSeqGuard,
+              hostRecapSeq: hostRecapSeqGuard
+            }
+          );
+        } catch (eDiagAllowCp) {
+          /* ignore */
+        }
+      }
+      /* m298 trace: a cardplay→cardplay push that reached here was NOT rejected, so the host is
+       * about to adopt it. Record the host's current vs incoming hand count for the active player
+       * to confirm whether the played-card reduction actually lands on the authoritative state. */
+      if (typeof window.risqueArtemisDiag === "function") {
+        try {
+          window.risqueArtemisDiag(
+            "cardplay-host-accept",
+            "Host accepting cardplay push from P" + senderSlot,
+            {
+              senderSlot: senderSlot,
+              currentPlayer: curNm,
+              hostCards: hostCards,
+              inCards: inCards,
+              inBookPlayedThisTurn: !!(gs && gs.bookPlayedThisTurn)
+            }
+          );
+        } catch (eHostAcceptDiag) {
+          /* ignore */
+        }
       }
     }
     if (
@@ -3649,9 +3720,27 @@
         return;
       }
       if (typeof window.risqueArtemisDiag === "function") {
+        var incAdvNm = String(gs.currentPlayer || "")
+          .trim()
+          .toLowerCase();
+        var incAdvP = (gs.players || []).find(function (p) {
+          return (
+            p &&
+            String(p.name || "")
+              .trim()
+              .toLowerCase() === incAdvNm
+          );
+        });
+        var incAdvHand = incAdvP
+          ? Array.isArray(incAdvP.cards)
+            ? incAdvP.cards.length
+            : Number(incAdvP.cardCount) || 0
+          : -1;
         window.risqueArtemisDiag("cardplay_host_income_advance", "P" + senderSlot + " cardplay → income", {
           currentPlayer: gs.currentPlayer,
-          controlSlot: gs.artemisControlSlot
+          controlSlot: gs.artemisControlSlot,
+          handCount: incAdvHand,
+          bookPlayedThisTurn: !!(gs && gs.bookPlayedThisTurn)
         });
       }
     }

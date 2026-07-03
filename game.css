@@ -2781,6 +2781,31 @@ html.risque-artemis-host.risque-view-host
   justify-content: flex-start !important;
 }
 
+/* m300 — Active player's UPPER hand pane clipped full-height (186px) thumbnails whenever the 50/50
+ * split left the pane shorter than one card; observers' recap shelf already scales, so only the
+ * card-processing players saw truncation. Let the hand row shrink to its pane and the thumbnails
+ * scale to fit (the receive-card model) so cards are never truncated and the upper window reads the
+ * same height as the lower staging window. */
+.runtime-hud-root--cardplay-panel-only .cardplay-hand-staging-split > .cardplay-hand-stack {
+  overflow: hidden;
+}
+.runtime-hud-root--cardplay-panel-only .cardplay-compact-root .cardplay-hand-row.cardplay-card-row {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding-top: 10px !important;
+}
+.runtime-hud-root--cardplay-panel-only .cardplay-compact-root .cardplay-hand-row.cardplay-card-row .card.cardplay-compact-card {
+  width: auto !important;
+  max-width: 120px !important;
+  height: auto !important;
+  max-height: 100% !important;
+}
+.runtime-hud-root--cardplay-panel-only .cardplay-compact-root .cardplay-hand-row.cardplay-card-row .cardplay-hand-slot {
+  min-height: 0 !important;
+  max-height: 100% !important;
+}
+
 /* ARTEMIS mock cardplay — Apollo panel-only layout; hand + staging split fills control panel */
 .runtime-hud-root--cardplay-panel-only .risque-artemis-mock-cardplay.cardplay-compact-root .cardplay-staging-wrap {
   display: flex !important;
@@ -9839,6 +9864,21 @@ body.risque-view-host #runtime-hud-root.runtime-hud-root--cardplay-panel-only.ru
   bottom: 0 !important;
 }
 
+/* m313 — Active player's recap windows were only ~half height with a big empty strip above them.
+ * Cause: syncPosition() (runtime-hud.js) pins the HUD column top to the STATS table (~243px down the
+ * 1080 canvas), but stats + the phase rows are HIDDEN during recap — so that whole top strip was dead
+ * space and the two shelf windows only got the lower portion of the column. Reclaim the strip for the
+ * recap column so the shelf spans almost the full canvas height (windows roughly double). CSS
+ * !important beats the JS inline top. Scoped to recap only — normal cardplay input keeps its
+ * stats-aligned top. Applies to the active host (Guido) and active clients (Mictor/Nooch) via
+ * --host-cardplay-recap, and the host's public spectator recap via --public-cardplay-recap. */
+html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap,
+body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap,
+html.risque-artemis-host.risque-view-host #runtime-hud-root.runtime-hud-root--public-cardplay-recap {
+  /* m313: 44px; m315: 20px — pull the recap column nearer the canvas top to hand the shelf more height. */
+  top: 20px !important;
+}
+
 html.risque-view-host .runtime-hud-root--host-cardplay-recap .hud-title-stack,
 body.risque-view-host .runtime-hud-root--host-cardplay-recap .hud-title-stack {
   padding-top: 2px;
@@ -9901,6 +9941,8 @@ body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .r
   min-height: 0;
   width: 100%;
   align-self: stretch;
+  /* m316 — resolvable height so the shelf (height:100%) fills instead of collapsing to content. */
+  height: 100%;
 }
 
 html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cardplay-recap-panel--shelf,
@@ -9909,18 +9951,33 @@ body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .r
   width: 100%;
   margin: 0 auto;
   flex: 1 1 auto;
-  min-height: min(720px, 72vh);
+  /* m313 — was min(720px, 72vh); with the reclaimed top strip (top: 44px) the column is now nearly
+   * the full canvas, so let the shelf fill it and the two panes roughly double in height. */
+  min-height: min(980px, 90vh);
   height: 100%;
 }
 
+/* m302 — both shelf panes keep a persistent 50/50 floor at ALL times (not just while the upper pane
+ * is empty). This block used to be scoped to html.risque-artemis-host.risque-view-host (the hot-seat
+ * host = Guido only), so the active NET CLIENT (Mictor: risque-view-host but NOT risque-artemis-host)
+ * only got the floor from the :has(upper-content:empty) rules below. The moment a card flew into her
+ * upper pane that guard dropped out, both panes lost their floor and collapsed — windows shrank, rose
+ * up leaving dead space below, the lower pane sprouted scrollbars, and the processing card truncated.
+ * Adding the body.risque-view-host branch gives the active client the same steady, full-size panes. */
 html.risque-artemis-host.risque-view-host
   #runtime-hud-root.runtime-hud-root--host-cardplay-recap
   .risque-public-cp-shelf-upper,
 html.risque-artemis-host.risque-view-host
   #runtime-hud-root.runtime-hud-root--host-cardplay-recap
+  .risque-public-cp-shelf-lower,
+body.risque-view-host
+  #runtime-hud-root.runtime-hud-root--host-cardplay-recap
+  .risque-public-cp-shelf-upper,
+body.risque-view-host
+  #runtime-hud-root.runtime-hud-root--host-cardplay-recap
   .risque-public-cp-shelf-lower {
   flex: 1 1 0;
-  min-height: min(260px, 30vh);
+  min-height: min(480px, 46vh);
 }
 
 /* Host staging: keep both panes balanced even before the card flies into the upper pane —
@@ -9934,7 +9991,7 @@ body.risque-view-host
   .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
   .risque-public-cp-shelf-lower {
   flex: 1 1 0;
-  min-height: min(260px, 30vh);
+  min-height: min(480px, 46vh);
   max-height: none;
 }
 
@@ -9947,7 +10004,7 @@ body.risque-view-host
   .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
   .risque-public-cp-shelf-upper {
   flex: 1 1 0;
-  min-height: min(260px, 30vh);
+  min-height: min(480px, 46vh);
   max-height: none;
 }
 
@@ -9976,9 +10033,73 @@ html.risque-artemis-host.risque-view-host .runtime-hud-root--public-cardplay-rec
   max-height: calc((100% - var(--risque-cp-shelf-pane-gap, 12px)) / 2 - 10px);
 }
 
+/* m311 — ARTEMIS host (Guido) spectating another player's cardplay renders the PUBLIC recap shelf,
+ * but inside the fixed host HUD column (not a 1080px TV). Unlike the active-host recap
+ * (--host-cardplay-recap), the host's public path had NO overlay flex-fill, NO shelf min-height, and
+ * an empty-upper pane floor of 0. On the first frame the shelf collapsed to content height and the
+ * lower window opened too short — the played book cards overflowed and threw scrollbars + truncation
+ * until a later reflow snapped it to size. Mirror the active-host recap sizing so the windows are
+ * correct from the first paint. Scoped to the host only — the real public TV (.risque-view-public)
+ * keeps its 50/50 observer behavior untouched. */
+html.risque-artemis-host.risque-view-host
+  #runtime-hud-root.runtime-hud-root--public-cardplay-recap
+  .risque-public-cardplay-recap-overlay--in-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  align-self: stretch;
+}
+html.risque-artemis-host.risque-view-host
+  #runtime-hud-root.runtime-hud-root--public-cardplay-recap
+  .risque-public-cardplay-recap-panel--shelf {
+  max-width: min(840px, 100%);
+  width: 100%;
+  margin: 0 auto;
+  flex: 1 1 auto;
+  /* m313 — match the active-host recap: fill the reclaimed column height. */
+  min-height: min(980px, 90vh);
+  height: 100%;
+}
+html.risque-artemis-host.risque-view-host
+  #runtime-hud-root.runtime-hud-root--public-cardplay-recap
+  .risque-public-cp-shelf-upper,
+html.risque-artemis-host.risque-view-host
+  #runtime-hud-root.runtime-hud-root--public-cardplay-recap
+  .risque-public-cp-shelf-lower {
+  flex: 1 1 0;
+  min-height: min(480px, 46vh);
+}
+/* Override the observer min-height:0 floor for the host's empty-upper staging frame (before the card
+ * flies up) so the lower window can't start collapsed. Higher specificity (#runtime-hud-root) wins. */
+html.risque-artemis-host.risque-view-host
+  #runtime-hud-root.runtime-hud-root--public-cardplay-recap
+  .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
+  .risque-public-cp-shelf-upper,
+html.risque-artemis-host.risque-view-host
+  #runtime-hud-root.runtime-hud-root--public-cardplay-recap
+  .risque-public-cardplay-recap-panel--shelf:has(.risque-public-cp-shelf-upper-content:empty)
+  .risque-public-cp-shelf-lower {
+  min-height: min(480px, 46vh);
+  max-height: none;
+}
+
 html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-lower,
 body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-lower {
-  min-height: min(340px, 42vh);
+  /* m301 — was min(340px, 42vh): a taller floor than the upper pane (min-height: 0) made the host's
+   * two shelf panes unequal on shorter screens (lower stayed big, upper got squeezed and truncated
+   * the processing card). Match the upper pane so both render as equal halves (receive-card model).
+   * m312 — but min-height: 0 defeated the m302 "persistent floor at ALL times": while the upper pane
+   * was empty the :has(upper-content:empty) rule floored both panes, but the instant a card flew up
+   * that guard dropped and these two rules (min-height: 0, later in the file, equal specificity) let
+   * BOTH panes collapse toward content height — the upper pane shrank to the tiny in-flight card and
+   * the whole shelf looked worthless mid-animation. Give both panes the SAME floor so they stay equal
+   * (m301's goal) AND never collapse (m302's goal), identical to the empty-upper staging frame.
+   * m314 — raised floor to 44vh and dropped the inherited `max-height: calc((100%-gap)/2 - 10px)`
+   * half-cap (base rule) that was clamping each animating pane to ~half the shelf (~35vh) no matter
+   * how tall the shelf/column got — that cap is why m313's taller shelf + reclaimed top did nothing.
+   * With the cap gone the two windows fill to the 44vh floor (≈ double the old ~22-30vh). */
+  min-height: min(480px, 46vh);
+  max-height: none;
   padding-bottom: min(14px, 1.6vh);
 }
 
@@ -9999,7 +10120,12 @@ body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .r
 
 html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-upper,
 body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-upper {
-  min-height: 0;
+  /* m312 — same persistent floor as the lower pane (was min-height: 0, which let the upper pane
+   * collapse to the in-flight card the moment the card left the empty-upper staging state).
+   * m314 — matching 44vh floor + drop the half-cap so the upper window fills instead of being
+   * clamped to ~half the shelf. */
+  min-height: min(480px, 46vh);
+  max-height: none;
 }
 
 html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-upper-content,
@@ -10608,6 +10734,27 @@ body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .r
   object-fit: contain;
   border-radius: 4px;
   flex: 0 0 auto;
+}
+
+/* m301 — UPPER processing card scales to its pane like the lower shelf cards (it was locked at a
+ * fixed 186px and got truncated whenever the top pane was shorter than one card — this hit every
+ * player processing a book). 26vh (vs the lower pane's 28vh) leaves room for the processing
+ * title/report text above and below the card. Matches the receive-card sizing model. */
+.risque-public-cp-shelf-upper .risque-public-cp-shelf-upper-card-row {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: center;
+}
+.risque-public-cp-shelf-upper .risque-public-cardplay-recap-card-img {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 120px !important;
+  height: auto !important;
+  max-height: min(26vh, 186px) !important;
+}
+.risque-public-cp-shelf-upper .risque-public-cardplay-recap-card-col {
+  min-height: 0;
+  max-height: 100%;
 }
 
 /* Remove legacy “offset singles” jumble when a book and singles share a row. */
@@ -11752,6 +11899,199 @@ html.risque-artemis-client .risque-artemis-host-bar {
   font-size: 13px;
   color: #94a3b8;
   line-height: 1.35;
+}
+
+/* ARTEMIS — host test launcher (after START, before game begins) */
+.risque-artemis-host-launcher {
+  position: fixed;
+  inset: 0;
+  /* Above the near-max-z wayback badge (2147483646) so nothing overlaps Launch. */
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 6, 23, 0.94);
+  backdrop-filter: blur(10px);
+}
+
+.risque-artemis-host-launcher[hidden] {
+  display: none !important;
+}
+
+/* Keep the low-left "SAVE FOLDER NOT CONNECTED" wayback badge (z-index ~max)
+   from floating over the launcher's Launch button while the menu is open. */
+html.risque-artemis-host-launcher-active #risque-wayback-connected-flag {
+  display: none !important;
+}
+
+.risque-artemis-host-launcher-card {
+  width: min(680px, 100%);
+  max-height: min(92vh, 900px);
+  overflow-y: auto;
+  padding: 28px 32px 32px;
+  border-radius: 18px;
+  background: linear-gradient(165deg, #0f172a 0%, #1e293b 100%);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.5);
+  color: #f1f5f9;
+}
+
+.risque-artemis-host-launcher-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.risque-artemis-host-launcher-mode {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 18px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.risque-artemis-host-launcher-mode:hover {
+  border-color: #38bdf8;
+  background: rgba(30, 41, 59, 0.95);
+  transform: translateY(-1px);
+}
+
+.risque-artemis-host-launcher-mode--selected {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.2);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.45);
+}
+
+.risque-artemis-host-launcher-mode-num {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #38bdf8;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.risque-artemis-host-launcher-mode-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.risque-artemis-host-launcher-mode-label {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.risque-artemis-host-launcher-mode-hint {
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.35;
+}
+
+.risque-artemis-host-launcher-sub {
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+}
+
+.risque-artemis-host-launcher-sub[hidden] {
+  display: none !important;
+}
+
+.risque-artemis-host-launcher-heading {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.risque-artemis-host-launcher-hint {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #94a3b8;
+}
+
+.risque-artemis-host-launcher-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.risque-artemis-host-launcher-chip {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.risque-artemis-host-launcher-chip--rig {
+  flex: 1 1 calc(50% - 10px);
+  font-size: 13px;
+}
+
+.risque-artemis-host-launcher-chip:hover {
+  border-color: #38bdf8;
+  background: rgba(30, 41, 59, 0.95);
+}
+
+.risque-artemis-host-launcher-chip--selected {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.18);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
+}
+
+.risque-artemis-host-launcher-go {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 16px 20px;
+  border: none;
+  border-radius: 12px;
+  background: #0284c7;
+  color: #f8fafc;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.risque-artemis-host-launcher-go:hover:not(:disabled) {
+  background: #0369a1;
+  transform: translateY(-1px);
+}
+
+.risque-artemis-host-launcher-go:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* ARTEMIS M2b — per-laptop login panel (clients) */
@@ -14072,4 +14412,156 @@ html.risque-artemis-host
   .risque-public-cp-shelf-upper
   .risque-public-book-voice-title {
   font-size: clamp(12px, 2vh, 18px);
+}
+
+/* ===================================================================================================
+ * m305 — ACTIVE NET CLIENT cardplay processing shelf fit (THE real fix; supersedes m301-m303).
+ * Ground truth from logs + user test: the ACTIVE player (host OR client) mounts the processing shelf
+ * with root class `--host-cardplay-recap` (risquePublicRecapShelfHudClass returns host-recap whenever
+ * risqueDisplayIsPublic is false — true for any active player). The host gets a full set of fitting
+ * `!important` refinements scoped to `html.risque-artemis-host … --host-cardplay-recap` (lines ~13978-
+ * 14138) — most importantly a `min-height: 120px !important` cap on `.risque-public-cardplay-recap-
+ * panel--shelf` that overrides the generic `min-height: min(720px, 72vh)` from the `html.risque-view-
+ * host …` rule (~9931). The active CLIENT is `html.risque-artemis-client`, so it NEVER matched those
+ * host-only refinements: it kept the oversized 720px/72vh shelf min-height, which is taller than the
+ * HUD column → the lower pane overflowed (scrollbars) and the processing card truncated. (The host's
+ * shelf fit, so Guido looked "unique/better" — exactly the user's observation.) m301-m303 missed
+ * because they targeted the wrong class (`--public-cardplay-recap`, which the active client never uses,
+ * or `--host-cardplay-recap` only via host scope). This block re-applies the host's host-recap
+ * refinements to the active client (`html.risque-artemis-client … --host-cardplay-recap`) so its shelf
+ * fits the column with steady, equal panes — no overflow, no truncation. Placed last → wins the
+ * generic `html.risque-view-host` rule on equal specificity.
+ * =================================================================================================== */
+
+html.risque-artemis-client #runtime-hud-root.runtime-hud-root--cardplay-panel-only.runtime-hud-root--host-cardplay-recap {
+  bottom: 0 !important;
+}
+
+html.risque-artemis-client .runtime-hud-root--host-cardplay-recap .hud-title-stack {
+  padding-top: 2px;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+/* Hide the cardplay selection panel + stats/phase chrome so the shelf owns the column. */
+html.risque-artemis-client .runtime-hud-root--host-cardplay-recap #hud-stats-panel,
+html.risque-artemis-client .runtime-hud-root--host-cardplay-recap .hud-phase-player-row {
+  display: none !important;
+}
+html.risque-artemis-client
+  .runtime-hud-root--host-cardplay-recap
+  #risque-phase-content:not(:has(#cardplay-host-income-gate-root)) {
+  display: none !important;
+}
+
+/* #hud-main-panel fills the column (matches host min-height 200px so the shelf has real height). */
+html.risque-artemis-client .runtime-hud-root--host-cardplay-recap #hud-main-panel {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  max-height: none !important;
+  position: relative;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding: 25px !important;
+  box-sizing: border-box;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  gap: 0;
+}
+html.risque-artemis-client
+  #runtime-hud-root.runtime-hud-root--cardplay-panel-only.runtime-hud-root--host-cardplay-recap
+  #hud-main-panel {
+  min-height: 200px !important;
+}
+
+/* Overlay flex-fills the inner box. */
+html.risque-artemis-client
+  .runtime-hud-root--host-cardplay-recap
+  .risque-public-cardplay-recap-overlay--in-panel {
+  position: relative !important;
+  inset: auto !important;
+  background: transparent !important;
+  flex: 1 1 auto !important;
+  min-height: 140px !important;
+  width: 100% !important;
+  /* m316 — was `height: auto`: with an auto-height overlay the shelf's `height: 100%` could not
+   * resolve, so the shelf collapsed to content height (the panes' min-height) and sat centered with
+   * dead space around it. That is why only pane min-height (m314) ever changed anything and m315's
+   * padding/card caps did nothing — the panes were pinned at their floor and never grew into the
+   * column. Give the overlay a resolvable height so the shelf fills #hud-main-panel and the panes
+   * flex-grow to fill the remaining space (matching the spectator windows). */
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* CRITICAL FIX: cap the shelf panel min-height like the host (was inheriting min(720px,72vh) from the
+ * generic html.risque-view-host rule → overflow + scrollbars + truncation on clients). */
+html.risque-artemis-client
+  #runtime-hud-root.runtime-hud-root--host-cardplay-recap
+  .risque-public-cardplay-recap-panel--shelf {
+  flex: 1 1 auto !important;
+  min-height: 120px !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+/* Card sizing parity with the host shelf (3-up, capped height so cards never truncate). */
+html.risque-artemis-client
+  #runtime-hud-root.runtime-hud-root--host-cardplay-recap
+  .risque-public-cp-shelf-card {
+  width: clamp(72px, calc((100% - 16px) / 3), 160px);
+  max-width: 160px;
+  max-height: min(28vh, 200px);
+}
+
+html.risque-artemis-client
+  #runtime-hud-root.runtime-hud-root--host-cardplay-recap
+  .risque-public-cp-shelf-upper
+  .risque-public-book-voice-title {
+  font-size: clamp(12px, 2vh, 18px);
+}
+
+/* ===================================================================================================
+ * m315 — Fill the remaining space + bigger cards for the active player (Guido/Mictor/Nooch) and the
+ * host spectator. The two panes already flex-fill the shelf, and the shelf fills #hud-main-panel — but
+ * #hud-main-panel carried a 25px padding (eating height + width) and the cards were capped at
+ * min(26-28vh, ~186-200px), so the windows stopped short of the canvas and the cards read small.
+ * Tighten the panel padding to reclaim the height/width and raise the card caps so the cards grow into
+ * the taller panes. Everything stays inside the canvas-pinned recap column (top / bottom:0). Placed
+ * last with #runtime-hud-root specificity so it wins the earlier padding/card rules.
+ * =================================================================================================== */
+html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap #hud-main-panel,
+body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap #hud-main-panel,
+html.risque-artemis-client #runtime-hud-root.runtime-hud-root--host-cardplay-recap #hud-main-panel,
+html.risque-artemis-host.risque-view-host #runtime-hud-root.runtime-hud-root--public-cardplay-recap #hud-main-panel {
+  padding: 8px !important;
+}
+
+/* Lower shelf book/played cards — fill the taller pane (was clamp .../160px, min(28vh, 200px)). */
+html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-card,
+body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-card,
+html.risque-artemis-client #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-card,
+html.risque-artemis-host.risque-view-host #runtime-hud-root.runtime-hud-root--public-cardplay-recap .risque-public-cp-shelf-card {
+  width: clamp(110px, calc((100% - 24px) / 3), 240px) !important;
+  max-width: 240px !important;
+  max-height: min(42vh, 340px) !important;
+}
+
+/* Upper pane PROCESSING card — grow to fill above the report text (was min(26vh, 186px)). Cover both
+ * the recap-card-img and book-voice-card-img class variants used by the processing render. */
+html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-upper .risque-public-cardplay-recap-card-img,
+body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-upper .risque-public-cardplay-recap-card-img,
+html.risque-artemis-client #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-upper .risque-public-cardplay-recap-card-img,
+html.risque-artemis-host.risque-view-host #runtime-hud-root.runtime-hud-root--public-cardplay-recap .risque-public-cp-shelf-upper .risque-public-cardplay-recap-card-img,
+html.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-upper .risque-public-book-voice-card-img,
+body.risque-view-host #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-upper .risque-public-book-voice-card-img,
+html.risque-artemis-client #runtime-hud-root.runtime-hud-root--host-cardplay-recap .risque-public-cp-shelf-upper .risque-public-book-voice-card-img,
+html.risque-artemis-host.risque-view-host #runtime-hud-root.runtime-hud-root--public-cardplay-recap .risque-public-cp-shelf-upper .risque-public-book-voice-card-img {
+  max-width: 240px !important;
+  max-height: min(40vh, 320px) !important;
 }

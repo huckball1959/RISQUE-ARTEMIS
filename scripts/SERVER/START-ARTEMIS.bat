@@ -23,7 +23,7 @@ if not exist "%ARTEMIS_GAME_ROOT%\artemis-server\server.js" (
   exit /b 1
 )
 
-(echo normal)> "%ARTEMIS_GAME_ROOT%\launchers\active-mode.txt"
+(echo cardplay-test)> "%ARTEMIS_GAME_ROOT%\launchers\active-mode.txt"
 
 echo.
 echo  Starting server window...
@@ -71,8 +71,9 @@ echo   Host IP: !ARTEMIS_LAN_IP!
 echo   ^(saved into LAPTOP 2 and LAPTOP 3 folders automatically^)
 echo.
 echo   Setup rig: appears on welcome blank after START ^(not on load^)
-echo   Login -^> welcome -^> first-card -^> deal -^> setup deploy -^> cardplay ...
-echo   Build cache: m255 ^(hard-refresh all laptops after code changes: Ctrl+Shift+R^)
+echo   CARDPLAY TEST MODE ^(auto^): all 3 connect -^> auto login -^> Round 4 cardplay
+echo   Guido is up first with a book ready — play it and check CARDS IN HAND after
+echo   Build cache: m305 ^(server join URLs bust cache automatically^)
 echo   Auto-diagnostics: logs\artemis-last-report.json
 echo   TURN PROBE: scripts\SERVER\START-PROBE.bat
 echo   CYCLE PROBE: scripts\SERVER\START-CYCLE-PROBE.bat

@@ -820,6 +820,7 @@
   function markHostGameStarted() {
     window.risqueArtemisFastBootGameStarted = true;
     hideRigPicker();
+    hideHostTestLauncher();
     renderRoster();
     if (typeof window.risqueSyncBoardCornerArtemisStart === "function") {
       window.risqueSyncBoardCornerArtemisStart();
@@ -839,17 +840,20 @@
     if (!isHost) return;
     if (window.risqueArtemisFastBootGameStarted) return;
     if (isPastArtemisLoginPhase()) return;
+    if (typeof window.risqueArtemisHostLauncherIsOpen === "function" && window.risqueArtemisHostLauncherIsOpen()) {
+      return;
+    }
     if (!hostCanBeginGame()) {
       hostStartFeedback("Waiting for all 3 players to sign in.");
       return;
     }
 
     function runHostStartGame() {
-      if (typeof window.risqueArtemisClearRigSetup === "function") {
-        window.risqueArtemisClearRigSetup();
-      }
       if (typeof window.risqueArtemisHideRigPicker === "function") {
         window.risqueArtemisHideRigPicker();
+      }
+      if (typeof window.risqueArtemisHideHostTestLauncher === "function") {
+        window.risqueArtemisHideHostTestLauncher();
       }
       markHostGameStarted();
       if (typeof window.risqueSyncBoardCornerArtemisStart === "function") {
@@ -896,6 +900,39 @@
             window.risqueArtemisLobbyHide();
           }
           hidePanel();
+          var useAutoSave = false;
+          var launchMode = "";
+          try {
+            launchMode = sessionStorage.getItem("risqueArtemisHostLaunchMode") || "";
+          } catch (eLm) {
+            launchMode = "";
+          }
+          if (launchMode === "mock") {
+            useAutoSave = true;
+          } else if (launchMode === "normal") {
+            useAutoSave = false;
+          } else {
+            try {
+              useAutoSave =
+                !!new URL(window.location.href).searchParams.get("artemisAutoSave") ||
+                (typeof window.risqueArtemisAutoSaveEnabled === "function" &&
+                  window.risqueArtemisAutoSaveEnabled());
+            } catch (eAutoQ) {
+              useAutoSave =
+                typeof window.risqueArtemisAutoSaveEnabled === "function" &&
+                window.risqueArtemisAutoSaveEnabled();
+            }
+          }
+          if (
+            useAutoSave &&
+            typeof window.risqueArtemisAutoSaveStartToCardplay === "function" &&
+            window.risqueArtemisAutoSaveStartToCardplay(gs)
+          ) {
+            if (typeof window.risqueArtemisSetupMilestone === "function") {
+              window.risqueArtemisSetupMilestone("AUTO-SAVE-skip-setup", "cards");
+            }
+            return;
+          }
           var usePreset = false;
           try {
             usePreset = !!new URL(window.location.href).searchParams.get("artemisPreset");
@@ -964,14 +1001,24 @@
       }
     }
 
-    if (typeof window.risqueArtemisBeatHostGateBeforeStart === "function") {
-      hostStartFeedback("Syncing all laptops before start…");
-      window.risqueArtemisBeatHostGateBeforeStart().then(function () {
-        runHostStartGame();
-      });
+    // Sync/start AFTER the host picks in the launcher — otherwise the beat gate
+    // goes stale while the menu is open and the roster commit bounces to sign-in.
+    function launchWithChoices() {
+      if (typeof window.risqueArtemisBeatHostGateBeforeStart === "function") {
+        hostStartFeedback("Syncing all laptops before start…");
+        window.risqueArtemisBeatHostGateBeforeStart().then(function () {
+          runHostStartGame();
+        });
+        return;
+      }
+      runHostStartGame();
+    }
+
+    if (typeof window.risqueArtemisShowHostTestLauncher === "function") {
+      window.risqueArtemisShowHostTestLauncher(launchWithChoices);
       return;
     }
-    runHostStartGame();
+    launchWithChoices();
   }
 
   window.risqueArtemisHostCanBeginGame = hostCanBeginGame;
@@ -987,8 +1034,6 @@
 
   window.risqueArtemisHostMapIdle = artemisHostMapIdle;
 
-  var rigPickerOverlay = null;
-  var rigPickContinueFn = null;
   var RIG_PICKER_LEAD_AFTER_START =
     "Pick who wins first-card, deploy-order, and cardplay roulettes. The game continues after you choose.";
   var RIG_PICKER_OPTIONS = [
@@ -997,6 +1042,296 @@
     { ui: 3, slot: 2, label: "Rigged — Mictor", hint: "Player 2 wins setup roulettes" },
     { ui: 4, slot: 3, label: "Rigged — Nooch", hint: "Player 3 wins setup roulettes" }
   ];
+
+  // Host test launcher — three exclusive modes:
+  //   "normal" → full setup, fair random roulettes (no rig)
+  //   "rigged" → full setup, roulettes rigged for a chosen player (rigSlot)
+  //   "mock"   → load cards.json mock cardplay, chosen player acts first (mockFirstSlot)
+  var hostLauncherOverlay = null;
+  var hostLauncherContinueFn = null;
+  var hostLauncherState = {
+    mode: null,
+    rigSlot: 1,
+    mockFirstSlot: 1
+  };
+
+  function slotPlayerLabel(slot) {
+    var key = String(slot);
+    var prof = profiles[key];
+    if (prof && prof.name) return String(prof.name).trim().toUpperCase();
+    return slot === 2 ? "MICTOR" : slot === 3 ? "NOOCH" : "GUIDO";
+  }
+
+  function resetHostLauncherState() {
+    hostLauncherState.mode = null;
+    hostLauncherState.rigSlot = 1;
+    hostLauncherState.mockFirstSlot = 1;
+  }
+
+  function refreshHostLauncherUi() {
+    if (!hostLauncherOverlay) return;
+    var mode = hostLauncherState.mode;
+
+    hostLauncherOverlay.querySelectorAll("[data-host-launch-mode]").forEach(function (btn) {
+      btn.classList.toggle(
+        "risque-artemis-host-launcher-mode--selected",
+        btn.getAttribute("data-host-launch-mode") === mode
+      );
+    });
+
+    var rigSection = hostLauncherOverlay.querySelector('[data-host-launch-panel="rigged"]');
+    var mockSection = hostLauncherOverlay.querySelector('[data-host-launch-panel="mock"]');
+    var normalNote = hostLauncherOverlay.querySelector('[data-host-launch-panel="normal"]');
+    if (rigSection) rigSection.hidden = mode !== "rigged";
+    if (mockSection) mockSection.hidden = mode !== "mock";
+    if (normalNote) normalNote.hidden = mode !== "normal";
+
+    hostLauncherOverlay.querySelectorAll("[data-host-launch-rig]").forEach(function (btn) {
+      var slot = Number(btn.getAttribute("data-host-launch-rig")) || 0;
+      btn.classList.toggle(
+        "risque-artemis-host-launcher-chip--selected",
+        mode === "rigged" && slot === hostLauncherState.rigSlot
+      );
+    });
+    hostLauncherOverlay.querySelectorAll("[data-host-launch-first]").forEach(function (btn) {
+      var slot = Number(btn.getAttribute("data-host-launch-first")) || 0;
+      btn.classList.toggle(
+        "risque-artemis-host-launcher-chip--selected",
+        mode === "mock" && slot === hostLauncherState.mockFirstSlot
+      );
+    });
+
+    var goBtn = hostLauncherOverlay.querySelector("#risque-artemis-host-launcher-go");
+    if (goBtn) {
+      var ready = mode === "normal" || mode === "rigged" || mode === "mock";
+      goBtn.disabled = !ready;
+      if (!mode) {
+        goBtn.textContent = "Choose a mode above";
+      } else if (mode === "normal") {
+        goBtn.textContent = "Launch — Normal play (random)";
+      } else if (mode === "rigged") {
+        goBtn.textContent = "Launch — Rigged for " + slotPlayerLabel(hostLauncherState.rigSlot);
+      } else {
+        goBtn.textContent = "Launch — Mock, " + slotPlayerLabel(hostLauncherState.mockFirstSlot) + " starts";
+      }
+    }
+  }
+
+  function buildLauncherPlayerRow(dataAttr, onPick) {
+    var row = document.createElement("div");
+    row.className = "risque-artemis-host-launcher-row";
+    [1, 2, 3].forEach(function (slot) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "risque-artemis-host-launcher-chip";
+      btn.setAttribute(dataAttr, String(slot));
+      btn.textContent = slotPlayerLabel(slot);
+      btn.addEventListener("click", function () {
+        onPick(slot);
+        refreshHostLauncherUi();
+      });
+      row.appendChild(btn);
+    });
+    return row;
+  }
+
+  function ensureHostLauncherOverlay() {
+    if (hostLauncherOverlay) return hostLauncherOverlay;
+    if (!document.body) return null;
+    hostLauncherOverlay = document.createElement("div");
+    hostLauncherOverlay.id = "risque-artemis-host-launcher";
+    hostLauncherOverlay.className = "risque-artemis-host-launcher";
+    hostLauncherOverlay.hidden = true;
+    hostLauncherOverlay.innerHTML =
+      '<div class="risque-artemis-host-launcher-card" role="dialog" aria-labelledby="risque-artemis-host-launcher-title">' +
+      '<h2 class="risque-artemis-rig-picker-title" id="risque-artemis-host-launcher-title">Start game — test menu</h2>' +
+      '<p class="risque-artemis-rig-picker-lead">Choose how to begin. Pick a mode, set its option, then launch.</p>' +
+      '<div class="risque-artemis-host-launcher-modes">' +
+      '<button type="button" class="risque-artemis-host-launcher-mode" data-host-launch-mode="normal">' +
+      '<span class="risque-artemis-host-launcher-mode-num">1</span>' +
+      '<span class="risque-artemis-host-launcher-mode-text"><span class="risque-artemis-host-launcher-mode-label">Normal play</span>' +
+      '<span class="risque-artemis-host-launcher-mode-hint">Full setup · fair random roulettes</span></span></button>' +
+      '<button type="button" class="risque-artemis-host-launcher-mode" data-host-launch-mode="rigged">' +
+      '<span class="risque-artemis-host-launcher-mode-num">2</span>' +
+      '<span class="risque-artemis-host-launcher-mode-text"><span class="risque-artemis-host-launcher-mode-label">Rigged</span>' +
+      '<span class="risque-artemis-host-launcher-mode-hint">Full setup · pick who wins selection</span></span></button>' +
+      '<button type="button" class="risque-artemis-host-launcher-mode" data-host-launch-mode="mock">' +
+      '<span class="risque-artemis-host-launcher-mode-num">3</span>' +
+      '<span class="risque-artemis-host-launcher-mode-text"><span class="risque-artemis-host-launcher-mode-label">Load mock game</span>' +
+      '<span class="risque-artemis-host-launcher-mode-hint">Round-4 cardplay · pick who starts</span></span></button>' +
+      "</div>" +
+      '<section class="risque-artemis-host-launcher-sub" data-host-launch-panel="normal" hidden>' +
+      '<p class="risque-artemis-host-launcher-hint">Fair random selection — nobody is rigged. Continues welcome → roulettes → deal.</p>' +
+      "</section>" +
+      '<section class="risque-artemis-host-launcher-sub" data-host-launch-panel="rigged" hidden>' +
+      '<h3 class="risque-artemis-host-launcher-heading">Rig selection for</h3>' +
+      '<p class="risque-artemis-host-launcher-hint">This player wins first-card, deploy-order, and cardplay roulettes.</p>' +
+      '<div data-host-launch-rig-row></div>' +
+      "</section>" +
+      '<section class="risque-artemis-host-launcher-sub" data-host-launch-panel="mock" hidden>' +
+      '<h3 class="risque-artemis-host-launcher-heading">Mock — who starts</h3>' +
+      '<p class="risque-artemis-host-launcher-hint">When mock cardplay loads, this player acts first.</p>' +
+      '<div data-host-launch-first-row></div>' +
+      "</section>" +
+      '<button type="button" class="risque-artemis-host-launcher-go" id="risque-artemis-host-launcher-go" disabled>Choose a mode above</button>' +
+      "</div>";
+    document.body.appendChild(hostLauncherOverlay);
+
+    var rigSlotContainer = hostLauncherOverlay.querySelector("[data-host-launch-rig-row]");
+    if (rigSlotContainer) {
+      rigSlotContainer.appendChild(
+        buildLauncherPlayerRow("data-host-launch-rig", function (slot) {
+          hostLauncherState.rigSlot = slot;
+        })
+      );
+    }
+    var firstContainer = hostLauncherOverlay.querySelector("[data-host-launch-first-row]");
+    if (firstContainer) {
+      firstContainer.appendChild(
+        buildLauncherPlayerRow("data-host-launch-first", function (slot) {
+          hostLauncherState.mockFirstSlot = slot;
+        })
+      );
+    }
+
+    hostLauncherOverlay.querySelectorAll("[data-host-launch-mode]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        hostLauncherState.mode = btn.getAttribute("data-host-launch-mode");
+        refreshHostLauncherUi();
+      });
+    });
+
+    var goBtn = hostLauncherOverlay.querySelector("#risque-artemis-host-launcher-go");
+    if (goBtn) {
+      goBtn.addEventListener("click", function () {
+        commitHostLauncherChoices();
+      });
+    }
+
+    resetHostLauncherState();
+    refreshHostLauncherUi();
+    return hostLauncherOverlay;
+  }
+
+  function commitHostLauncherChoices() {
+    var mode = hostLauncherState.mode;
+    if (mode !== "normal" && mode !== "rigged" && mode !== "mock") return;
+
+    if (typeof window.risqueArtemisClearRigSetup === "function") {
+      window.risqueArtemisClearRigSetup();
+    }
+
+    // launchMode drives onLoginSuccess: "mock" auto-loads cards.json; "normal" runs full setup.
+    var launchMode = mode === "mock" ? "mock" : "normal";
+    var mockSlot = Number(hostLauncherState.mockFirstSlot) || 1;
+    if (mockSlot < 1 || mockSlot > 3) mockSlot = 1;
+    var rigSlot = Number(hostLauncherState.rigSlot) || 1;
+    if (rigSlot < 1 || rigSlot > 3) rigSlot = 1;
+
+    if (typeof window.risqueArtemisApplyRigSetup === "function") {
+      if (mode === "rigged") {
+        window.risqueArtemisApplyRigSetup({ slot: rigSlot });
+      } else {
+        // Normal + mock: fair random (locked so setup won't re-prompt the rig picker).
+        window.risqueArtemisApplyRigSetup({ random: true });
+      }
+    }
+
+    if (mode === "mock") {
+      window.risqueArtemisAutoSave = "cards";
+    } else {
+      try {
+        delete window.risqueArtemisAutoSave;
+      } catch (eDelAuto) {
+        window.risqueArtemisAutoSave = "";
+      }
+    }
+    window.risqueArtemisMockFirstSlot = mockSlot;
+
+    try {
+      sessionStorage.setItem("risqueArtemisHostLaunchMode", launchMode);
+      sessionStorage.setItem("risqueArtemisMockFirstSlot", String(mockSlot));
+    } catch (eSs) {
+      /* ignore */
+    }
+
+    if (window.gameState && typeof window.risqueArtemisCaptureRigIntoGameState === "function") {
+      window.risqueArtemisCaptureRigIntoGameState(window.gameState);
+      try {
+        localStorage.setItem("gameState", JSON.stringify(window.gameState));
+      } catch (eGs) {
+        /* ignore */
+      }
+    }
+
+    // Capture the continuation BEFORE hiding — hideHostTestLauncher() nulls
+    // hostLauncherContinueFn, so reading it after would drop runHostStartGame
+    // and leave the host stuck on login (the "Launch does nothing" bug).
+    var cont = hostLauncherContinueFn;
+    hostLauncherContinueFn = null;
+    hideHostTestLauncher();
+    var summary =
+      mode === "mock"
+        ? "Mock — " + slotPlayerLabel(mockSlot) + " starts"
+        : mode === "rigged"
+        ? "Rigged for " + slotPlayerLabel(rigSlot)
+        : "Normal play (random)";
+    if (typeof window.risqueSetBoardCornerMsg === "function") {
+      window.risqueSetBoardCornerMsg(summary);
+    }
+    if (typeof cont === "function") {
+      setTimeout(function () {
+        try {
+          cont();
+        } catch (eCont) {
+          try {
+            console.error("[ARTEMIS host-launcher] continue failed:", eCont);
+          } catch (eLog) {
+            /* ignore */
+          }
+        }
+      }, 0);
+    }
+  }
+
+  function hideHostTestLauncher() {
+    if (hostLauncherOverlay) hostLauncherOverlay.hidden = true;
+    document.documentElement.classList.remove("risque-artemis-host-launcher-active");
+    hostLauncherContinueFn = null;
+  }
+
+  function hostLauncherIsOpen() {
+    return !!(hostLauncherOverlay && !hostLauncherOverlay.hidden);
+  }
+
+  window.risqueArtemisShowHostTestLauncher = function (continueFn) {
+    if (!isHost) {
+      if (typeof continueFn === "function") continueFn();
+      return;
+    }
+    hostLauncherContinueFn = continueFn;
+    if (!ensureHostLauncherOverlay()) {
+      hostLauncherContinueFn = null;
+      if (typeof continueFn === "function") continueFn();
+      return;
+    }
+    resetHostLauncherState();
+    hostLauncherOverlay.querySelectorAll("[data-host-launch-rig], [data-host-launch-first]").forEach(function (btn) {
+      var slot =
+        Number(btn.getAttribute("data-host-launch-rig") || btn.getAttribute("data-host-launch-first")) || 0;
+      if (slot) btn.textContent = slotPlayerLabel(slot);
+    });
+    refreshHostLauncherUi();
+    hostLauncherOverlay.hidden = false;
+    document.documentElement.classList.add("risque-artemis-host-launcher-active");
+    hostStartFeedback("");
+  };
+
+  window.risqueArtemisHideHostTestLauncher = hideHostTestLauncher;
+  window.risqueArtemisHostLauncherIsOpen = hostLauncherIsOpen;
+
+  var rigPickerOverlay = null;
+  var rigPickContinueFn = null;
 
   function ensureRigPickerOverlay() {
     if (rigPickerOverlay) return rigPickerOverlay;

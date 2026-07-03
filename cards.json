@@ -1,0 +1,436 @@
+{
+  "phase": "cardplay",
+  "attackPhase": "attack",
+  "selectionPhase": "firstCard",
+  "players": [
+    {
+      "name": "GUIDO",
+      "color": "red",
+      "playerOrder": 1,
+      "bookValue": 0,
+      "continentValues": {},
+      "bankValue": 0,
+      "cardCount": 3,
+      "cards": [
+        {
+          "name": "central_america",
+          "id": "44cfe8e2-8c15-4213-aadf-f10e0c811fd2"
+        },
+        {
+          "name": "east_africa",
+          "id": "93b7a986-46b4-467b-8b96-97214425c228"
+        },
+        {
+          "name": "great_britain",
+          "id": "cb3b2d14-8b8a-4414-9ae1-06cf5a6d12bd"
+        }
+      ],
+      "territories": [
+        {
+          "name": "alaska",
+          "troops": 3
+        },
+        {
+          "name": "alberta",
+          "troops": 3
+        },
+        {
+          "name": "central_america",
+          "troops": 3
+        },
+        {
+          "name": "eastern_united_states",
+          "troops": 3
+        },
+        {
+          "name": "greenland",
+          "troops": 3
+        },
+        {
+          "name": "northwest_territory",
+          "troops": 3
+        },
+        {
+          "name": "ontario",
+          "troops": 3
+        },
+        {
+          "name": "quebec",
+          "troops": 3
+        },
+        {
+          "name": "western_united_states",
+          "troops": 3
+        },
+        {
+          "name": "eastern_australia",
+          "troops": 3
+        },
+        {
+          "name": "indonesia",
+          "troops": 3
+        },
+        {
+          "name": "new_guinea",
+          "troops": 3
+        },
+        {
+          "name": "western_australia",
+          "troops": 3
+        }
+      ],
+      "troopsTotal": 39,
+      "confirmed": true
+    },
+    {
+      "name": "MICTOR",
+      "color": "blue",
+      "playerOrder": 2,
+      "bookValue": 0,
+      "continentValues": {},
+      "bankValue": 0,
+      "cardCount": 3,
+      "cards": [
+        {
+          "name": "afghanistan",
+          "id": "132bcd32-1de7-4667-9fba-ebc83808ba25"
+        },
+        {
+          "name": "argentina",
+          "id": "1e27dd96-b4a4-417d-9d78-b1ca67adaa82"
+        },
+        {
+          "name": "brazil",
+          "id": "7fb64cd6-b450-4edb-a55e-589ef86df322"
+        }
+      ],
+      "territories": [
+        {
+          "name": "afghanistan",
+          "troops": 3
+        },
+        {
+          "name": "china",
+          "troops": 3
+        },
+        {
+          "name": "india",
+          "troops": 3
+        },
+        {
+          "name": "irkutsk",
+          "troops": 3
+        },
+        {
+          "name": "japan",
+          "troops": 3
+        },
+        {
+          "name": "kamchatka",
+          "troops": 3
+        },
+        {
+          "name": "middle_east",
+          "troops": 3
+        },
+        {
+          "name": "mongolia",
+          "troops": 3
+        },
+        {
+          "name": "siam",
+          "troops": 3
+        },
+        {
+          "name": "siberia",
+          "troops": 3
+        },
+        {
+          "name": "ural",
+          "troops": 3
+        },
+        {
+          "name": "yakutsk",
+          "troops": 3
+        },
+        {
+          "name": "argentina",
+          "troops": 3
+        },
+        {
+          "name": "brazil",
+          "troops": 3
+        }
+      ],
+      "troopsTotal": 42,
+      "confirmed": true
+    },
+    {
+      "name": "NOOCH",
+      "color": "green",
+      "playerOrder": 3,
+      "bookValue": 0,
+      "continentValues": {},
+      "bankValue": 0,
+      "cardCount": 3,
+      "cards": [
+        {
+          "name": "north_africa",
+          "id": "ba79fa07-af6e-4ae7-a293-e8c1258a0eb1"
+        },
+        {
+          "name": "scandinavia",
+          "id": "ba4f80f4-1d64-4069-b28b-d3617c3cd146"
+        },
+        {
+          "name": "siberia",
+          "id": "edcaa514-cabc-4cd4-ba0d-6fab092f9f14"
+        }
+      ],
+      "territories": [
+        {
+          "name": "congo",
+          "troops": 3
+        },
+        {
+          "name": "east_africa",
+          "troops": 3
+        },
+        {
+          "name": "egypt",
+          "troops": 3
+        },
+        {
+          "name": "madagascar",
+          "troops": 3
+        },
+        {
+          "name": "north_africa",
+          "troops": 3
+        },
+        {
+          "name": "south_africa",
+          "troops": 3
+        },
+        {
+          "name": "great_britain",
+          "troops": 3
+        },
+        {
+          "name": "iceland",
+          "troops": 3
+        },
+        {
+          "name": "northern_europe",
+          "troops": 3
+        },
+        {
+          "name": "scandinavia",
+          "troops": 3
+        },
+        {
+          "name": "southern_europe",
+          "troops": 3
+        },
+        {
+          "name": "ukraine",
+          "troops": 3
+        },
+        {
+          "name": "western_europe",
+          "troops": 3
+        },
+        {
+          "name": "peru",
+          "troops": 3
+        },
+        {
+          "name": "venezuela",
+          "troops": 3
+        }
+      ],
+      "troopsTotal": 45,
+      "confirmed": true
+    }
+  ],
+  "turnOrder": [
+    "GUIDO",
+    "MICTOR",
+    "NOOCH"
+  ],
+  "currentPlayer": "GUIDO",
+  "round": 4,
+  "setupComplete": true,
+  "aerialAttack": false,
+  "aerialAttackEligible": false,
+  "aerialBridge": null,
+  "conquered": false,
+  "conqueredThisTurn": false,
+  "cardplayConquered": false,
+  "cardEarnedViaAttack": false,
+  "cardEarnedViaCardplay": false,
+  "cardAwardedThisTurn": false,
+  "bookPlayedThisTurn": false,
+  "bookValue": 0,
+  "lastCardDrawn": null,
+  "defeatedPlayer": null,
+  "winner": null,
+  "attackingTerritory": null,
+  "acquiredTerritory": null,
+  "minTroopsToTransfer": 0,
+  "transferredCardCount": 0,
+  "pendingNewContinents": [],
+  "isInitialDeploy": false,
+  "deck": [
+    "alaska",
+    "alberta",
+    "china",
+    "congo",
+    "eastern_australia",
+    "eastern_united_states",
+    "egypt",
+    "greenland",
+    "iceland",
+    "india",
+    "indonesia",
+    "irkutsk",
+    "japan",
+    "kamchatka",
+    "madagascar",
+    "middle_east",
+    "mongolia",
+    "new_guinea",
+    "northern_europe",
+    "northwest_territory",
+    "ontario",
+    "peru",
+    "quebec",
+    "siam",
+    "south_africa",
+    "southern_europe",
+    "ukraine",
+    "ural",
+    "venezuela",
+    "western_australia",
+    "western_europe",
+    "western_united_states",
+    "yakutsk",
+    "wildcard1",
+    "wildcard2"
+  ],
+  "discardPile": [],
+  "continents": {
+    "south_america": {
+      "territories": [
+        "argentina",
+        "brazil",
+        "peru",
+        "venezuela"
+      ],
+      "bonus": 2
+    },
+    "north_america": {
+      "territories": [
+        "alaska",
+        "alberta",
+        "central_america",
+        "eastern_united_states",
+        "greenland",
+        "northwest_territory",
+        "ontario",
+        "quebec",
+        "western_united_states"
+      ],
+      "bonus": 5
+    },
+    "africa": {
+      "territories": [
+        "congo",
+        "east_africa",
+        "egypt",
+        "madagascar",
+        "north_africa",
+        "south_africa"
+      ],
+      "bonus": 3
+    },
+    "europe": {
+      "territories": [
+        "great_britain",
+        "iceland",
+        "northern_europe",
+        "scandinavia",
+        "southern_europe",
+        "ukraine",
+        "western_europe"
+      ],
+      "bonus": 5
+    },
+    "asia": {
+      "territories": [
+        "afghanistan",
+        "china",
+        "india",
+        "irkutsk",
+        "japan",
+        "kamchatka",
+        "middle_east",
+        "mongolia",
+        "siam",
+        "siberia",
+        "ural",
+        "yakutsk"
+      ],
+      "bonus": 7
+    },
+    "australia": {
+      "territories": [
+        "eastern_australia",
+        "indonesia",
+        "new_guinea",
+        "western_australia"
+      ],
+      "bonus": 2
+    }
+  },
+  "continentsSnapshot": {},
+  "continentCollectionCounts": {
+    "south_america": 0,
+    "north_america": 0,
+    "africa": 0,
+    "europe": 0,
+    "asia": 0,
+    "australia": 0
+  },
+  "risquePlayedCardsGallery": [],
+  "risqueLuckyLedger": {
+    "byPlayer": {
+      "GUIDO": {
+        "dice": 0,
+        "sixes": 0,
+        "roundWins": 0,
+        "roundLosses": 0,
+        "roundTies": 0
+      },
+      "MICTOR": {
+        "dice": 0,
+        "sixes": 0,
+        "roundWins": 0,
+        "roundLosses": 0,
+        "roundTies": 0
+      },
+      "NOOCH": {
+        "dice": 0,
+        "sixes": 0,
+        "roundWins": 0,
+        "roundLosses": 0,
+        "roundTies": 0
+      }
+    }
+  },
+  "risqueLuckySessionRoster": [
+    "GUIDO",
+    "MICTOR",
+    "NOOCH"
+  ]
+}

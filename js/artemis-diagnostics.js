@@ -233,6 +233,65 @@
   var lastCardplaySnapshotKey = "";
   var lastCardplaySnapshotAt = 0;
 
+  /**
+   * m317 — Ground-truth probe for the active player's cardplay recap shelf. Every prior fix (m312-m316)
+   * edited CSS on the assumption that Mictor's animation windows are the `--host-cardplay-recap` shelf
+   * panes, but the changes had no visible effect even though the build IS loaded. This reports the REAL
+   * rendered box sizes + class names + which element carries a constraining computed height/min/max so we
+   * can see exactly which node is deciding the pane height (instead of guessing at the cascade).
+   */
+  function measureRecapShelfLayout() {
+    try {
+      function box(el, extraProps) {
+        if (!el) return null;
+        var cs = window.getComputedStyle(el);
+        var rect = el.getBoundingClientRect();
+        var out = {
+          h: Math.round(rect.height),
+          w: Math.round(rect.width),
+          minH: cs.minHeight,
+          maxH: cs.maxHeight,
+          height: cs.height,
+          flex: cs.flexGrow + " " + cs.flexShrink + " " + cs.flexBasis,
+          disp: cs.display,
+          pad: cs.padding,
+        };
+        if (extraProps) {
+          out.top = cs.top;
+          out.bottom = cs.bottom;
+          out.pos = cs.position;
+        }
+        return out;
+      }
+      var root = document.getElementById("runtime-hud-root");
+      if (!root) return { note: "no runtime-hud-root" };
+      var overlay = document.getElementById("risque-public-cardplay-recap-overlay");
+      if (!overlay) return { note: "no recap overlay (not in cardplay recap)" };
+      var shelf = overlay.querySelector(".risque-public-cardplay-recap-panel--shelf");
+      var upper = overlay.querySelector(".risque-public-cp-shelf-upper");
+      var lower = overlay.querySelector(".risque-public-cp-shelf-lower");
+      var card = overlay.querySelector(".risque-public-cp-shelf-card");
+      var procImg =
+        overlay.querySelector(".risque-public-cp-shelf-upper .risque-public-book-voice-card-img") ||
+        overlay.querySelector(".risque-public-cp-shelf-upper .risque-public-cardplay-recap-card-img");
+      return {
+        htmlClass: document.documentElement.className,
+        rootClass: root.className,
+        viewportH: window.innerHeight,
+        root: box(root, true),
+        mainPanel: box(document.getElementById("hud-main-panel")),
+        overlay: box(overlay),
+        shelf: box(shelf),
+        upper: box(upper),
+        lower: box(lower),
+        card: card ? box(card) : null,
+        procImg: procImg ? box(procImg) : null,
+      };
+    } catch (e) {
+      return { err: String(e) };
+    }
+  }
+
   function cardplayClientSnapshot() {
     if (!window.risqueArtemisMode || window.risqueArtemisHost) return;
     var gs = window.gameState;
@@ -263,6 +322,7 @@
       controlSlot: gs.artemisControlSlot,
       togglesOk: !!document.getElementById("risque-private-stats-toggle"),
       voiceOk: !!document.getElementById("control-voice"),
+      recapLayout: measureRecapShelfLayout(),
     };
     var snapKey = JSON.stringify(snap);
     var now = Date.now();
@@ -277,6 +337,25 @@
   }
 
   setInterval(cardplayClientSnapshot, 8000);
+
+  /* m317 — fast recap-shelf layout probe: the recap overlay is only on screen for a few seconds during
+   * the book animation, so the 8s snapshot can miss it. Fire every 1.2s while the overlay exists, sending
+   * only when the measured layout changes (and only for non-host clients — the active player we care about). */
+  var lastRecapLayoutKey = "";
+  function recapLayoutProbe() {
+    if (!window.risqueArtemisMode || window.risqueArtemisHost) return;
+    if (!document.getElementById("risque-public-cardplay-recap-overlay")) return;
+    var layout = measureRecapShelfLayout();
+    var key = JSON.stringify(layout);
+    if (key === lastRecapLayoutKey) return;
+    lastRecapLayoutKey = key;
+    sendDiag({
+      kind: "cardplay_recap_layout",
+      summary: "P" + slotLabel() + " recap shelf layout probe",
+      detail: layout,
+    });
+  }
+  setInterval(recapLayoutProbe, 1200);
 
   function receiveCardHandNames(gs) {
     if (!gs || !gs.players || !gs.currentPlayer) return [];

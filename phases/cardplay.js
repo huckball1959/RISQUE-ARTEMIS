@@ -20,6 +20,79 @@
       : "game.html?phase=login&loginLegacyNext=game.html%3Fphase%3DplayerSelect%26selectKind%3DfirstCard&loginLoadRedirect=game.html%3Fphase%3Dcardplay%26legacyNext%3Dincome.html";
   }
 
+  /**
+   * Central "can't mount cardplay — go back to login" handler.
+   * In ARTEMIS mock/auto-save test mode we DON'T bounce to sign-in (that produced the
+   * confusing "loop back to sign in" during launcher testing). Instead we surface the
+   * exact reason + a gameState summary on-screen and in the console, and stop — so the
+   * tester can see why the mock failed instead of ping-ponging to the login page.
+   */
+  function cardplayRecoveryRedirect(reason) {
+    var gs = window.gameState;
+    var summary = {
+      reason: reason,
+      hasGs: !!gs,
+      phase: gs && gs.phase,
+      currentPlayer: gs && gs.currentPlayer,
+      playerNames:
+        gs && Array.isArray(gs.players)
+          ? gs.players.map(function (p) {
+              return p && p.name;
+            })
+          : null,
+      turnOrder: gs && gs.turnOrder,
+      artemisMock: !!window.risqueArtemisAutoSave,
+      host: !!window.risqueArtemisHost,
+      isPublic: !!window.risqueDisplayIsPublic
+    };
+    try {
+      console.error("[ARTEMIS cardplay recovery] " + reason, summary);
+    } catch (eLogRec) {
+      /* ignore */
+    }
+    logToStorage("Cardplay recovery: " + reason, summary);
+    if (typeof window.risqueArtemisDiag === "function") {
+      try {
+        window.risqueArtemisDiag("cardplay-recovery", reason, summary);
+      } catch (eDiagRec) {
+        /* ignore */
+      }
+    }
+
+    var mockMode = !!window.risqueArtemisAutoSave;
+    if (mockMode) {
+      var msg =
+        "MOCK CARDPLAY COULD NOT MOUNT — " +
+        reason +
+        " | currentPlayer=" +
+        (summary.currentPlayer || "?") +
+        " | players=" +
+        (summary.playerNames ? summary.playerNames.join(",") : "?") +
+        " | turnOrder=" +
+        (Array.isArray(summary.turnOrder) ? summary.turnOrder.join(",") : "?");
+      if (typeof window.risqueArtemisSetTopStatus === "function") {
+        window.risqueArtemisSetTopStatus(msg, "err");
+      }
+      try {
+        if (window.gameUtils && typeof window.gameUtils.showError === "function") {
+          window.gameUtils.showError(msg);
+        }
+      } catch (eShowRec) {
+        /* ignore */
+      }
+      return; // do NOT redirect — avoid the sign-in loop while testing the mock
+    }
+
+    if (window.gameUtils && typeof window.gameUtils.showError === "function") {
+      window.gameUtils.showError("Cannot continue: " + reason + ". Redirecting to risque.");
+    }
+    setTimeout(function () {
+      var u = loginRecoveryUrl();
+      if (window.risqueNavigateWithFade) window.risqueNavigateWithFade(u);
+      else window.location.href = u;
+    }, 2000);
+  }
+
   function injectStyles() {
     if (document.getElementById(STYLE_ID)) return;
     var s = document.createElement("style");
@@ -987,6 +1060,22 @@
         }
       }
       if (typeof window.risqueArtemisDiag === "function") {
+        var recapCurNm = String(gs.currentPlayer || "")
+          .trim()
+          .toLowerCase();
+        var recapCurP = (gs.players || []).find(function (p) {
+          return (
+            p &&
+            String(p.name || "")
+              .trim()
+              .toLowerCase() === recapCurNm
+          );
+        });
+        var recapHandCount = recapCurP
+          ? Array.isArray(recapCurP.cards)
+            ? recapCurP.cards.length
+            : Number(recapCurP.cardCount) || 0
+          : -1;
         window.risqueArtemisDiag(
           "cardplay_host_recap_push",
           "P" + (window.risqueArtemisPlayerSlot || "?") + " cardplay recap → host",
@@ -994,7 +1083,9 @@
             phase: gs.phase,
             pushed: pushed,
             currentPlayer: gs.currentPlayer,
-            recapSeq: gs.risquePublicCardplayRecapAckRequiredSeq
+            recapSeq: gs.risquePublicCardplayRecapAckRequiredSeq,
+            handCount: recapHandCount,
+            bookPlayedThisTurn: !!gs.bookPlayedThisTurn
           }
         );
       }
@@ -1679,12 +1770,7 @@
       }
       const gameState = window.gameState;
       if (!gameState || !gameState.players || !gameState.currentPlayer) {
-        logToStorage('Invalid game state');
-        window.gameUtils.showError("Invalid game state. Redirecting to risque.");
-        setTimeout(() => {
-          var u = loginRecoveryUrl();
-          if (window.risqueNavigateWithFade) window.risqueNavigateWithFade(u); else window.location.href = u;
-        }, 2000);
+        cardplayRecoveryRedirect("invalid game state (missing players or currentPlayer)");
         return;
       }
       normalizeAllPlayerCards(gameState);
@@ -1704,12 +1790,7 @@
       }
       const currentPlayer = gameState.players.find(p => p.name === gameState.currentPlayer);
       if (!currentPlayer) {
-        logToStorage('Current player not found');
-        window.gameUtils.showError("Current player not found. Redirecting to risque.");
-        setTimeout(() => {
-          var u = loginRecoveryUrl();
-          if (window.risqueNavigateWithFade) window.risqueNavigateWithFade(u); else window.location.href = u;
-        }, 2000);
+        cardplayRecoveryRedirect("current player \"" + gameState.currentPlayer + "\" not found in players list");
         return;
       }
       if (window.risqueDisplayIsPublic) {
@@ -2665,6 +2746,25 @@
       window.gameState.bookPlayedThisTurn = true;
       currentPlayer.bookValue = (currentPlayer.bookValue || 0) + 1;
       localStorage.setItem('gameState', JSON.stringify(window.gameState));
+      if (typeof window.risqueArtemisDiag === "function") {
+        try {
+          window.risqueArtemisDiag(
+            "cardplay_book_removed",
+            "Book removed " + (originalCardCount - currentPlayer.cards.length) + " cards from " + currentPlayer.name,
+            {
+              player: currentPlayer.name,
+              before: originalCardCount,
+              after: currentPlayer.cards.length,
+              discardSize: Array.isArray(window.gameState.discardPile)
+                ? window.gameState.discardPile.length
+                : -1,
+              bookPlayedThisTurn: !!window.gameState.bookPlayedThisTurn
+            }
+          );
+        } catch (eBookRemovedDiag) {
+          /* ignore */
+        }
+      }
       logToStorage("Book selected, processing effects", {
         cards: cardNames,
         cardCount: currentPlayer.cardCount,
@@ -4489,12 +4589,7 @@
     }
     var gs = window.gameState;
     if (!gs || !gs.players || !gs.currentPlayer || !gs.turnOrder || !Array.isArray(gs.turnOrder) || gs.turnOrder.length === 0) {
-      logToStorage('Invalid or missing game state at mount');
-      if (window.gameUtils.showError) window.gameUtils.showError('Invalid game state.');
-      setTimeout(function () {
-        var u = loginRecoveryUrl();
-        if (window.risqueNavigateWithFade) window.risqueNavigateWithFade(u); else window.location.href = u;
-      }, 2000);
+      cardplayRecoveryRedirect("invalid/missing game state at mount (need players, currentPlayer, non-empty turnOrder)");
       return;
     }
     gs.phase = 'cardplay';

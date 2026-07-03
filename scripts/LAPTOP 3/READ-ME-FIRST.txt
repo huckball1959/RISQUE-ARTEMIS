@@ -1,29 +1,35 @@
 ARTEMIS — LAPTOP 3 (NOOCH)
 ============================
 
-COPY THIS ENTIRE FOLDER to Nooch's laptop desktop.
+COPY THIS ENTIRE FOLDER to Nooch's laptop desktop (overwrite the old one).
 
 Files in this folder:
   JOIN.bat                    <- double-click this every game night
-  ARTEMIS-JOIN.bat            <- same launcher (JOIN.bat calls this)
+  ARTEMIS-JOIN.bat            <- real launcher (JOIN.bat calls this);
+                                 the host IP is baked in near the top
   _artemis-launch-browser.bat <- helper (do not delete)
-  artemis-host-ip.txt         <- host IP (updated when Guido runs START)
-  artemis-seat.txt            <- already set to Player 3 (do not change)
+  artemis-host-ip.txt         <- reference copy of the host IP (auto-synced)
+  artemis-seat.txt            <- reference copy of the seat (Player 3)
 
-HOST DEV FOLDER (Guido only — not copied to this laptop)
-  C:\Users\huckb\OneDrive\Documents\GitHub\RISQUE-ARTEMIS\scripts\SERVER\START-ARTEMIS.bat
+CURRENT HOST IP: 192.168.68.56
+  (Set after switching to the TP-Link Deco mesh, July 2026.)
 
 SETUP
   1. Guido runs START-ARTEMIS.bat on the host PC first
   2. Copy this folder to Nooch's desktop (overwrite old folder if asked)
   3. Nooch double-clicks JOIN.bat
 
-NO OTHER FILES NEEDED. Do not copy LAPTOP 2 folder to this laptop.
+IF THE HOST IP CHANGES AGAIN (new router, or "site can't be reached"):
+  1. On the host PC, run ipconfig and read the IPv4 Address
+  2. Open ARTEMIS-JOIN.bat and edit the ONE line:  set "HOST_IP=..."
+  3. Re-copy this whole folder to Nooch's laptop
+  (Editing artemis-host-ip.txt alone is NOT enough anymore — the batch
+   is now the source of truth and rewrites that text file on each run.)
 
-The host traffic cop sends this laptop to whatever test is active
-(normal game, cycle probe, etc.). You never edit URL params here.
+ALL 3 LAPTOPS MUST BE ON THE SAME WI-FI / SUBNET
+  Every laptop's IPv4 should start with the same first three numbers as
+  the host (currently 192.168.68.___). Check with ipconfig if unsure.
+
+NO OTHER FILES NEEDED. Do not copy the LAPTOP 2 folder to this laptop.
 
 FULLSCREEN: Ctrl+Shift+F toggle   Esc exit
-
-If host IP changed: artemis-host-ip.txt is refreshed when Guido
-runs START and re-copies this folder, or edit the IP in that file.

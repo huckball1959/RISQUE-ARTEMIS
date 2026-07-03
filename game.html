@@ -17,8 +17,8 @@
       } catch (e) { /* ignore */ }
     })();
   </script>
-  <meta name="risque-artemis-build" content="m294-dev-reload-shortcut" />
-  <title>RISQUE Runtime · ARTEMIS m294</title>
+  <meta name="risque-artemis-build" content="m317-recap-layout-probe" />
+  <title>RISQUE Runtime · ARTEMIS m317</title>
   <script>
     (function () {
       window.risqueArtemisFastBoot = true;
@@ -38,6 +38,10 @@
         var presetParam = new URL(window.location.href).searchParams.get("artemisPreset");
         if (presetParam) {
           window.risqueArtemisPresetMode = presetParam;
+        }
+        var autoSaveParam = new URL(window.location.href).searchParams.get("artemisAutoSave");
+        if (autoSaveParam) {
+          window.risqueArtemisAutoSave = autoSaveParam;
         }
       } catch (ePreset) {
         /* ignore */
@@ -84,13 +88,13 @@
       }
     })();
   </script>
-  <script src="js/artemis-net.js?v=artemis-m291-attack-capture-mirror-2026-06-25"></script>
+  <script src="js/artemis-net.js?v=artemis-m299-cardplay-auto-save-boot-2026-06-28"></script>
   <script src="js/artemis-sync-gate.js?v=artemis-m248-hide-sync-badges-2026-06-10"></script>
   <script src="js/artemis-beat-sync.js?v=artemis-m248-hide-sync-badges-2026-06-10"></script>
-  <script src="js/artemis-diagnostics.js?v=artemis-m213-cardplay-order-probe-2026-06-07"></script>
+  <script src="js/artemis-diagnostics.js?v=artemis-m317-recap-layout-probe-2026-07-03"></script>
   <script src="js/artemis-control-bus.js?v=artemis-m58-deploy-finish-bus-2026-06-07"></script>
   <script src="js/artemis-lobby.js?v=artemis-m142-autologin-cardplay-ui-2026-06-09"></script>
-  <script src="js/artemis-login.js?v=artemis-m270-phase-cv-cleanup-2026-06-10"></script>
+  <script src="js/artemis-login.js?v=artemis-m310-launch-continuation-fix-2026-07-03"></script>
   <script src="js/artemis-play.js?v=artemis-m287-host-p2-deploy-fix-2026-06-10"></script>
   <script src="js/artemis-turn-deploy-panel.js?v=artemis-m266-host-turn-deploy-badges-2026-06-10"></script>
   <script src="js/artemis-cardplay-panel.js?v=artemis-m283-spectator-mirror-fixes-2026-06-10"></script>
@@ -100,10 +104,11 @@
   <script src="js/artemis-attack-panel.js?v=artemis-m285-attack-chrome-restore-2026-06-10"></script>
   <script src="js/artemis-deploy-panel.js?v=artemis-m266-host-turn-deploy-badges-2026-06-10"></script>
   <script src="js/artemis-setup-milestones.js?v=artemis-m180-deploy-order-mirror-fix-2026-06-07"></script>
-  <script src="js/artemis-setup-flow.js?v=artemis-m270-phase-cv-cleanup-2026-06-10"></script>
+  <script src="js/artemis-setup-flow.js?v=artemis-m306-skip-rig-if-locked-2026-07-02"></script>
   <script src="js/artemis-fast.js?v=artemis-m50-sequential-setup-2026-06-07"></script>
   <script src="js/artemis-mock-phases.js?v=artemis-m179-unrig-dev-defaults-2026-06-07"></script>
-  <script src="js/artemis-preset.js?v=artemis-m181-deploy-handoff-cardplay-fix-2026-06-07"></script>
+  <script src="js/artemis-preset.js?v=artemis-m299-cardplay-auto-save-boot-2026-06-28"></script>
+  <script src="js/artemis-auto-save.js?v=artemis-m309-mock-nav-diagnostics-2026-07-03"></script>
   <script>
     (function () {
       try {
@@ -238,7 +243,7 @@
       pointer-events: none !important;
     }
   </style>
-  <link rel="stylesheet" href="game.css?v=artemis-m293-deploy-font-receivecard-campaign-final-transfer-2026-06-27" />
+  <link rel="stylesheet" href="game.css?v=artemis-m317-recap-layout-probe-2026-07-03" />
   <script>
     (function () {
       try {
@@ -673,7 +678,7 @@
   <script src="phases/attack.js?v=artemis-m293-campaign-final-manual-transfer-2026-06-27"></script>
   <script src="phases/runtime-hud.js?v=artemis-m278-income-host-dice-2026-06-10"></script>
   <script src="js/post-cardplay-navigator.js?v=con-income-requires-chain-2026-05-16"></script>
-  <script src="phases/cardplay.js?v=artemis-m288-client-cardplay-recap-push-2026-06-10"></script>
+  <script src="phases/cardplay.js?v=artemis-m309-mock-nav-diagnostics-2026-07-03"></script>
   <script src="phases/income.js?v=artemis-m224-round1-turn-deploy-2026-06-10"></script>
   <script src="phases/reinforce.js?v=artemis-m283-spectator-mirror-fixes-2026-06-10"></script>
   <script src="phases/receivecard.js?v=artemis-m293-receivecard-cv-count-on-flyup-2026-06-27"></script>
@@ -685,7 +690,7 @@
   <script src="js/replay-machine.js?v=battle-outcome-stills-kind-2026-05-18"></script>
   <script src="phases/login.js?v=artemis-m220-rig-after-start-2026-06-10"></script>
   <script src="js/artemis-cycle-probe.js?v=artemis-cycle2-player-first-2026-06-09"></script>
-  <script src="js/game-shell.js?v=artemis-m294-dev-reload-shortcut-2026-06-27"></script>
+  <script src="js/game-shell.js?v=artemis-m299-cardplay-auto-save-boot-2026-06-28"></script>
 </body>
 </html>
 
