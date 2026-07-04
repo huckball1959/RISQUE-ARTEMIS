@@ -338,6 +338,95 @@
     return INCOME_DEPLOY_NEXT;
   }
 
+  function incomeBreakdownBookMatches(gs, bd) {
+    if (!bd || !gs) return true;
+    var curNm = normName(gs.currentPlayer);
+    var p = (gs.players || []).find(function (pl) {
+      return normName(pl && pl.name) === curNm;
+    });
+    if (!p) return true;
+    var expectBook = !!(gs.bookPlayedThisTurn && (Number(p.bookValue) || 0) > 0);
+    var hasBook = !!(bd.showBook && Number(bd.bookBonus) > 0);
+    return expectBook === hasBook;
+  }
+
+  /** Synchronous income grid payload — used when mirrors arrive before incomeInit finishes (book cash). */
+  window.risqueArtemisEnsurePublicIncomeBreakdown = function (gsOpt) {
+    var gs =
+      gsOpt && typeof gsOpt === "object"
+        ? gsOpt
+        : window.gameState && typeof window.gameState === "object"
+          ? window.gameState
+          : null;
+    if (!gs || !window.gameUtils) return null;
+    var ph = String(gs.phase || "");
+    if (ph !== "income" && ph !== "con-income") return null;
+    var curNm = normName(gs.currentPlayer);
+    var currentPlayer = (gs.players || []).find(function (p) {
+      return normName(p && p.name) === curNm;
+    });
+    if (!currentPlayer) return null;
+    var existing = gs.risquePublicIncomeBreakdown;
+    if (
+      existing &&
+      existing.total != null &&
+      Number.isFinite(Number(existing.total)) &&
+      incomeBreakdownBookMatches(gs, existing)
+    ) {
+      return existing;
+    }
+    if (!gs.continentCollectionCounts) {
+      gs.continentCollectionCounts = {
+        south_america: 0,
+        north_america: 0,
+        africa: 0,
+        europe: 0,
+        asia: 0,
+        australia: 0
+      };
+    }
+    var territoryCount = (currentPlayer.territories || []).length;
+    var territoryBonus = Math.max(Math.floor(territoryCount / 3), 3);
+    var bookCount = gs.bookPlayedThisTurn ? Number(currentPlayer.bookValue) || 0 : 0;
+    var bookBonus = bookCount * 10;
+    var ownedContinents = window.gameUtils.getPlayerContinents(currentPlayer);
+    var continentBonus = ownedContinents.reduce(function (sum, continent) {
+      var key = Object.keys(window.gameUtils.continentDisplayNames || {}).find(function (k) {
+        return window.gameUtils.continentDisplayNames[k] === continent;
+      });
+      var collectionCount =
+        gs.continentCollectionCounts && key != null ? gs.continentCollectionCounts[key] || 0 : 0;
+      return sum + window.gameUtils.getNextContinentValue(key, collectionCount);
+    }, 0);
+    var total = territoryBonus + bookBonus + continentBonus;
+    var continentRowsForMirror = [];
+    ownedContinents.forEach(function (c) {
+      var cKey = Object.keys(window.gameUtils.continentDisplayNames || {}).find(function (k) {
+        return window.gameUtils.continentDisplayNames[k] === c;
+      });
+      var cVal =
+        cKey != null
+          ? window.gameUtils.getNextContinentValue(cKey, gs.continentCollectionCounts[cKey] || 0)
+          : 0;
+      if (cVal > 0) {
+        continentRowsForMirror.push({
+          name: c.replace("South America", "S. America").replace("North America", "N. America"),
+          bonus: cVal
+        });
+      }
+    });
+    gs.risquePublicIncomeBreakdown = {
+      territoryCount: territoryCount,
+      territoryBonus: territoryBonus,
+      continentRows: continentRowsForMirror,
+      showBook: !!(gs.bookPlayedThisTurn && bookBonus > 0),
+      bookCount: bookCount,
+      bookBonus: bookBonus,
+      total: total
+    };
+    return gs.risquePublicIncomeBreakdown;
+  };
+
   function resolveIncomeTotal(gs, currentPlayer) {
     if (!gs || !currentPlayer) return 0;
     var bd = gs.risquePublicIncomeBreakdown;
@@ -814,6 +903,10 @@
 
   function ensureIncomeBreakdownVoice(gs) {
     if (!gs) return;
+    if (!incomeBreakdownLooksComplete(gs)) {
+      window.risqueArtemisEnsurePublicIncomeBreakdown(gs);
+      gs = window.gameState || gs;
+    }
     if (!incomeBreakdownLooksComplete(gs)) {
       try {
         window.__risqueIncomeInitKey = "";

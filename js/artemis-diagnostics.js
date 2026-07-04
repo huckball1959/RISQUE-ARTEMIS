@@ -425,6 +425,82 @@
   }
   setInterval(attackVoiceProbe, 400);
 
+  /* m327 — income-breakdown probe. In a live game, the turn where the current player CASHES A BOOK in
+   * cardplay lands on income showing only "NAME - INCOME" with no numbers on every screen (continue still
+   * banks the correct total). Other players' income renders fine. Two possibilities: (a) the breakdown
+   * object never made it onto gameState for this player (stale snapshot / delete race), or (b) it is on
+   * gameState but the CV grid was never painted. This probe records both the STATE (gs.risquePublicIncomeBreakdown
+   * + total + bookPlayedThisTurn + hand count) and the DOM (#control-voice-text content) so the report tells
+   * us which. Hand count is included so we can also see whether the just-played book cards are already back
+   * in hand at income time (linking this to the receive-card hand-reappear bug). Fires on host + clients,
+   * on change, while phase is income/con-income. */
+  function measureIncomeBreakdown() {
+    try {
+      var gs = window.gameState || {};
+      var cp = String(gs.currentPlayer || "");
+      var pl = (gs.players || []).find(function (p) {
+        return p && String(p.name || "").trim().toUpperCase() === cp.trim().toUpperCase();
+      });
+      var bd = gs.risquePublicIncomeBreakdown;
+      var vt = document.getElementById("control-voice-text");
+      var vtHtml = vt ? String(vt.innerHTML || "") : "";
+      var incomeBtn =
+        document.getElementById("risque-artemis-income-god-btn") ||
+        document.querySelector("#risque-phase-content .income-button");
+      return {
+        phase: String(gs.phase || ""),
+        currentPlayer: cp,
+        controlSlot: gs.artemisControlSlot,
+        controlSeq: Number(gs.risqueArtemisControlSeq) || 0,
+        bookPlayedThisTurn: !!gs.bookPlayedThisTurn,
+        playerBookValue: pl ? Number(pl.bookValue) || 0 : null,
+        handCount: pl && Array.isArray(pl.cards) ? pl.cards.length : null,
+        handCardCountField: pl ? Number(pl.cardCount) || 0 : null,
+        hasBreakdown: !!(bd && typeof bd === "object"),
+        breakdownTotal: bd && bd.total != null ? Number(bd.total) : null,
+        breakdownShowBook: bd ? !!bd.showBook : null,
+        breakdownBookBonus: bd ? bd.bookBonus : null,
+        breakdownContinentRows:
+          bd && Array.isArray(bd.continentRows) ? bd.continentRows.length : null,
+        cvTextHasGrid:
+          vtHtml.indexOf("income-breakdown") !== -1 ||
+          vtHtml.indexOf("public-income-stack") !== -1,
+        cvTextSample: (vt ? String(vt.textContent || "") : "").slice(0, 100),
+        incomeControlsPresent: !!incomeBtn,
+        clientPlaying: !!window.risqueArtemisClientPlaying,
+        viewPublic: document.documentElement.classList.contains("risque-view-public"),
+        displayIsPublic: !!window.risqueDisplayIsPublic,
+      };
+    } catch (e) {
+      return { err: String(e) };
+    }
+  }
+  var lastIncomeBreakdownKey = "";
+  function incomeBreakdownProbe() {
+    if (!window.risqueArtemisMode) return;
+    var gs = window.gameState;
+    if (!gs) return;
+    var ph = String(gs.phase || "");
+    if (ph !== "income" && ph !== "con-income") return;
+    var info = measureIncomeBreakdown();
+    var key = JSON.stringify(info);
+    if (key === lastIncomeBreakdownKey) return;
+    lastIncomeBreakdownKey = key;
+    sendDiag({
+      kind: "income_breakdown_probe",
+      summary:
+        "P" +
+        slotLabel() +
+        " income breakdown " +
+        String(gs.currentPlayer || "?").toUpperCase() +
+        (info.hasBreakdown
+          ? " total=" + info.breakdownTotal + (info.cvTextHasGrid ? " painted" : " NOT-painted")
+          : " NO-breakdown-on-state"),
+      detail: info,
+    });
+  }
+  setInterval(incomeBreakdownProbe, 500);
+
   function receiveCardHandNames(gs) {
     if (!gs || !gs.players || !gs.currentPlayer) return [];
     var cp = String(gs.currentPlayer || "");

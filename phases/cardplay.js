@@ -2745,6 +2745,20 @@
       }
       window.gameState.bookPlayedThisTurn = true;
       currentPlayer.bookValue = (currentPlayer.bookValue || 0) + 1;
+      if (window.risqueArtemisNetClient && !window.risqueArtemisHost) {
+        window.__risqueArtemisLocalBookCommit = {
+          at: Date.now(),
+          player: currentPlayer.name,
+          phase: window.gameState.phase,
+          controlSeq: Number(window.gameState.risqueArtemisControlSeq) || 0,
+          bookValue: currentPlayer.bookValue,
+          cards: currentPlayer.cards.slice(),
+          cardCount: currentPlayer.cardCount,
+          removed: selectedCards.map(function (sc) {
+            return { name: sc.card, id: sc.id };
+          })
+        };
+      }
       localStorage.setItem('gameState', JSON.stringify(window.gameState));
       if (typeof window.risqueArtemisDiag === "function") {
         try {

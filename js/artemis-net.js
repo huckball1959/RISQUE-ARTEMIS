@@ -3045,6 +3045,11 @@
       } catch (eClrIncFin) {
         /* ignore */
       }
+    } else if (
+      (!gs.risquePublicIncomeBreakdown || gs.risquePublicIncomeBreakdown.total == null) &&
+      typeof window.risqueArtemisEnsurePublicIncomeBreakdown === "function"
+    ) {
+      window.risqueArtemisEnsurePublicIncomeBreakdown(gs);
     }
     artemisPreserveHostAttackSpectatorLive(gs);
     if (
@@ -4030,6 +4035,127 @@
     }
   }
 
+  function artemisNormPlayerName(n) {
+    return String(n || "")
+      .trim()
+      .toUpperCase();
+  }
+
+  function artemisPlayerByName(gs, name) {
+    var want = artemisNormPlayerName(name);
+    if (!gs || !Array.isArray(gs.players) || !want) return null;
+    for (var i = 0; i < gs.players.length; i += 1) {
+      var p = gs.players[i];
+      if (p && artemisNormPlayerName(p.name) === want) return p;
+    }
+    return null;
+  }
+
+  function artemisRemoveCommittedBookCards(cards, removed) {
+    var out = Array.isArray(cards) ? cards.slice() : [];
+    if (!Array.isArray(removed) || !removed.length) return out;
+    removed.forEach(function (rc) {
+      if (!rc) return;
+      var wantId = rc.id != null ? String(rc.id) : "";
+      var wantName = String(rc.name || rc.card || "")
+        .trim()
+        .toLowerCase();
+      var idx = -1;
+      if (wantId) {
+        idx = out.findIndex(function (card) {
+          return card && card.id != null && String(card.id) === wantId;
+        });
+      }
+      if (idx < 0 && wantName) {
+        idx = out.findIndex(function (card) {
+          var raw = typeof card === "string" ? card : card && card.name;
+          return String(raw || "")
+            .trim()
+            .toLowerCase() === wantName;
+        });
+      }
+      if (idx >= 0) out.splice(idx, 1);
+    });
+    return out;
+  }
+
+  function artemisProtectLocalBookCommitMirror(state) {
+    if (mode !== "client" || !state || !window.__risqueArtemisLocalBookCommit) return state;
+    var stamp = window.__risqueArtemisLocalBookCommit;
+    if (Date.now() - (Number(stamp.at) || 0) > 10 * 60 * 1000) {
+      try {
+        delete window.__risqueArtemisLocalBookCommit;
+      } catch (eOldBookStamp) {
+        /* ignore */
+      }
+      return state;
+    }
+    if (artemisNormPlayerName(state.currentPlayer) !== artemisNormPlayerName(stamp.player)) return state;
+    var ph = String(state.phase || "");
+    if (
+      ph !== "cardplay" &&
+      ph !== "con-cardplay" &&
+      ph !== "income" &&
+      ph !== "con-income" &&
+      ph !== "deploy" &&
+      ph !== "receivecard" &&
+      ph !== "getcard"
+    ) {
+      return state;
+    }
+    var p = artemisPlayerByName(state, stamp.player);
+    if (!p) return state;
+    var before = Array.isArray(p.cards) ? p.cards.length : Number(p.cardCount) || 0;
+    var cleaned = artemisRemoveCommittedBookCards(p.cards, stamp.removed);
+    var removedAgain = cleaned.length < before;
+    var staleBookFlags =
+      (ph === "cardplay" || ph === "con-cardplay" || ph === "income" || ph === "con-income") &&
+      (!state.bookPlayedThisTurn || Number(p.bookValue) < Number(stamp.bookValue || 0));
+    if (!removedAgain && !staleBookFlags) return state;
+
+    p.cards = cleaned;
+    p.cardCount = cleaned.length;
+    if (ph === "cardplay" || ph === "con-cardplay" || ph === "income" || ph === "con-income") {
+      state.bookPlayedThisTurn = true;
+      p.bookValue = Math.max(Number(p.bookValue) || 0, Number(stamp.bookValue) || 1);
+      if (removedAgain) {
+        try {
+          delete state.risquePublicIncomeBreakdown;
+          delete state.risquePublicIncomeGateToken;
+        } catch (eClearBadIncome) {
+          /* ignore */
+        }
+      } else if (
+        (ph === "income" || ph === "con-income") &&
+        typeof window.risqueArtemisEnsurePublicIncomeBreakdown === "function"
+      ) {
+        window.risqueArtemisEnsurePublicIncomeBreakdown(state);
+      }
+    }
+    try {
+      localStorage.setItem("gameState", JSON.stringify(state));
+    } catch (eSaveBookGuard) {
+      /* ignore */
+    }
+    if (typeof window.risqueArtemisDiag === "function") {
+      try {
+        window.risqueArtemisDiag("book_commit_guard", "Preserved local book cash against stale mirror", {
+          player: stamp.player,
+          phase: ph,
+          before: before,
+          after: p.cardCount,
+          removedAgain: removedAgain,
+          staleBookFlags: staleBookFlags,
+          bookPlayedThisTurn: !!state.bookPlayedThisTurn,
+          bookValue: p.bookValue
+        });
+      } catch (eDiagBookGuard) {
+        /* ignore */
+      }
+    }
+    return state;
+  }
+
   function flushPendingPublicStates() {
     if (mode !== "client") return;
     if (!window.risqueArtemisLobbyStarted) return;
@@ -4094,6 +4220,7 @@
           window.gameState && window.gameState.currentPlayer != null
             ? window.gameState.currentPlayer
             : null;
+        artemisProtectLocalBookCommitMirror(item.state);
         var mirrorApplied =
           typeof window.risquePublicMirrorGameState === "function" &&
           window.risquePublicMirrorGameState(item.state) === true;
@@ -4481,6 +4608,12 @@
           }
           if (typeof window.risqueArtemisSyncPortableIncome === "function") {
             window.risqueArtemisSyncPortableIncome(item.state);
+          }
+          if (
+            !item.state.risquePublicIncomeBreakdown &&
+            typeof window.risqueArtemisEnsurePublicIncomeBreakdown === "function"
+          ) {
+            window.risqueArtemisEnsurePublicIncomeBreakdown(item.state);
           }
           if (typeof window.risqueArtemisEnsureIncomeInteractive === "function") {
             window.risqueArtemisEnsureIncomeInteractive(item.state);

@@ -204,6 +204,56 @@
     });
     if (!player) return gs;
 
+    var localBookCommit = window.__risqueArtemisLocalBookCommit;
+    if (
+      window.risqueArtemisNetClient &&
+      !window.risqueArtemisHost &&
+      localBookCommit &&
+      normName(localBookCommit.player) === leadName &&
+      Date.now() - (Number(localBookCommit.at) || 0) <= 10 * 60 * 1000
+    ) {
+      var cardsBeforeGuard = Array.isArray(player.cards) ? player.cards.length : 0;
+      var cardsAfterGuard = Array.isArray(player.cards) ? player.cards.slice() : [];
+      (localBookCommit.removed || []).forEach(function (rc) {
+        var wantId = rc && rc.id != null ? String(rc.id) : "";
+        var wantName = String((rc && (rc.name || rc.card)) || "")
+          .trim()
+          .toLowerCase();
+        var idx = -1;
+        if (wantId) {
+          idx = cardsAfterGuard.findIndex(function (card) {
+            return card && card.id != null && String(card.id) === wantId;
+          });
+        }
+        if (idx < 0 && wantName) {
+          idx = cardsAfterGuard.findIndex(function (card) {
+            var raw = typeof card === "string" ? card : card && card.name;
+            return String(raw || "")
+              .trim()
+              .toLowerCase() === wantName;
+          });
+        }
+        if (idx >= 0) cardsAfterGuard.splice(idx, 1);
+      });
+      player.cards = cardsAfterGuard;
+      player.cardCount = cardsAfterGuard.length;
+      gs.bookPlayedThisTurn = true;
+      player.bookValue = Math.max(Number(player.bookValue) || 0, Number(localBookCommit.bookValue) || 1);
+      if (cardsAfterGuard.length < cardsBeforeGuard && typeof window.risqueArtemisDiag === "function") {
+        try {
+          window.risqueArtemisDiag("book_commit_hand_guard", "Blocked book hand rehydrate", {
+            player: player.name,
+            before: cardsBeforeGuard,
+            after: player.cardCount,
+            bookValue: player.bookValue
+          });
+        } catch (eBookHandDiag) {
+          /* ignore */
+        }
+      }
+      return gs;
+    }
+
     var haveCards = Array.isArray(player.cards) ? player.cards.length : 0;
     var wantCount = Number(player.cardCount) || 0;
     if (

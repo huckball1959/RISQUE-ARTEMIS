@@ -9450,6 +9450,37 @@
         }
       }
     }
+    if (
+      window.risqueArtemisNetClient &&
+      !window.risqueArtemisHost &&
+      window.gameState &&
+      typeof window.risqueArtemisClientNameMatchesCurrent === "function" &&
+      window.risqueArtemisClientNameMatchesCurrent(window.gameState)
+    ) {
+      var phIncPreserve = String(gs.phase || "");
+      if (phIncPreserve === "income" || phIncPreserve === "con-income") {
+        var liveIncBd = window.gameState.risquePublicIncomeBreakdown;
+        if (
+          liveIncBd &&
+          liveIncBd.total != null &&
+          (!gs.risquePublicIncomeBreakdown || gs.risquePublicIncomeBreakdown.total == null)
+        ) {
+          try {
+            gs.risquePublicIncomeBreakdown = JSON.parse(JSON.stringify(liveIncBd));
+          } catch (eIncBdClone) {
+            gs.risquePublicIncomeBreakdown = liveIncBd;
+          }
+          if (window.gameState.bookPlayedThisTurn) {
+            gs.bookPlayedThisTurn = true;
+          }
+        } else if (
+          !gs.risquePublicIncomeBreakdown &&
+          typeof window.risqueArtemisEnsurePublicIncomeBreakdown === "function"
+        ) {
+          window.risqueArtemisEnsurePublicIncomeBreakdown(gs);
+        }
+      }
+    }
     window.gameState = gs;
     /* Keep boot `state` in sync so a late refreshVisuals() rAF cannot wipe mirror-only fields (e.g. name-roulette flash). */
     if (

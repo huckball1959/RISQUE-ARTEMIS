@@ -1562,6 +1562,13 @@
       return;
     }
     if (ph === "income" || ph === "con-income") {
+      if (
+        !gs.risquePublicIncomeBreakdown &&
+        typeof window.risqueArtemisEnsurePublicIncomeBreakdown === "function"
+      ) {
+        window.risqueArtemisEnsurePublicIncomeBreakdown(gs);
+        gs = window.gameState || gs;
+      }
       if (mine) {
         if (
           !gs.risquePublicIncomeBreakdown &&
