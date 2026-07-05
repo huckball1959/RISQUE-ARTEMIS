@@ -1,5 +1,5 @@
 {
-  "cacheVersion": "m329",
+  "cacheVersion": "m336",
   "note": "Single source of truth for join URLs. Edit params here only — clients use /join/<key> and always get the latest build.",
   "profiles": {
     "host": {

@@ -1043,17 +1043,36 @@
     { ui: 4, slot: 3, label: "Rigged — Nooch", hint: "Player 3 wins setup roulettes" }
   ];
 
-  // Host test launcher — three exclusive modes:
-  //   "normal" → full setup, fair random roulettes (no rig)
-  //   "rigged" → full setup, roulettes rigged for a chosen player (rigSlot)
-  //   "mock"   → load cards.json mock cardplay, chosen player acts first (mockFirstSlot)
+  // Host test launcher — four exclusive modes:
+  //   "normal"  → full setup, fair random roulettes (no rig)
+  //   "rigged"  → full setup, roulettes rigged for a chosen player (rigSlot)
+  //   "mock"    → load cards.json mock cardplay, chosen player acts first (mockFirstSlot)
+  //   "conquer" → load conquer-* mock attack, chosen elimination chain (conquerScenario)
   var hostLauncherOverlay = null;
   var hostLauncherContinueFn = null;
   var hostLauncherState = {
     mode: null,
     rigSlot: 1,
-    mockFirstSlot: 1
+    mockFirstSlot: 1,
+    conquerScenario: 1
   };
+
+  function conquerScenarioLabel(scenario) {
+    scenario = Number(scenario) || 1;
+    if (scenario === 1) return "Guido → Mictor → Nooch";
+    if (scenario === 2) return "Mictor → Guido → Nooch";
+    return "Mictor → Nooch → Guido";
+  }
+
+  function conquerScenarioSaveId(scenario) {
+    if (typeof window.risqueArtemisConquerAutoSaveId === "function") {
+      return window.risqueArtemisConquerAutoSaveId(scenario);
+    }
+    scenario = Number(scenario) || 1;
+    if (scenario === 1) return "conquer-guido";
+    if (scenario === 2) return "conquer-mictor-guido";
+    return "conquer-mictor-nooch";
+  }
 
   function slotPlayerLabel(slot) {
     var key = String(slot);
@@ -1066,6 +1085,7 @@
     hostLauncherState.mode = null;
     hostLauncherState.rigSlot = 1;
     hostLauncherState.mockFirstSlot = 1;
+    hostLauncherState.conquerScenario = 1;
   }
 
   function refreshHostLauncherUi() {
@@ -1081,9 +1101,11 @@
 
     var rigSection = hostLauncherOverlay.querySelector('[data-host-launch-panel="rigged"]');
     var mockSection = hostLauncherOverlay.querySelector('[data-host-launch-panel="mock"]');
+    var conquerSection = hostLauncherOverlay.querySelector('[data-host-launch-panel="conquer"]');
     var normalNote = hostLauncherOverlay.querySelector('[data-host-launch-panel="normal"]');
     if (rigSection) rigSection.hidden = mode !== "rigged";
     if (mockSection) mockSection.hidden = mode !== "mock";
+    if (conquerSection) conquerSection.hidden = mode !== "conquer";
     if (normalNote) normalNote.hidden = mode !== "normal";
 
     hostLauncherOverlay.querySelectorAll("[data-host-launch-rig]").forEach(function (btn) {
@@ -1100,10 +1122,18 @@
         mode === "mock" && slot === hostLauncherState.mockFirstSlot
       );
     });
+    hostLauncherOverlay.querySelectorAll("[data-host-launch-conquer]").forEach(function (btn) {
+      var scenario = Number(btn.getAttribute("data-host-launch-conquer")) || 0;
+      btn.classList.toggle(
+        "risque-artemis-host-launcher-chip--selected",
+        mode === "conquer" && scenario === hostLauncherState.conquerScenario
+      );
+    });
 
     var goBtn = hostLauncherOverlay.querySelector("#risque-artemis-host-launcher-go");
     if (goBtn) {
-      var ready = mode === "normal" || mode === "rigged" || mode === "mock";
+      var ready =
+        mode === "normal" || mode === "rigged" || mode === "mock" || mode === "conquer";
       goBtn.disabled = !ready;
       if (!mode) {
         goBtn.textContent = "Choose a mode above";
@@ -1111,6 +1141,9 @@
         goBtn.textContent = "Launch — Normal play (random)";
       } else if (mode === "rigged") {
         goBtn.textContent = "Launch — Rigged for " + slotPlayerLabel(hostLauncherState.rigSlot);
+      } else if (mode === "conquer") {
+        goBtn.textContent =
+          "Launch — Conquer test: " + conquerScenarioLabel(hostLauncherState.conquerScenario);
       } else {
         goBtn.textContent = "Launch — Mock, " + slotPlayerLabel(hostLauncherState.mockFirstSlot) + " starts";
       }
@@ -1159,6 +1192,10 @@
       '<span class="risque-artemis-host-launcher-mode-num">3</span>' +
       '<span class="risque-artemis-host-launcher-mode-text"><span class="risque-artemis-host-launcher-mode-label">Load mock game</span>' +
       '<span class="risque-artemis-host-launcher-mode-hint">Round-4 cardplay · pick who starts</span></span></button>' +
+      '<button type="button" class="risque-artemis-host-launcher-mode" data-host-launch-mode="conquer">' +
+      '<span class="risque-artemis-host-launcher-mode-num">4</span>' +
+      '<span class="risque-artemis-host-launcher-mode-text"><span class="risque-artemis-host-launcher-mode-label">Conquer test</span>' +
+      '<span class="risque-artemis-host-launcher-mode-hint">Attack phase · one elimination away · pick chain</span></span></button>' +
       "</div>" +
       '<section class="risque-artemis-host-launcher-sub" data-host-launch-panel="normal" hidden>' +
       '<p class="risque-artemis-host-launcher-hint">Fair random selection — nobody is rigged. Continues welcome → roulettes → deal.</p>' +
@@ -1172,6 +1209,11 @@
       '<h3 class="risque-artemis-host-launcher-heading">Mock — who starts</h3>' +
       '<p class="risque-artemis-host-launcher-hint">When mock cardplay loads, this player acts first.</p>' +
       '<div data-host-launch-first-row></div>' +
+      "</section>" +
+      '<section class="risque-artemis-host-launcher-sub" data-host-launch-panel="conquer" hidden>' +
+      '<h3 class="risque-artemis-host-launcher-heading">Conquer chain</h3>' +
+      '<p class="risque-artemis-host-launcher-hint">Each victim is down to one border territory. Attack to trigger celebration → card transfer.</p>' +
+      '<div data-host-launch-conquer-row></div>' +
       "</section>" +
       '<button type="button" class="risque-artemis-host-launcher-go" id="risque-artemis-host-launcher-go" disabled>Choose a mode above</button>' +
       "</div>";
@@ -1192,6 +1234,26 @@
           hostLauncherState.mockFirstSlot = slot;
         })
       );
+    }
+    var conquerContainer = hostLauncherOverlay.querySelector("[data-host-launch-conquer-row]");
+    if (conquerContainer) {
+      var conquerRow = document.createElement("div");
+      conquerRow.className =
+        "risque-artemis-host-launcher-row risque-artemis-host-launcher-row--stack";
+      [1, 2, 3].forEach(function (scenario) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className =
+          "risque-artemis-host-launcher-chip risque-artemis-host-launcher-chip--wide";
+        btn.setAttribute("data-host-launch-conquer", String(scenario));
+        btn.textContent = conquerScenarioLabel(scenario);
+        btn.addEventListener("click", function () {
+          hostLauncherState.conquerScenario = scenario;
+          refreshHostLauncherUi();
+        });
+        conquerRow.appendChild(btn);
+      });
+      conquerContainer.appendChild(conquerRow);
     }
 
     hostLauncherOverlay.querySelectorAll("[data-host-launch-mode]").forEach(function (btn) {
@@ -1215,14 +1277,14 @@
 
   function commitHostLauncherChoices() {
     var mode = hostLauncherState.mode;
-    if (mode !== "normal" && mode !== "rigged" && mode !== "mock") return;
+    if (mode !== "normal" && mode !== "rigged" && mode !== "mock" && mode !== "conquer") return;
 
     if (typeof window.risqueArtemisClearRigSetup === "function") {
       window.risqueArtemisClearRigSetup();
     }
 
-    // launchMode drives onLoginSuccess: "mock" auto-loads cards.json; "normal" runs full setup.
-    var launchMode = mode === "mock" ? "mock" : "normal";
+    // launchMode drives onLoginSuccess: "mock" auto-loads save JSON; "normal" runs full setup.
+    var launchMode = mode === "mock" || mode === "conquer" ? "mock" : "normal";
     var mockSlot = Number(hostLauncherState.mockFirstSlot) || 1;
     if (mockSlot < 1 || mockSlot > 3) mockSlot = 1;
     var rigSlot = Number(hostLauncherState.rigSlot) || 1;
@@ -1239,6 +1301,8 @@
 
     if (mode === "mock") {
       window.risqueArtemisAutoSave = "cards";
+    } else if (mode === "conquer") {
+      window.risqueArtemisAutoSave = conquerScenarioSaveId(hostLauncherState.conquerScenario);
     } else {
       try {
         delete window.risqueArtemisAutoSave;
@@ -1273,6 +1337,8 @@
     var summary =
       mode === "mock"
         ? "Mock — " + slotPlayerLabel(mockSlot) + " starts"
+        : mode === "conquer"
+        ? "Conquer test — " + conquerScenarioLabel(hostLauncherState.conquerScenario)
         : mode === "rigged"
         ? "Rigged for " + slotPlayerLabel(rigSlot)
         : "Normal play (random)";

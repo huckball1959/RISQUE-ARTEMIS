@@ -461,6 +461,51 @@
     return document.getElementById(id);
   }
 
+  /** Upper hand: 5 columns; 2 rows when 4+ cards so up to 9 fit without overlap/clip. */
+  function receiveCardSyncUpperHandLayout(upperStrip) {
+    if (!upperStrip) return;
+    var n = upperStrip.querySelectorAll("img.receivecard-thumb").length;
+    var twoRow = n >= 4;
+    try {
+      upperStrip.setAttribute("data-receivecard-upper-count", String(n));
+    } catch (eAttr) {
+      /* ignore */
+    }
+    upperStrip.classList.toggle("receivecard-hand-strip--upper-one-row", n > 0 && !twoRow);
+    upperStrip.classList.toggle("receivecard-hand-strip--upper-two-row", twoRow);
+    var stack = upperStrip.closest(".receivecard-hand-stack");
+    if (stack) {
+      stack.classList.toggle("receivecard-hand-stack--upper-two-row", twoRow);
+    }
+
+    function applyMeasuredThumbHeights() {
+      var stripH = upperStrip.clientHeight;
+      if (stripH < 12) return;
+      var rows = twoRow ? 2 : 1;
+      var rowGap = 4;
+      var cellH = Math.max(52, Math.floor((stripH - rowGap * (rows - 1)) / rows));
+      try {
+        upperStrip.style.setProperty("--receivecard-upper-row-h", cellH + "px");
+      } catch (eVar) {
+        /* ignore */
+      }
+      var imgs = upperStrip.querySelectorAll("img.receivecard-thumb");
+      for (var i = 0; i < imgs.length; i += 1) {
+        var img = imgs[i];
+        img.style.maxHeight = cellH + "px";
+        img.style.width = "auto";
+        img.style.height = "auto";
+        img.style.maxWidth = "100%";
+      }
+    }
+
+    applyMeasuredThumbHeights();
+    requestAnimationFrame(function () {
+      applyMeasuredThumbHeights();
+      requestAnimationFrame(applyMeasuredThumbHeights);
+    });
+  }
+
   function receiveCardUiNeedsRepaint(gs, currentPlayer) {
     if (!gs || !currentPlayer) return true;
     var upper = receiveCardQueryEl("receivecard-hand-strip-upper");
@@ -531,6 +576,13 @@
     });
     staging.innerHTML =
       '<div class="receivecard-staging-merge-note" role="status">Added to hand above.</div>';
+    receiveCardSyncUpperHandLayout(upper);
+    requestAnimationFrame(function () {
+      receiveCardSyncUpperHandLayout(upper);
+      if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.syncPosition === "function") {
+        window.risqueRuntimeHud.syncPosition();
+      }
+    });
   }
 
   function receiveCardScheduleAdvanceAfterStagingMerge() {
@@ -1355,6 +1407,12 @@
     } catch (eV) {
       /* ignore */
     }
+    if (upperStrip) {
+      receiveCardSyncUpperHandLayout(upperStrip);
+      requestAnimationFrame(function () {
+        receiveCardSyncUpperHandLayout(upperStrip);
+      });
+    }
     refreshReceiveCardPublicSpectatorMirror();
     window.__risqueReceiveCardDisplayCompleted = true;
     window.__risqueReceiveCardDisplayKey =
@@ -1610,6 +1668,7 @@
 
   window.initReceiveCardPhase = initReceiveCardPhase;
   window.receiveCardRunDisplay = receiveCardRunDisplay;
+  window.receiveCardSyncUpperHandLayout = receiveCardSyncUpperHandLayout;
   window.receiveCardRepaintIfNeeded = receiveCardRepaintIfNeeded;
   window.receiveCardEndTurn = receiveCardEndTurn;
   window.risqueReceiveCardPrepareLoadedState = receiveCardPrepareLoadedState;

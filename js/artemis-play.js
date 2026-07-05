@@ -685,6 +685,15 @@
         phHost === "reinforce" ||
         phHost === "receivecard"
       ) {
+        var hostNmTurn = hostSessionName();
+        if (hostNmTurn && hostNmTurn === normName(gs.currentPlayer)) {
+          if (typeof window.risqueArtemisForceControlSlotFromCurrentPlayer === "function") {
+            window.risqueArtemisForceControlSlotFromCurrentPlayer(gs);
+          } else if (typeof window.risqueArtemisStampControlSlot === "function") {
+            window.risqueArtemisStampControlSlot(gs);
+          }
+          return true;
+        }
         if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
           window.risqueArtemisResolveOwnerSlot(gs);
         }

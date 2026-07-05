@@ -1,7 +1,7 @@
 /**
  * ARTEMIS auto mock-save boot — zero keyboard shortcuts.
- * Enable with ?artemisAutoSave=cards on join URLs (see launchers/profiles.json cardplay-test mode).
- * After fast-boot login, fetches cards.json and jumps straight to round-4 cardplay (Guido + book).
+ * Enable with ?artemisAutoSave=cards|conquer-* on join URLs or host test launcher.
+ * After fast-boot login, fetches the save JSON and jumps straight to cardplay or attack.
  * Does NOT set risqueArtemisPresetId / risqueArtemisPresetMode (avoids preset host-reject path).
  */
 (function () {
@@ -24,6 +24,10 @@
       /* ignore */
     }
     return "";
+  }
+
+  function isConquerAutoSave(id) {
+    return /^conquer-/i.test(String(id || ""));
   }
 
   function autoSaveFileName(id) {
@@ -77,7 +81,7 @@
     return out;
   }
 
-  function mergeRosterIntoMock(mock, loginGs) {
+  function mergeRosterIntoMock(mock, loginGs, saveId) {
     var out = mock;
     var roster =
       (loginGs && Array.isArray(loginGs.artemisRoster) && loginGs.artemisRoster.length
@@ -96,19 +100,47 @@
         if (p && r.color) p.color = r.color;
       });
     }
-    applyMockFirstPlayer(out, readMockFirstSlot());
+
+    var isConquer =
+      isConquerAutoSave(saveId) || String(out.phase || "").toLowerCase() === "attack";
+
+    if (isConquer && (!out.artemisRoster || !out.artemisRoster.length)) {
+      out.artemisRoster = ["GUIDO", "MICTOR", "NOOCH"].map(function (name, i) {
+        var p = (out.players || []).find(function (pl) {
+          return normName(pl && pl.name) === normName(name);
+        });
+        return { slot: i + 1, name: name, color: p && p.color ? p.color : name };
+      });
+    }
+
+    if (!isConquer) {
+      applyMockFirstPlayer(out, readMockFirstSlot());
+      out.phase = "cardplay";
+      out.risqueArtemisAutoSaveId = saveId || "cards";
+      if (!out.risqueArtemisAutoSaveLabel) {
+        out.risqueArtemisAutoSaveLabel = "CARDPLAY TEST — Round 4";
+      }
+    } else {
+      out.risqueArtemisAutoSaveId = saveId || out.risqueArtemisAutoSaveId || "conquer";
+      if (!out.attackPhase) out.attackPhase = "attack";
+      if (!out.risqueArtemisAutoSaveLabel) {
+        out.risqueArtemisAutoSaveLabel = "CONQUER TEST — attack to eliminate";
+      }
+    }
+
     if (typeof window.risqueArtemisForceControlSlotFromCurrentPlayer === "function") {
       window.risqueArtemisForceControlSlotFromCurrentPlayer(out);
     } else if (typeof window.risqueArtemisStampControlSlot === "function") {
       window.risqueArtemisStampControlSlot(out);
     }
+    if (isConquer && typeof window.risqueArtemisClearSetupDeployWinnerLock === "function") {
+      window.risqueArtemisClearSetupDeployWinnerLock(out);
+    }
+    if (isConquer) {
+      out.risqueArtemisControlSeq = Math.max(Number(out.risqueArtemisControlSeq) || 0, 2);
+    }
     out.setupComplete = true;
     out.isInitialDeploy = false;
-    out.phase = "cardplay";
-    out.risqueArtemisAutoSaveId = "cards";
-    if (!out.risqueArtemisAutoSaveLabel) {
-      out.risqueArtemisAutoSaveLabel = "CARDPLAY TEST — Round 4";
-    }
     try {
       delete out.risqueArtemisPresetId;
       delete out.risqueArtemisPresetLabel;
@@ -138,32 +170,44 @@
     }
   }
 
-  function navigateCardplay(gs) {
-    var url = "game.html?phase=cardplay&legacyNext=income.html&postReceive=1";
-    if (typeof window.risqueArtemisAppendSessionParams === "function") {
-      url = window.risqueArtemisAppendSessionParams(url);
-    }
+  function appendAutoSaveParam(url, saveId) {
     try {
-      var q = new URL(window.location.href).searchParams;
-      var autoId = q.get("artemisAutoSave");
+      var autoId =
+        saveId ||
+        new URL(window.location.href).searchParams.get("artemisAutoSave") ||
+        resolveAutoSaveId();
       if (autoId) {
-        url += (url.indexOf("?") >= 0 ? "&" : "?") + "artemisAutoSave=" + encodeURIComponent(autoId);
+        url +=
+          (url.indexOf("?") >= 0 ? "&" : "?") +
+          "artemisAutoSave=" +
+          encodeURIComponent(autoId);
       }
     } catch (eUrl) {
       /* ignore */
     }
+    return url;
+  }
+
+  function navigateMockPhase(gs, phase, saveId) {
+    var url =
+      String(phase || "").toLowerCase() === "attack"
+        ? "game.html?phase=attack"
+        : "game.html?phase=cardplay&legacyNext=income.html&postReceive=1";
+    if (typeof window.risqueArtemisAppendSessionParams === "function") {
+      url = window.risqueArtemisAppendSessionParams(url);
+    }
+    url = appendAutoSaveParam(url, saveId);
+
     if (typeof window.risqueNavigateGameHtmlSoft === "function" && window.risqueNavigateGameHtmlSoft(url)) {
       try {
-        console.info("[ARTEMIS auto-save] soft-nav to cardplay ->", url);
+        console.info("[ARTEMIS auto-save] soft-nav to " + phase + " ->", url);
       } catch (eLogNav) {
         /* ignore */
       }
       if (window.risqueArtemisHost) pushHostMirror(gs);
       return;
     }
-    // A FULL page reload on the host = the sign-in trap (game already started server-side,
-    // host can't re-join, lands on login). Never full-reload the host during mock boot;
-    // surface the failure instead so we can see why soft-nav was refused.
+
     if (window.risqueArtemisHost) {
       var softAllowed =
         typeof window.risqueArtemisSoftNavAllowed === "function"
@@ -171,12 +215,16 @@
           : !window.risqueDisplayIsPublic;
       var diag = {
         url: url,
+        phase: phase,
         softAllowed: softAllowed,
         isPublic: !!window.risqueDisplayIsPublic,
         hasSoftFn: typeof window.risqueNavigateGameHtmlSoft === "function"
       };
       try {
-        console.error("[ARTEMIS auto-save] host soft-nav to cardplay REFUSED (would loop to sign-in). Diag:", diag);
+        console.error(
+          "[ARTEMIS auto-save] host soft-nav to " + phase + " REFUSED (would loop to sign-in). Diag:",
+          diag
+        );
       } catch (eLogRef) {
         /* ignore */
       }
@@ -205,14 +253,19 @@
     }
   }
 
-  function showAutoSaveBanner(gs) {
+  function showAutoSaveBanner(gs, saveId) {
+    var isConquer = isConquerAutoSave(saveId);
     var who = gs && gs.currentPlayer ? String(gs.currentPlayer) : "GUIDO";
     var msg =
-      "CARDPLAY TEST — " +
-      who +
-      "'s turn (R" +
-      (gs && gs.round ? gs.round : 4) +
-      ") — play the book, then check CARDS IN HAND";
+      gs && gs.risqueArtemisAutoSaveLabel
+        ? gs.risqueArtemisAutoSaveLabel
+        : isConquer
+        ? "CONQUER TEST — " + who + "'s attack — eliminate the last territory"
+        : "CARDPLAY TEST — " +
+          who +
+          "'s turn (R" +
+          (gs && gs.round ? gs.round : 4) +
+          ") — play the book, then check CARDS IN HAND";
     if (typeof window.risqueArtemisSetTopStatus === "function") {
       window.risqueArtemisSetTopStatus(msg, "ok");
     }
@@ -227,7 +280,8 @@
         var curP = (gs && gs.players || []).find(function (p) {
           return normName(p && p.name) === curNm;
         });
-        window.risqueArtemisDiag("auto-save-boot", "Loaded cards.json mock save", {
+        window.risqueArtemisDiag("auto-save-boot", "Loaded mock save " + (saveId || ""), {
+          saveId: saveId,
           phase: gs && gs.phase,
           round: gs && gs.round,
           currentPlayer: gs && gs.currentPlayer,
@@ -244,7 +298,51 @@
     }
   }
 
-  window.risqueArtemisAutoSaveStartToCardplay = function (loginGs) {
+  function scheduleConquerAttackBootRecovery(gs, saveId) {
+    if (!isConquerAutoSave(saveId)) return;
+    var attempts = 0;
+    var tick = function () {
+      attempts += 1;
+      var live = window.gameState || gs;
+      if (!live || String(live.phase || "").toLowerCase() !== "attack") return;
+      try {
+        document.body.classList.remove("risque-artemis-attack-spectator");
+        document.body.removeAttribute("data-risque-show-public-dice");
+      } catch (eClrSpec) {
+        /* ignore */
+      }
+      if (typeof window.risqueRestoreHostMapCanvasFromPhaseArtifacts === "function") {
+        window.risqueRestoreHostMapCanvasFromPhaseArtifacts();
+      }
+      var uioBoot = document.getElementById("ui-overlay");
+      if (
+        uioBoot &&
+        window.risqueRuntimeHud &&
+        typeof window.risqueRuntimeHud.ensure === "function" &&
+        (!document.getElementById("control-voice") || !document.getElementById("hud-main-panel"))
+      ) {
+        window.risqueRuntimeHud.ensure(uioBoot);
+      }
+      if (typeof window.risqueArtemisStampControlSlot === "function") {
+        window.risqueArtemisStampControlSlot(live);
+      }
+      if (typeof window.risqueArtemisEnsureAttackInteractive === "function") {
+        window.risqueArtemisEnsureAttackInteractive(live);
+      } else if (typeof window.risqueArtemisSyncPortableAttack === "function") {
+        window.risqueArtemisSyncPortableAttack(live);
+      }
+      var chromeReady =
+        window.__risqueAttackInitialized &&
+        document.getElementById("attack-toolbar-strip") &&
+        document.getElementById("roll");
+      if (!chromeReady && attempts < 10) {
+        setTimeout(tick, attempts < 4 ? 120 : 280);
+      }
+    };
+    setTimeout(tick, 0);
+  }
+
+  function bootAutoSave(loginGs) {
     var saveId = resolveAutoSaveId();
     if (!saveId) return false;
     var file = autoSaveFileName(saveId);
@@ -260,16 +358,18 @@
         }
         var gs;
         try {
-          gs = mergeRosterIntoMock(JSON.parse(JSON.stringify(mock)), loginGs);
+          gs = mergeRosterIntoMock(JSON.parse(JSON.stringify(mock)), loginGs, saveId);
         } catch (eMerge) {
-          gs = mergeRosterIntoMock(mock, loginGs);
+          gs = mergeRosterIntoMock(mock, loginGs, saveId);
         }
         persistState(gs);
-        showAutoSaveBanner(gs);
+        showAutoSaveBanner(gs, saveId);
+        var phase = String(gs.phase || "cardplay").toLowerCase();
         if (typeof window.risqueArtemisSetupMilestone === "function") {
-          window.risqueArtemisSetupMilestone("AUTO-SAVE-cardplay", file);
+          window.risqueArtemisSetupMilestone("AUTO-SAVE-" + phase, file);
         }
-        navigateCardplay(gs);
+        navigateMockPhase(gs, phase, saveId);
+        scheduleConquerAttackBootRecovery(gs, saveId);
       })
       .catch(function (err) {
         var msg = err && err.message ? err.message : String(err);
@@ -300,9 +400,19 @@
         }
       });
     return true;
-  };
+  }
+
+  window.risqueArtemisAutoSaveStartToCardplay = bootAutoSave;
+  window.risqueArtemisAutoSaveBoot = bootAutoSave;
 
   window.risqueArtemisAutoSaveEnabled = function () {
     return !!resolveAutoSaveId();
+  };
+
+  window.risqueArtemisConquerAutoSaveId = function (scenario) {
+    scenario = Number(scenario) || 1;
+    if (scenario === 1) return "conquer-guido";
+    if (scenario === 2) return "conquer-mictor-guido";
+    return "conquer-mictor-nooch";
   };
 })();

@@ -15042,8 +15042,19 @@
       if (legacyLoginHudAtk && legacyLoginHudAtk.parentNode) {
         legacyLoginHudAtk.parentNode.removeChild(legacyLoginHudAtk);
       }
+      var uioSoftAtk = document.getElementById("ui-overlay");
       var rhLoginAtk = document.getElementById("runtime-hud-root");
-      if (rhLoginAtk) {
+      var loginHudSoftAtk = !!(rhLoginAtk && rhLoginAtk.classList.contains("runtime-hud-root--login"));
+      if (
+        uioSoftAtk &&
+        window.risqueRuntimeHud &&
+        typeof window.risqueRuntimeHud.ensure === "function" &&
+        (loginHudSoftAtk ||
+          !document.getElementById("control-voice") ||
+          !document.getElementById("hud-main-panel"))
+      ) {
+        window.risqueRuntimeHud.ensure(uioSoftAtk);
+      } else if (rhLoginAtk) {
         rhLoginAtk.classList.remove("runtime-hud-root--login");
       }
       phaseLabelEl.textContent = "Phase: attack";
@@ -18465,6 +18476,8 @@
       }
     }
     u.searchParams.set("artemisDevReload", String(Date.now()));
+    /* Bust cached game.html so new ?v= script tags in the shell actually load. */
+    u.searchParams.set("htmlv", String(Date.now()));
     window.location.href = u.toString();
   }
 

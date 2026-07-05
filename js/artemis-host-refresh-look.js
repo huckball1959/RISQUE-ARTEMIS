@@ -71,6 +71,27 @@
       if (typeof window.risqueArtemisScheduleLayoutSync === "function") {
         window.risqueArtemisScheduleLayoutSync();
       }
+      if (typeof window.receiveCardRunDisplay === "function") {
+        try {
+          window.receiveCardRunDisplay();
+        } catch (eRcRepaint) {
+          /* ignore */
+        }
+      } else if (typeof window.receiveCardRepaintIfNeeded === "function") {
+        try {
+          window.receiveCardRepaintIfNeeded();
+        } catch (eRcRepaint2) {
+          /* ignore */
+        }
+      }
+      if (typeof window.cardplaySyncUpperHandLayout === "function") {
+        try {
+          var cpHand = document.getElementById("cardplay-card-grid");
+          if (cpHand) window.cardplaySyncUpperHandLayout(cpHand);
+        } catch (eCpHand) {
+          /* ignore */
+        }
+      }
       if (typeof window.risqueArtemisDiag === "function") {
         window.risqueArtemisDiag("refresh_look_ok", "game.css reloaded", {
           source: sourceLabel || "unknown",

@@ -35,6 +35,63 @@
     return !!document.getElementById("attack-toolbar-strip");
   }
 
+  /** True only when attack toolbar exists, ROLL is wired, and initAttackPhase has run. */
+  function attackControlsReady() {
+    if (!attackChromePresent()) return false;
+    if (!document.getElementById("roll")) return false;
+    if (!document.getElementById("control-voice")) return false;
+    var hudRoot = document.getElementById("runtime-hud-root");
+    if (hudRoot && hudRoot.classList.contains("runtime-hud-root--login")) return false;
+    return !!window.__risqueAttackInitialized;
+  }
+
+  function ensureAttackStageVisible() {
+    document.body.classList.add("risque-setup-fullstage");
+    if (typeof window.risqueRestoreHostMapCanvasFromPhaseArtifacts === "function") {
+      window.risqueRestoreHostMapCanvasFromPhaseArtifacts();
+    }
+    if (window.gameUtils && typeof window.gameUtils.resizeCanvas === "function") {
+      try {
+        window.gameUtils.resizeCanvas();
+      } catch (eResize) {
+        /* ignore */
+      }
+    }
+  }
+
+  function ensureAttackHudShell(uio) {
+    if (!uio || !window.risqueRuntimeHud) return;
+    var incomplete =
+      !document.getElementById("control-voice") ||
+      !document.getElementById("hud-main-panel") ||
+      !document.getElementById("hud-attack-chrome");
+    if (incomplete && typeof window.risqueRuntimeHud.ensure === "function") {
+      window.risqueRuntimeHud.ensure(uio);
+    }
+  }
+
+  function finishAttackMountInit(gs) {
+    if (
+      typeof window.risqueArtemisShouldAttackChromeBeInteractive === "function" &&
+      !window.risqueArtemisShouldAttackChromeBeInteractive(gs)
+    ) {
+      return;
+    }
+    if (!window.__risqueAttackInitialized && typeof window.initAttackPhase === "function") {
+      if (document.getElementById("roll")) {
+        window.__risqueAttackMountEpoch = (window.__risqueAttackMountEpoch || 0) + 1;
+        try {
+          window.initAttackPhase(window.__risqueAttackMountEpoch);
+        } catch (eInit) {
+          /* ignore */
+        }
+      }
+    }
+    if (attackControlsReady()) {
+      refreshActiveAttackClient(gs);
+    }
+  }
+
   function attackMountKey(gs) {
     if (!gs) return "";
     return String(ownerSlot(gs)) + ":" + normName(gs.currentPlayer);
@@ -553,7 +610,7 @@
     var up = normName(gs.currentPlayer);
     var ctrl = ownerSlot(gs);
     var mountKey = String(ctrl) + ":" + up;
-    if (attackMountedFor === mountKey && attackChromePresent()) {
+    if (attackMountedFor === mountKey && attackControlsReady()) {
       setHostAttackSpectatorBodyClass(false);
       stripSetupHudClasses();
       if (typeof window.risqueRuntimeHud.setAttackChromeInteractive === "function") {
@@ -571,7 +628,8 @@
     if (typeof window.risqueArtemisRestoreHostAttackChrome === "function") {
       window.risqueArtemisRestoreHostAttackChrome();
     }
-    document.body.classList.add("risque-setup-fullstage");
+    ensureAttackStageVisible();
+    ensureAttackHudShell(document.getElementById("ui-overlay"));
     var stageHost = document.getElementById("stage-host") || document.body;
     if (typeof window.risquePhases.attack.mount === "function") {
       window.risquePhases.attack.mount(stageHost, {
@@ -600,6 +658,7 @@
       }
     }
     wireOmniToggles(gs);
+    finishAttackMountInit(gs);
   }
 
   function softNavigateAttack(gs) {
@@ -635,7 +694,7 @@
         window.risqueArtemisReconcileClientPlayMode(gs);
       }
     }
-    if (!attackChromePresent()) {
+    if (!attackControlsReady()) {
       attackMountedFor = "";
       mountRealAttack(gs);
     } else {
@@ -738,7 +797,7 @@
         }
       }
       var mountKey = attackMountKey(gs);
-      if (mountKey && attackMountedFor === mountKey && attackChromePresent()) {
+      if (mountKey && attackMountedFor === mountKey && attackControlsReady()) {
         refreshActiveAttackClient(gs);
         return;
       }

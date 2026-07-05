@@ -249,6 +249,14 @@
     }
   }
 
+  /** Login minimal shell strips classes without rebuilding — require voice + main panel before skipping ensure(). */
+  function runtimeHudShellIsComplete() {
+    return !!(
+      document.getElementById("control-voice") &&
+      document.getElementById("hud-main-panel")
+    );
+  }
+
   /**
    * Full game HUD shell (stats, control panel, voice, log). Replaces login or setup shells only.
    */
@@ -274,7 +282,8 @@
     if (
       existingRoot &&
       !existingRoot.classList.contains("runtime-hud-root--login") &&
-      !existingRoot.classList.contains("runtime-hud-root--setup")
+      !existingRoot.classList.contains("runtime-hud-root--setup") &&
+      runtimeHudShellIsComplete()
     ) {
       return;
     }

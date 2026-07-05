@@ -4089,15 +4089,18 @@ body[data-risque-phase="postgame"] #risque-host-cards-in-hand-panel {
 }
 
 .receivecard-compact-root--simple .receivecard-hand-strip--upper {
-  flex: 0 0 auto;
-  overflow: visible;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
   padding-bottom: 4px;
   box-sizing: border-box;
 }
 
-/* Five cards in the upper hand pane: flex + 138px thumbs overflow — fit one row (staging stays larger). */
+/* Legacy five-up grid override — superseded by host receive-card grid (m333); keep one-row fallback. */
 .risque-phase-content
-  .receivecard-hand-strip--upper:has(img.receivecard-thumb:nth-child(5)) {
+  .receivecard-hand-strip--upper:has(img.receivecard-thumb:nth-child(5)):not(
+    .receivecard-hand-strip--upper-two-row
+  ) {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 5px 6px;
@@ -4108,7 +4111,9 @@ body[data-risque-phase="postgame"] #risque-host-cards-in-hand-panel {
 }
 
 .risque-phase-content
-  .receivecard-hand-strip--upper:has(img.receivecard-thumb:nth-child(5))
+  .receivecard-hand-strip--upper:has(img.receivecard-thumb:nth-child(5)):not(
+    .receivecard-hand-strip--upper-two-row
+  )
   .receivecard-thumb {
   width: 100% !important;
   max-width: 100% !important;
@@ -4310,6 +4315,21 @@ body[data-risque-phase="postgame"] #risque-host-cards-in-hand-panel {
 .risque-phase-content .receivecard-compact-root--simple .receivecard-thumb {
   width: 138px !important;
   height: 213px !important;
+}
+
+/* Dual-pane upper/staging strips override fixed 138×213 — grid scales thumbs to fit (m334). */
+.risque-phase-content
+  .receivecard-compact-root--simple
+  .receivecard-hand-strip--upper
+  .receivecard-thumb,
+.risque-phase-content
+  .receivecard-compact-root--simple
+  .receivecard-staging-grid
+  .receivecard-thumb {
+  width: auto !important;
+  height: auto !important;
+  max-width: 100% !important;
+  flex-shrink: 1 !important;
 }
 
 /* New draw matches hand size; halo distinguishes it (no second tier / duplicate image) */
@@ -7588,42 +7608,107 @@ body.risque-view-host[data-risque-phase="receivecard"] .receivecard-hand-staging
   overflow: hidden;
 }
 
-body.risque-view-host[data-risque-phase="receivecard"] .receivecard-hand-strip--upper,
+/* Five-across grid; thumbs scale to pane (1 row ≤5, 2 rows for 6–9 — no overlap / clip). */
+body.risque-view-host[data-risque-phase="receivecard"] .receivecard-hand-strip--upper {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px 5px;
+  align-content: start;
+  justify-items: center;
+  align-items: start;
+  flex-wrap: unset !important;
+  overflow: hidden !important;
+  box-sizing: border-box;
+}
+
+body.risque-view-host[data-risque-phase="receivecard"]
+  .receivecard-hand-strip--upper.receivecard-hand-strip--upper-one-row,
+body.risque-view-host[data-risque-phase="receivecard"]
+  .receivecard-hand-strip--upper:not(.receivecard-hand-strip--upper-two-row):not(
+    :has(img.receivecard-thumb:nth-child(4))
+  ) {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+body.risque-view-host[data-risque-phase="receivecard"]
+  .receivecard-hand-strip--upper.receivecard-hand-strip--upper-two-row,
+body.risque-view-host[data-risque-phase="receivecard"]
+  .receivecard-hand-strip--upper:has(img.receivecard-thumb:nth-child(4)) {
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  align-content: stretch;
+}
+
+body.risque-view-host[data-risque-phase="receivecard"]
+  .receivecard-hand-strip--upper
+  .receivecard-thumb {
+  width: auto !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: var(--receivecard-upper-row-h, 100%) !important;
+  min-height: 0;
+  object-fit: contain !important;
+  flex-shrink: 1 !important;
+  box-sizing: border-box;
+}
+
+body.risque-view-host[data-risque-phase="receivecard"]
+  .receivecard-hand-stack--upper-two-row
+  .receivecard-hand-strip--upper {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  align-content: stretch;
+}
+
+body.risque-view-host[data-risque-phase="receivecard"]
+  .receivecard-hand-staging-split
+  .receivecard-hand-stack
+  .receivecard-hand-strip--upper {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  width: 100%;
+}
+
 body.risque-view-host[data-risque-phase="receivecard"] .receivecard-staging-grid {
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  align-content: center;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px 5px;
+  align-content: start;
+  justify-items: center;
+  align-items: start;
   overflow: hidden;
   box-sizing: border-box;
 }
 
-/* Five-across slot width (cardplay shelf proportions); scale down to fit pane after merge. */
 body.risque-view-host[data-risque-phase="receivecard"]
-  .receivecard-compact-root--simple
+  .receivecard-staging-grid
   .receivecard-thumb {
-  width: clamp(72px, calc((100% - 24px) / 5), 138px) !important;
-  max-width: 138px !important;
+  width: 100% !important;
+  max-width: 100% !important;
   height: auto !important;
-  max-height: min(213px, calc(100% - 12px)) !important;
+  max-height: min(180px, 100%) !important;
   object-fit: contain !important;
-  flex-shrink: 1;
   box-sizing: border-box;
 }
 
 body.risque-view-host[data-risque-phase="receivecard"]
-  .receivecard-hand-strip--upper:has(img.receivecard-thumb:nth-child(5))
+  .risque-phase-content
+  .receivecard-compact-root--simple
+  .receivecard-hand-strip--upper
+  .receivecard-thumb,
+body.risque-view-host[data-risque-phase="receivecard"]
+  .risque-phase-content
+  .receivecard-compact-root--simple
+  .receivecard-staging-grid
   .receivecard-thumb {
   width: 100% !important;
+  height: auto !important;
   max-width: 100% !important;
-  max-height: min(213px, calc(100% - 8px)) !important;
 }
 
-/* Conquest elimination: hide prompt under banner; 5-up grid; smaller thumbs (≤2 rows for 9 cards) */
+/* Conquest elimination: hide prompt under banner; dual-pane grid fits up to 9 in upper / 5 in staging */
 body.risque-view-host[data-risque-phase="receivecard"]
   .receivecard-compact-root--conquest-elim.receivecard-compact-root--simple {
   gap: 4px;
@@ -7656,45 +7741,10 @@ body.risque-view-host[data-risque-phase="receivecard"]
 
 body.risque-view-host[data-risque-phase="receivecard"]
   .receivecard-compact-root--conquest-elim
-  .receivecard-hand-strip--upper,
-body.risque-view-host[data-risque-phase="receivecard"]
-  .receivecard-compact-root--conquest-elim
-  .receivecard-staging-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 5px 6px;
-  align-items: start;
-  justify-items: center;
-}
-
-body.risque-view-host[data-risque-phase="receivecard"]
-  .receivecard-compact-root--conquest-elim
-  .receivecard-hand-strip--upper {
-  overflow: visible;
-}
-
-body.risque-view-host[data-risque-phase="receivecard"]
-  .receivecard-compact-root--conquest-elim
-  .receivecard-staging-grid {
-  min-height: 0;
-}
-
-body.risque-view-host[data-risque-phase="receivecard"]
-  .receivecard-compact-root--conquest-elim
   .receivecard-staging-wrap {
   min-height: 0;
   padding-top: 8px;
   padding-bottom: 10px;
-}
-
-body.risque-view-host[data-risque-phase="receivecard"]
-  .risque-phase-content
-  .receivecard-compact-root--conquest-elim
-  .receivecard-thumb {
-  width: 102px !important;
-  height: 157px !important;
-  max-width: 100%;
-  object-fit: contain;
 }
 
 body.risque-view-host[data-risque-phase="receivecard"] .receivecard-strip-label {
@@ -7794,14 +7844,56 @@ html.risque-artemis-client.risque-artemis-my-turn.risque-view-host body[data-ris
 }
 
 #runtime-hud-root.runtime-hud-root--receivecard-panel-only
-  .receivecard-compact-root--simple
+  .receivecard-hand-strip--upper {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px 5px;
+  align-content: start;
+  justify-items: center;
+  flex-wrap: unset !important;
+  overflow: hidden !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  width: 100%;
+}
+
+#runtime-hud-root.runtime-hud-root--receivecard-panel-only
+  .receivecard-hand-strip--upper.receivecard-hand-strip--upper-two-row,
+#runtime-hud-root.runtime-hud-root--receivecard-panel-only
+  .receivecard-hand-strip--upper:has(img.receivecard-thumb:nth-child(4)) {
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  align-content: stretch;
+}
+
+#runtime-hud-root.runtime-hud-root--receivecard-panel-only
+  .receivecard-hand-strip--upper.receivecard-hand-strip--upper-one-row,
+#runtime-hud-root.runtime-hud-root--receivecard-panel-only
+  .receivecard-hand-strip--upper:not(.receivecard-hand-strip--upper-two-row):not(
+    :has(img.receivecard-thumb:nth-child(4))
+  ) {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+#runtime-hud-root.runtime-hud-root--receivecard-panel-only
+  .receivecard-hand-strip--upper
   .receivecard-thumb {
-  width: clamp(72px, calc((100% - 24px) / 5), 138px) !important;
-  max-width: 138px !important;
+  width: auto !important;
+  max-width: 100% !important;
   height: auto !important;
-  max-height: min(213px, calc(100% - 12px)) !important;
+  max-height: var(--receivecard-upper-row-h, 100%) !important;
   object-fit: contain !important;
-  flex-shrink: 1;
+  flex-shrink: 1 !important;
+  box-sizing: border-box;
+}
+
+#runtime-hud-root.runtime-hud-root--receivecard-panel-only
+  .receivecard-staging-grid
+  .receivecard-thumb {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: min(180px, 100%) !important;
+  object-fit: contain !important;
   box-sizing: border-box;
 }
 
@@ -12082,6 +12174,11 @@ html.risque-artemis-host-launcher-active #risque-wayback-connected-flag {
   gap: 10px;
 }
 
+.risque-artemis-host-launcher-row--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
 .risque-artemis-host-launcher-chip {
   flex: 1 1 140px;
   min-width: 0;
@@ -12101,6 +12198,14 @@ html.risque-artemis-host-launcher-active #risque-wayback-connected-flag {
 .risque-artemis-host-launcher-chip--rig {
   flex: 1 1 calc(50% - 10px);
   font-size: 13px;
+}
+
+.risque-artemis-host-launcher-chip--wide {
+  width: 100%;
+  flex: 1 1 100%;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  padding: 10px 14px;
 }
 
 .risque-artemis-host-launcher-chip:hover {
@@ -14708,4 +14813,465 @@ html.risque-artemis-host
   min-height: 0 !important;
   overflow: hidden !important;
   justify-content: flex-start !important;
+}
+
+/* m336 — Conquest elimination: full-screen celebration overlay + active-player roster fade */
+#risque-conquest-confetti-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 100049;
+  pointer-events: none;
+}
+
+.risque-conquest-celebration-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100048;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.risque-conquest-celebration-overlay--shown {
+  opacity: 1;
+}
+
+.risque-conquest-celebration-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  animation: risque-conquest-backdrop-flash 1.1s ease-out forwards;
+}
+
+@keyframes risque-conquest-backdrop-flash {
+  0% {
+    background: rgba(255, 220, 120, 0.72);
+  }
+  35% {
+    background: rgba(20, 12, 0, 0.62);
+  }
+  100% {
+    background: rgba(0, 0, 0, 0.68);
+  }
+}
+
+.risque-conquest-celebration-panel {
+  position: relative;
+  z-index: 2;
+  width: min(560px, 96vw);
+  padding: 22px 20px 18px;
+  border-radius: 14px;
+  border: 2px solid rgba(251, 191, 36, 0.75);
+  background: linear-gradient(165deg, rgba(15, 23, 42, 0.96), rgba(30, 20, 5, 0.94));
+  box-shadow:
+    0 0 48px rgba(251, 191, 36, 0.35),
+    0 18px 50px rgba(0, 0, 0, 0.65);
+  text-align: center;
+  pointer-events: auto;
+  animation: risque-conquest-panel-pop 0.65s cubic-bezier(0.22, 1.12, 0.36, 1) forwards;
+}
+
+@keyframes risque-conquest-panel-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.82) translateY(18px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.risque-conquest-celebration-badge {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #0f172a;
+  background: linear-gradient(90deg, #fde68a, #fbbf24, #fde68a);
+  background-size: 200% 100%;
+  animation: risque-conquest-badge-shimmer 2.4s ease-in-out infinite;
+}
+
+@keyframes risque-conquest-badge-shimmer {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.risque-conquest-celebration-headline {
+  margin: 0 0 14px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: clamp(22px, 4.2vw, 38px);
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #fffbeb;
+  text-shadow:
+    0 0 24px rgba(251, 191, 36, 0.55),
+    0 2px 10px rgba(0, 0, 0, 0.85);
+  animation: risque-conquest-headline-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes risque-conquest-headline-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+.risque-conquest-celebration-headline-mid {
+  display: block;
+  margin: 6px 0;
+  font-size: clamp(13px, 2vw, 17px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #cbd5e1;
+  text-transform: uppercase;
+}
+
+.risque-conquest-celebration-defeated {
+  display: inline-block;
+  text-decoration: line-through;
+  text-decoration-thickness: 3px;
+  text-decoration-color: rgba(248, 113, 113, 0.85);
+}
+
+.risque-conquest-roster {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.risque-conquest-roster-label {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.risque-conquest-roster-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.risque-conquest-roster-item {
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(100, 116, 139, 0.45);
+  transition:
+    opacity 1.1s ease,
+    transform 1.1s ease,
+    filter 1.1s ease,
+    max-width 1.1s ease,
+    padding 1.1s ease,
+    margin 1.1s ease;
+}
+
+.risque-conquest-roster-item--conqueror {
+  border-color: rgba(251, 191, 36, 0.75);
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.35);
+  animation: risque-conquest-roster-crown 1.6s ease-in-out infinite;
+}
+
+@keyframes risque-conquest-roster-crown {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.risque-conquest-roster-item--eliminated {
+  animation: risque-conquest-roster-eliminate 2.4s ease forwards;
+  animation-delay: 0.85s;
+}
+
+@keyframes risque-conquest-roster-eliminate {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    filter: none;
+    text-decoration: none;
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.04);
+    filter: brightness(1.15);
+  }
+  70% {
+    opacity: 0.45;
+    transform: scale(0.92);
+    filter: grayscale(0.6);
+    text-decoration: line-through;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.75);
+    filter: grayscale(1) blur(1px);
+    text-decoration: line-through;
+    padding-top: 0;
+    padding-bottom: 0;
+    max-width: 0;
+    margin: 0;
+    border-width: 0;
+    overflow: hidden;
+  }
+}
+
+.risque-conquest-celebration-sub {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.risque-conquest-overlay-proceed {
+  width: 100%;
+  max-width: 360px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 2px solid #000;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: #000;
+  background: #22c55e;
+  box-shadow: 0 0 18px rgba(34, 197, 94, 0.45);
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 0.45s ease,
+    transform 0.45s ease,
+    background 0.15s ease;
+}
+
+.risque-conquest-overlay-proceed--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.risque-conquest-overlay-proceed:hover {
+  background: #4ade80;
+}
+
+.risque-conquest-sparkles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.risque-conquest-sparkle {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: #fde68a;
+  opacity: 0;
+  animation: risque-conquest-sparkle-burst 1.4s ease-out forwards;
+  animation-delay: calc(var(--i) * 0.05s);
+  transform: rotate(calc(var(--i) * 22.5deg)) translateY(0);
+}
+
+@keyframes risque-conquest-sparkle-burst {
+  0% {
+    opacity: 0;
+    transform: rotate(calc(var(--i) * 22.5deg)) translateY(0) scale(0.3);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(calc(var(--i) * 22.5deg)) translateY(min(-42vh, -220px)) scale(1.2);
+  }
+}
+
+#control-voice-text .risque-conquest-celebration-root,
+.risque-conquest-celebration-root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 4px 4px 8px;
+  text-align: center;
+  max-width: 100%;
+}
+
+.risque-conquest-celebration-line {
+  font-family: Arial, sans-serif;
+  font-weight: 900;
+  font-size: clamp(14px, 1.35vw, 20px);
+  line-height: 1.25;
+  color: #fde68a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 12px rgba(251, 191, 36, 0.45);
+  animation: risque-conquest-line-flash 0.55s ease-in-out infinite;
+}
+
+.risque-conquest-celebration-line--steady {
+  animation: none;
+  opacity: 1;
+}
+
+@keyframes risque-conquest-line-flash {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.risque-conquest-celebration-tv-hint,
+.risque-conquest-celebration-wait {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  max-width: 280px;
+}
+
+.risque-conquest-celebration-btn {
+  width: 100%;
+  max-width: 280px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  background: #22c55e;
+  color: #0f172a;
+}
+
+.risque-conquest-celebration-btn:hover {
+  background: #4ade80;
+}
+
+/* m335 — cardplay upper hand (#cardplay-card-grid): 5×2 grid, scaled thumbs (conquest 4–9 card hands).
+ * Previous flex-wrap + fixed 120×186 / 213px slots clipped row 2 behind overflow:hidden on the 50% pane. */
+.runtime-hud-root--cardplay-panel-only #cardplay-card-grid.cardplay-hand-row.cardplay-card-row {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 4px 5px !important;
+  flex-wrap: unset !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden !important;
+  align-items: start !important;
+  align-content: start !important;
+  justify-content: unset !important;
+  justify-items: center !important;
+  padding: 4px 0 2px !important;
+}
+
+.runtime-hud-root--cardplay-panel-only #cardplay-card-grid.cardplay-hand-two-row {
+  grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.runtime-hud-root--cardplay-panel-only #cardplay-card-grid.cardplay-hand-one-row {
+  grid-template-rows: minmax(0, 1fr) !important;
+}
+
+.runtime-hud-root--cardplay-panel-only
+  #cardplay-card-grid.cardplay-hand-row
+  .card.cardplay-compact-card {
+  width: auto !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: var(--cardplay-hand-row-h, 100%) !important;
+  flex: unset !important;
+}
+
+.runtime-hud-root--cardplay-panel-only #cardplay-card-grid.cardplay-hand-row .cardplay-hand-slot {
+  width: auto !important;
+  max-width: 100% !important;
+  min-height: 0 !important;
+  max-height: var(--cardplay-hand-row-h, 100%) !important;
+  height: var(--cardplay-hand-row-h, auto) !important;
+}
+
+html.risque-artemis-host
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .cardplay-hand-staging-split
+  > .cardplay-hand-stack,
+html.risque-artemis-client.risque-artemis-my-turn
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  .cardplay-hand-staging-split
+  > .cardplay-hand-stack {
+  overflow-y: hidden !important;
+}
+
+html.risque-artemis-host
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  #cardplay-card-grid.cardplay-hand-row
+  .card.cardplay-compact-card,
+html.risque-artemis-client.risque-artemis-my-turn
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  #cardplay-card-grid.cardplay-hand-row
+  .card.cardplay-compact-card {
+  width: auto !important;
+  max-width: 100% !important;
+  max-height: var(--cardplay-hand-row-h, 100%) !important;
+}
+
+html.risque-artemis-host
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  #cardplay-card-grid
+  .cardplay-hand-slot,
+html.risque-artemis-client.risque-artemis-my-turn
+  .runtime-hud-root--artemis-cardplay.runtime-hud-root--cardplay-panel-only
+  #cardplay-card-grid
+  .cardplay-hand-slot {
+  width: auto !important;
+  max-width: 100% !important;
+  min-height: 0 !important;
+  max-height: var(--cardplay-hand-row-h, 100%) !important;
 }

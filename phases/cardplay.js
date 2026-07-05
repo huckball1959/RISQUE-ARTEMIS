@@ -2386,6 +2386,7 @@
       if (typeof window.risqueArtemisEnsureCardplayDualPane === "function") {
         window.risqueArtemisEnsureCardplayDualPane(window.gameState);
       }
+      cardplaySyncUpperHandLayout(handGrid);
       refreshValidBookReminder();
     }
 
@@ -4575,6 +4576,61 @@
       proceedCardplayToIncome();
     }
 
+  /** Upper hand pane (#cardplay-card-grid): 5×2 grid + measured row height so 4–9 cards fit without clipping. */
+  function cardplaySyncUpperHandLayout(handGrid) {
+    if (!handGrid || handGrid.id !== "cardplay-card-grid") return;
+    var root = document.getElementById("runtime-hud-root");
+    if (!root || !root.classList.contains("runtime-hud-root--cardplay-panel-only")) return;
+    var items = handGrid.querySelectorAll("img.cardplay-compact-card, .cardplay-hand-slot");
+    var n = items.length;
+    var twoRow = n >= 4;
+    try {
+      handGrid.setAttribute("data-cardplay-hand-count", String(n));
+    } catch (eAttr) {
+      /* ignore */
+    }
+    handGrid.classList.toggle("cardplay-hand-two-row", twoRow);
+    handGrid.classList.toggle("cardplay-hand-one-row", n > 0 && !twoRow);
+    var stack = handGrid.closest(".cardplay-hand-stack");
+    if (stack) {
+      stack.classList.toggle("cardplay-hand-stack--two-row", twoRow);
+    }
+
+    function applyMeasuredHeights() {
+      var stripH = handGrid.clientHeight;
+      if (stripH < 12) return;
+      var rows = twoRow ? 2 : 1;
+      var rowGap = 4;
+      var cellH = Math.max(48, Math.floor((stripH - rowGap * (rows - 1)) / rows));
+      try {
+        handGrid.style.setProperty("--cardplay-hand-row-h", cellH + "px");
+      } catch (eVar) {
+        /* ignore */
+      }
+      for (var i = 0; i < items.length; i += 1) {
+        var el = items[i];
+        if (el.tagName === "IMG") {
+          el.style.maxHeight = cellH + "px";
+          el.style.width = "auto";
+          el.style.height = "auto";
+          el.style.maxWidth = "100%";
+        } else {
+          el.style.height = cellH + "px";
+          el.style.width = "auto";
+          el.style.maxWidth = "100%";
+          el.style.minHeight = "0";
+          el.style.maxHeight = cellH + "px";
+        }
+      }
+    }
+
+    applyMeasuredHeights();
+    requestAnimationFrame(function () {
+      applyMeasuredHeights();
+      requestAnimationFrame(applyMeasuredHeights);
+    });
+  }
+
   function mount(host, opts) {
     mountOpts = opts || {};
     injectStyles();
@@ -4691,4 +4747,5 @@
 
   window.risquePhases = window.risquePhases || {};
   window.risquePhases.cardplay = { mount: mount };
+  window.cardplaySyncUpperHandLayout = cardplaySyncUpperHandLayout;
 })();
