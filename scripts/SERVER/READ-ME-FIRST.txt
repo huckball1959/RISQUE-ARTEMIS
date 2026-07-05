@@ -19,6 +19,8 @@ EVERY GAME NIGHT
   6. When done: STOP-ARTEMIS.bat
 
 START updates artemis-host-ip.txt in LAPTOP 2 / LAPTOP 3 automatically.
+Guido host IP is reserved on Deco at 192.168.68.51 (July 2026).
+Client LAPTOP folders read artemis-host-ip.txt — re-copy after START if IP ever changes.
 
 WHEN YOU CHANGE LAUNCH URLS IN DEVELOPMENT
   Edit ONE file: launchers\profiles.json

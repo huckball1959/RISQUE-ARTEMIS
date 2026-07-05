@@ -5,26 +5,22 @@ COPY THIS ENTIRE FOLDER to Mictor's laptop desktop (overwrite the old one).
 
 Files in this folder:
   JOIN.bat                    <- double-click this every game night
-  ARTEMIS-JOIN.bat            <- real launcher (JOIN.bat calls this);
-                                 the host IP is baked in near the top
+  ARTEMIS-JOIN.bat            <- real launcher (JOIN.bat calls this)
   _artemis-launch-browser.bat <- helper (do not delete)
-  artemis-host-ip.txt         <- reference copy of the host IP (auto-synced)
+  artemis-host-ip.txt         <- host IP (auto-updated by START-ARTEMIS)
   artemis-seat.txt            <- reference copy of the seat (Player 2)
 
-CURRENT HOST IP: 192.168.68.56
-  (Set after switching to the TP-Link Deco mesh, July 2026.)
+HOST IP: 192.168.68.51 (reserved on TP-Link Deco for Guido's laptop, July 2026)
 
 SETUP
   1. Guido runs START-ARTEMIS.bat on the host PC first
   2. Copy this folder to Mictor's desktop (overwrite old folder if asked)
   3. Mictor double-clicks JOIN.bat
 
-IF THE HOST IP CHANGES AGAIN (new router, or "site can't be reached"):
-  1. On the host PC, run ipconfig and read the IPv4 Address
-  2. Open ARTEMIS-JOIN.bat and edit the ONE line:  set "HOST_IP=..."
-  3. Re-copy this whole folder to Mictor's laptop
-  (Editing artemis-host-ip.txt alone is NOT enough anymore — the batch
-   is now the source of truth and rewrites that text file on each run.)
+IF THE HOST IP CHANGES AGAIN (should be rare — IP is reserved on Deco):
+  1. Guido runs START-ARTEMIS.bat (updates artemis-host-ip.txt here)
+  2. Re-copy this whole folder to Mictor's laptop
+  No need to edit ARTEMIS-JOIN.bat by hand anymore.
 
 ALL 3 LAPTOPS MUST BE ON THE SAME WI-FI / SUBNET
   Every laptop's IPv4 should start with the same first three numbers as

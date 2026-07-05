@@ -8,23 +8,23 @@ REM  Connects to the host "traffic cop" (/join/p3); the host then
 REM  redirects to whatever test/build is active. Never edit URL
 REM  params here — change launchers on the HOST only.
 REM
-REM  >>> IF THE ROUTER OR HOST IP CHANGES, EDIT ONE LINE BELOW <<<
-REM  (the HOST_IP line). Then re-copy this folder to the laptop.
+REM  Host IP: read from artemis-host-ip.txt (updated when Guido
+REM  runs START-ARTEMIS.bat). Re-copy this folder after START if
+REM  the IP ever changes. Fallback default matches Deco reservation.
 REM ============================================================
 
 set "PORT=5700"
 set "DIR=%~dp0"
+set "HOST_IP="
 
-REM ============================================================
-REM  HOST IP — single source of truth. Edit ONLY this line if the
-REM  host's address changes (check with ipconfig on the host PC).
-REM ============================================================
-set "HOST_IP=192.168.68.56"
+if exist "%DIR%artemis-host-ip.txt" set /p HOST_IP=<"%DIR%artemis-host-ip.txt"
+set "HOST_IP=!HOST_IP: =!"
+
+if not defined HOST_IP set "HOST_IP=192.168.68.51"
 
 REM  This folder is always Player 3 (Nooch).
 set "JOIN_KEY=p3"
 
-REM  Keep the reference text files in sync (not read for launching).
 >"%DIR%artemis-host-ip.txt" echo !HOST_IP!
 >"%DIR%artemis-seat.txt" echo 3
 
@@ -38,8 +38,8 @@ echo  !URL!
 echo.
 echo  If you see "site can't be reached":
 echo    1^) Make sure Guido ran START-ARTEMIS.bat on the host PC
-echo    2^) Check the host IP with ipconfig ^(IPv4 Address^) and, if it
-echo       changed, edit the HOST_IP line in this file, then re-copy.
+echo    2^) On Guido, re-copy this folder from scripts\LAPTOP 3\
+echo       ^(START updates artemis-host-ip.txt automatically^)
 echo.
 echo  Fullscreen in game: Ctrl+Shift+F   Esc = exit
 echo.
