@@ -63,8 +63,8 @@
     "MICTOR",
     "NOOCH"
   ],
-  "risqueArtemisAutoSaveId": "conquer-mictor-nooch",
-  "risqueArtemisAutoSaveLabel": "CONQUER TEST — Mictor eliminates Nooch, then Guido (attack)",
+  "risqueArtemisAutoSaveId": "conquer-nooch-guido-cardplay",
+  "risqueArtemisAutoSaveLabel": "CONQUER TEST — Nooch card-win vs Guido (2 books + Alaska)",
   "artemisRoster": [
     {
       "slot": 1,
@@ -82,11 +82,11 @@
       "color": "green"
     }
   ],
-  "artemisControlSlot": 2,
+  "artemisControlSlot": 3,
   "risqueArtemisControlSeq": 2,
   "risqueConquestChainActive": true,
-  "phase": "attack",
-  "attackPhase": "attack",
+  "phase": "cardplay",
+  "attackPhase": null,
   "players": [
     {
       "name": "GUIDO",
@@ -99,23 +99,23 @@
       "cards": [
         {
           "name": "greenland",
-          "id": "3e90b1f0-9b6d-4ad5-8edb-d8dc61bde7d5"
+          "id": "b484235f-707f-4468-8c7f-42d3aaf2bc1b"
         },
         {
           "name": "ontario",
-          "id": "cb423704-0ea2-4484-ad46-80f850678b21"
+          "id": "63a77723-f305-4918-b425-c1199aa845ca"
         },
         {
           "name": "quebec",
-          "id": "ed9c9e32-f4d1-4a70-9a16-90e7c2c4af2e"
+          "id": "a0dfe125-a667-4723-97c1-841537c3dfa0"
         },
         {
           "name": "alberta",
-          "id": "0328dc6a-9634-44f1-abb4-5240064b804b"
+          "id": "df7ac651-a61c-448e-ae18-af0f37311ae8"
         },
         {
           "name": "japan",
-          "id": "c89fa960-6abc-4f89-82d5-924e20ceb410"
+          "id": "938c1d3e-c6b1-414f-9b15-5ef79c79f350"
         }
       ],
       "territories": [
@@ -134,23 +134,56 @@
       "bookValue": 0,
       "continentValues": {},
       "bankValue": 0,
-      "cardCount": 4,
+      "cardCount": 0,
+      "cards": [],
+      "territories": [],
+      "troopsTotal": 0,
+      "confirmed": true
+    },
+    {
+      "name": "NOOCH",
+      "color": "green",
+      "playerOrder": 3,
+      "bookValue": 0,
+      "continentValues": {},
+      "bankValue": 0,
+      "cardCount": 9,
       "cards": [
         {
-          "name": "argentina",
-          "id": "cb92d1b4-0184-4cf5-94a2-4359e617b938"
-        },
-        {
           "name": "brazil",
-          "id": "c4130f15-6362-4515-b1e6-94b6ac8f71e7"
+          "id": "926fa3f7-5cef-4401-be9a-491dd68dbe3b"
         },
         {
-          "name": "peru",
-          "id": "9e293d64-1545-496f-bf28-5a5d6be33b80"
+          "name": "indonesia",
+          "id": "a8eacb08-3a94-4363-9a1c-ddfae69dc8e9"
+        },
+        {
+          "name": "north_africa",
+          "id": "3ef10a7d-043d-4dc6-827c-56529cf9f32d"
+        },
+        {
+          "name": "eastern_australia",
+          "id": "a08fdd51-d9fd-4b66-93ba-a4689ac8fbb8"
+        },
+        {
+          "name": "new_guinea",
+          "id": "6a40758e-9459-44a0-85e1-a40901fb5f41"
+        },
+        {
+          "name": "greenland",
+          "id": "a996b1fd-4e28-40e9-b8f4-e58120415cb3"
         },
         {
           "name": "alaska",
-          "id": "e8754374-7404-49e1-bb39-2e43c4ecc461"
+          "id": "e5364078-e978-4e8f-8136-163d1bdafa45"
+        },
+        {
+          "name": "japan",
+          "id": "cd713021-403c-4aeb-8b58-6f2d9dd2fa3a"
+        },
+        {
+          "name": "irkutsk",
+          "id": "666b7519-5c1d-4995-ba0c-97940629828a"
         }
       ],
       "territories": [
@@ -276,7 +309,7 @@
         },
         {
           "name": "kamchatka",
-          "troops": 50
+          "troops": 3
         },
         {
           "name": "middle_east",
@@ -308,64 +341,29 @@
         },
         {
           "name": "indonesia",
-          "troops": 50
+          "troops": 3
         },
         {
           "name": "new_guinea",
           "troops": 3
-        }
-      ],
-      "troopsTotal": 214,
-      "confirmed": true
-    },
-    {
-      "name": "NOOCH",
-      "color": "green",
-      "playerOrder": 3,
-      "bookValue": 0,
-      "continentValues": {},
-      "bankValue": 0,
-      "cardCount": 5,
-      "cards": [
-        {
-          "name": "eastern_australia",
-          "id": "c8bb120f-057f-44f2-829d-959ab12616cf"
-        },
-        {
-          "name": "new_guinea",
-          "id": "05bfbc7d-f0e1-4e74-8dfe-3001e7a6a8df"
-        },
-        {
-          "name": "siam",
-          "id": "789f7fa3-0eec-4653-9c78-531951120e64"
         },
         {
           "name": "western_australia",
-          "id": "0e5a45e1-02bb-44a7-86fc-b715653ef899"
-        },
-        {
-          "name": "indonesia",
-          "id": "8b036336-da7f-4cad-9419-403501b9c1ab"
+          "troops": 3
         }
       ],
-      "territories": [
-        {
-          "name": "western_australia",
-          "troops": 1
-        }
-      ],
-      "troopsTotal": 1,
+      "troopsTotal": 123,
       "confirmed": true
     }
   ],
   "turnOrder": [
-    "GUIDO",
-    "MICTOR",
-    "NOOCH"
+    "NOOCH",
+    "GUIDO"
   ],
-  "currentPlayer": "MICTOR",
+  "currentPlayer": "NOOCH",
   "deck": [
     "afghanistan",
+    "argentina",
     "central_america",
     "china",
     "congo",
@@ -375,21 +373,22 @@
     "great_britain",
     "iceland",
     "india",
-    "irkutsk",
     "kamchatka",
     "madagascar",
     "middle_east",
     "mongolia",
-    "north_africa",
     "northern_europe",
     "northwest_territory",
+    "peru",
     "scandinavia",
+    "siam",
     "siberia",
     "south_africa",
     "southern_europe",
     "ukraine",
     "ural",
     "venezuela",
+    "western_australia",
     "western_europe",
     "western_united_states",
     "yakutsk",
@@ -469,5 +468,7 @@
       ],
       "bonus": 2
     }
-  }
+  },
+  "risqueConquestElimCardplayFinal": true,
+  "risqueConquestPriorEliminated": "MICTOR"
 }

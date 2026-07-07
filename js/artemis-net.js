@@ -2105,6 +2105,7 @@
       "reinforce",
       "receivecard",
       "getcard",
+      "postgame",
     ];
     if (gameplay.indexOf(mirrorPh) === -1 && gameplay.indexOf(mirrorPhRaw) === -1) return false;
     var wrapLocal = prevPhOpt
@@ -2271,6 +2272,7 @@
   /** Host advanced into cardplay/income while this laptop still shows stale deploy chrome. */
   function clientShouldAcceptGameplayCatchUpMirror(local, incoming) {
     if (!local || !incoming) return false;
+    if (String(incoming.phase || "") === "postgame") return true;
     if (artemisIsTurnWrapToCardplay(local, incoming)) return true;
     var localPh = String(local.phase || "");
     var inPh = String(incoming.phase || "");
@@ -2442,6 +2444,7 @@
     }
     var local = window.gameState;
     if (!local || !incoming) return false;
+    if (String(incoming.phase || "") === "postgame") return false;
     var localPh = String(local.phase || "");
     var inPh = String(incoming.phase || "");
     if (localPh && inPh && localPh !== inPh) {
@@ -2729,6 +2732,7 @@
       "reinforce",
       "receivecard",
       "getcard",
+      "postgame",
     ];
     if (followPhases.indexOf(mirrorPh) === -1) return;
     setTimeout(function () {
@@ -4253,7 +4257,8 @@
             mirrorPhPersist === "getcard" ||
             mirrorPhPersist === "welcome" ||
             mirrorPhPersist === "playerSelect" ||
-            mirrorPhPersist === "deal"
+            mirrorPhPersist === "deal" ||
+            mirrorPhPersist === "postgame"
           ) {
             artemisClientPersistMirrorToLocalStorage(item.state);
           }
@@ -4267,7 +4272,8 @@
             mirrorPhPersist === "deploy" ||
             mirrorPhPersist === "con-deploy" ||
             mirrorPhPersist === "income" ||
-            mirrorPhPersist === "con-income"
+            mirrorPhPersist === "con-income" ||
+            mirrorPhPersist === "postgame"
           ) {
             artemisClientFollowGameplayPhaseFromMirrorSync(
               item.state,

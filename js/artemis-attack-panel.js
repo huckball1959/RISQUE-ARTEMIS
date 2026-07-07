@@ -228,11 +228,9 @@
   }
 
   function stripHostAttackMapInteraction(gs) {
-    if (typeof window.risqueArtemisCancelAttackMapRouting === "function") {
-      window.risqueArtemisCancelAttackMapRouting();
-    }
-    if (typeof window.risqueTeardownAttackPhaseControlListeners === "function") {
-      window.risqueTeardownAttackPhaseControlListeners();
+    if (typeof window.risqueArtemisStripAttackSpectatorMapInteraction === "function") {
+      window.risqueArtemisStripAttackSpectatorMapInteraction(gs);
+      return;
     }
     window.handleTerritoryClick = function () {};
     if (window.gameUtils && gs) {
@@ -341,6 +339,13 @@
 
   function paintHostAttackSpectatorMap(gs) {
     if (!gs || !window.gameUtils) return;
+    if (hostIsAttackSpectator(gs)) {
+      if (typeof window.risqueArtemisReassertHostAttackSpectator === "function") {
+        window.risqueArtemisReassertHostAttackSpectator(gs);
+      } else if (typeof window.risqueArtemisStripAttackSpectatorMapInteraction === "function") {
+        window.risqueArtemisStripAttackSpectatorMapInteraction(gs);
+      }
+    }
     /* Host never runs the transfer pulse ticker — stale pulse from client player_state freezes mid-hop counts (003/001). */
     try {
       delete gs.risqueTransferPulse;
@@ -810,6 +815,9 @@
     attackMountedFor = "";
     if (window.risqueArtemisNetClient) {
       exitClientPlayMode();
+      if (typeof window.risqueArtemisStripAttackSpectatorMapInteraction === "function") {
+        window.risqueArtemisStripAttackSpectatorMapInteraction(gs);
+      }
     }
     if (window.risqueArtemisHost && !window.risqueArtemisNetClient) {
       ensureHostAttackSpectatorChrome(gs);

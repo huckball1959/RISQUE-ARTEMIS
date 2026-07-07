@@ -15194,6 +15194,34 @@ html.risque-artemis-host
   background: #4ade80;
 }
 
+/* m337 — cardplay instructions in control voice (panel hints hidden) */
+.runtime-hud-root--artemis-cardplay .cardplay-hud-hint,
+.runtime-hud-root--artemis-cardplay .cardplay-staging-empty-hint,
+.runtime-hud-root--artemis-cardplay #no-cards-message.cardplay-selection-hint {
+  display: none !important;
+}
+
+.runtime-hud-root--artemis-cardplay #control-voice-report.ucp-voice-report--cardplay-instruction,
+.runtime-hud-root--artemis-cardplay .ucp-voice-report--cardplay-instruction {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+  letter-spacing: 0.02em !important;
+  text-transform: none !important;
+  color: #bbf7d0 !important;
+  margin-top: 4px !important;
+  white-space: pre-wrap !important;
+}
+
+.risque-artemis-host-launcher-subheading {
+  margin: 10px 0 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
 /* m335 — cardplay upper hand (#cardplay-card-grid): 5×2 grid, scaled thumbs (conquest 4–9 card hands).
  * Previous flex-wrap + fixed 120×186 / 213px slots clipped row 2 behind overflow:hidden on the 50% pane. */
 .runtime-hud-root--cardplay-panel-only #cardplay-card-grid.cardplay-hand-row.cardplay-card-row {

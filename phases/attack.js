@@ -1050,10 +1050,42 @@ function checkPlayerElimination(defenderPlayer) {
     } catch (eGs) {
       /* ignore */
     }
+    if (window.risqueArtemisMode && typeof window.risqueArtemisPreparePostgameEntry === "function") {
+      window.risqueArtemisPreparePostgameEntry(window.gameState);
+    } else if (window.risqueArtemisMode) {
+      try {
+        document.documentElement.classList.remove('risque-artemis-login-active');
+        document.documentElement.classList.remove('risque-artemis-login-confirmed');
+        document.body.classList.remove('risque-public-login-active');
+        var hudRoot = document.getElementById('runtime-hud-root');
+        if (hudRoot) hudRoot.classList.remove('runtime-hud-root--login');
+        var legacyLogin = document.getElementById('risque-login-hud-root');
+        if (legacyLogin && legacyLogin.parentNode) legacyLogin.parentNode.removeChild(legacyLogin);
+      } catch (eArtemisPg) {
+        /* ignore */
+      }
+    }
     const dest =
       typeof window.risquePostgameUrl === 'function'
         ? window.risquePostgameUrl()
         : 'game.html?phase=postgame';
+    if (!window.risqueDisplayIsPublic && typeof window.risqueMirrorPushGameState === 'function') {
+      try {
+        window.risqueMirrorPushGameState();
+      } catch (eMirPg) {
+        /* ignore */
+      }
+    } else if (
+      window.risqueArtemisNetClient &&
+      !window.risqueArtemisHost &&
+      typeof window.risqueMirrorPushGameState === "function"
+    ) {
+      try {
+        window.risqueMirrorPushGameState();
+      } catch (eMirPgCl) {
+        /* ignore */
+      }
+    }
     if (typeof window.risqueNavigateWithFade === 'function') {
       window.risqueNavigateWithFade(dest);
     } else {
@@ -1105,8 +1137,9 @@ function checkPlayerElimination(defenderPlayer) {
         /* ignore */
       }
       delete window.__risqueGameWinOverlayMounted;
-      /* Public TV only mirrors the host — never navigate or rewrite STORAGE_KEY from here. */
-      if (window.risqueDisplayIsPublic) return;
+      /* Pure public TV mirrors celebration only — ARTEMIS client laptops still advance to postgame. */
+      var artemisClientLaptop = window.risqueArtemisNetClient && !window.risqueArtemisHost;
+      if (window.risqueDisplayIsPublic && !artemisClientLaptop) return;
       risqueGameWinNavigateToPostgame();
     }, RISQUE_GAME_WIN_OVERLAY_MS);
   };
@@ -6469,7 +6502,18 @@ function clearPendingTransferForMapRetarget() {
   return true;
 }
 
-function risqueAttackPhaseTerritoryClick(label, owner, troops) {
+function risqueAttackPhaseTerritoryClick(label, owner, troops, ev) {
+  if (window.risqueArtemisMode && window.gameState) {
+    if (
+      typeof window.risqueArtemisAttackSpectatorClickBlocked === "function" &&
+      window.risqueArtemisAttackSpectatorClickBlocked(window.gameState)
+    ) {
+      if (typeof window.risqueArtemisNotifyAttackSpectatorBlocked === "function") {
+        window.risqueArtemisNotifyAttackSpectatorBlocked(window.gameState, ev);
+      }
+      return;
+    }
+  }
   clearPendingTransferForMapRetarget();
   if (isAwaitingAerialConfirm) return;
 

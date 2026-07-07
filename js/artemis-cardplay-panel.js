@@ -547,12 +547,51 @@
     var handN = activeHandCount(gs);
     var ncMsg = document.getElementById("no-cards-message");
     if (ncMsg) {
-      ncMsg.hidden = handN === 0;
+      ncMsg.hidden = true;
       if (handN === 0) {
         ncMsg.textContent = "";
       }
     }
+    var stagingHint = document.getElementById("cardplay-staging-empty-hint");
+    if (stagingHint) stagingHint.hidden = true;
   }
+
+  window.risqueArtemisSyncCardplayInstructionVoice = function (hintText) {
+    if (!window.risqueArtemisMode) return;
+    var gs = window.gameState;
+    if (!gs) return;
+    var mine =
+      (typeof window.risqueArtemisIsMyTurn === "function" && window.risqueArtemisIsMyTurn(gs)) ||
+      (window.risqueArtemisHost && !window.risqueArtemisNetClient);
+    if (!mine) return;
+    var nameU = String(gs.currentPlayer || "PLAYER").toUpperCase();
+    var handN = activeHandCount(gs);
+    var primary = handN === 0 ? "NO CARDS IN HAND" : nameU + " — CARD PLAY";
+    var report =
+      hintText != null && String(hintText).trim() !== ""
+        ? String(hintText).trim()
+        : handN === 0
+          ? ""
+          : "Select cards to play or tap SKIP.";
+    if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.setControlVoiceText === "function") {
+      window.risqueRuntimeHud.setControlVoiceText(primary, report, {
+        skipMirror: true,
+        reportClass: report ? "ucp-voice-report--cardplay-instruction" : "",
+      });
+    }
+    var vt = document.getElementById("control-voice-text");
+    var vr = document.getElementById("control-voice-report");
+    if (vt) vt.textContent = primary;
+    if (vr) {
+      vr.textContent = report;
+      vr.style.display = report ? "block" : "none";
+      if (report) {
+        vr.classList.add("ucp-voice-report--cardplay-instruction");
+      } else {
+        vr.classList.remove("ucp-voice-report--cardplay-instruction");
+      }
+    }
+  };
 
   function artemisPaintCardplaySpectatorWaitingVoice(gs) {
     if (!gs) return;
@@ -689,7 +728,7 @@
     artemisClearCardplaySpectatorVoiceBacks();
     var handN = activeHandCount(gs);
     var primary = handN === 0 ? "NO CARDS IN HAND" : nameU + " — CARD PLAY";
-    var report = handN === 0 ? "" : "Select cards to play or tap SKIP.";
+    var report = handN === 0 ? "" : "";
     if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.setControlVoiceText === "function") {
       window.risqueRuntimeHud.setControlVoiceText(primary, report, { skipMirror: true });
     }
@@ -701,6 +740,9 @@
       vr.style.display = report ? "block" : "none";
     }
     artemisSyncActiveCardplayEmptyHandHint(gs);
+    if (typeof window.risqueArtemisRequestCardplayHintRefresh === "function") {
+      window.risqueArtemisRequestCardplayHintRefresh();
+    }
   }
 
   function artemisInjectCardplayButtonStyles() {

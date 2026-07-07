@@ -1666,7 +1666,8 @@
       phHud !== "attack" &&
       phHud !== "reinforce" &&
       phHud !== "receivecard" &&
-      phHud !== "getcard"
+      phHud !== "getcard" &&
+      phHud !== "postgame"
     ) {
       hudRoot.classList.add("runtime-hud-root--artemis-compact");
     } else {
@@ -2054,6 +2055,7 @@
     if (p === "attack") return 40;
     if (p === "reinforce") return 50;
     if (p === "receivecard" || p === "getcard") return 60;
+    if (p === "postgame") return 100;
     return 0;
   };
 
@@ -2655,6 +2657,36 @@
       window.risqueArtemisSyncSetupMirror(gs);
     }
 
+    if (ph === "postgame") {
+      if (typeof window.risqueArtemisPreparePostgameEntry === "function") {
+        window.risqueArtemisPreparePostgameEntry(gs);
+      }
+      if (
+        window.risquePhases &&
+        window.risquePhases.postgame &&
+        typeof window.risquePhases.postgame.mount === "function"
+      ) {
+        var pgSlot = document.getElementById("risque-phase-content");
+        var pgMounted = pgSlot && pgSlot.querySelector(".postgame-compact-root");
+        if (!pgMounted) {
+          var pgHost = document.getElementById("app") || document.body;
+          try {
+            window.risquePhases.postgame.mount(pgHost, {
+              onLog: function (msg, data) {
+                try {
+                  console.info("[ARTEMIS postgame]", msg, data || "");
+                } catch (ePgLog) {
+                  /* ignore */
+                }
+              }
+            });
+          } catch (ePgMount) {
+            /* ignore */
+          }
+        }
+      }
+    }
+
     if (typeof window.risqueArtemisSyncMyTurnClass === "function") {
       window.risqueArtemisSyncMyTurnClass(gs);
     }
@@ -2710,6 +2742,140 @@
       return false;
     }
     return true;
+  };
+
+  var __artemisAttackSpectatorNotifyTs = 0;
+
+  /** True when this laptop may not pick attack territories (host TV or idle client). */
+  window.risqueArtemisAttackSpectatorClickBlocked = function (gs) {
+    if (!window.risqueArtemisMode) return false;
+    gs = gs || window.gameState;
+    if (!gs || String(gs.phase || "") !== "attack") return false;
+    if (typeof window.risqueArtemisShouldAttackChromeBeInteractive === "function") {
+      return !window.risqueArtemisShouldAttackChromeBeInteractive(gs);
+    }
+    return typeof window.risqueArtemisIsMyTurn === "function" && !window.risqueArtemisIsMyTurn(gs);
+  };
+
+  window.risqueArtemisNotifyAttackSpectatorBlocked = function (gsOpt, ev) {
+    var gs = gsOpt && typeof gsOpt === "object" ? gsOpt : window.gameState;
+    if (!window.risqueArtemisAttackSpectatorClickBlocked(gs)) return;
+    var now = Date.now();
+    if (now - __artemisAttackSpectatorNotifyTs < 2000) return;
+    __artemisAttackSpectatorNotifyTs = now;
+    var attacker =
+      gs && gs.currentPlayer != null && String(gs.currentPlayer).trim() !== ""
+        ? String(gs.currentPlayer).trim()
+        : "the attacker";
+    var msg = "You can not select territories. " + attacker + " is the attacker";
+    if (window.gameUtils && typeof window.gameUtils.showError === "function") {
+      window.gameUtils.showError(msg);
+    } else if (
+      window.risqueRuntimeHud &&
+      typeof window.risqueRuntimeHud.setControlVoiceText === "function"
+    ) {
+      window.risqueRuntimeHud.setControlVoiceText("ATTACK", msg, { force: true });
+    }
+    if (ev) {
+      try {
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        ev.stopPropagation();
+      } catch (eStop) {
+        /* ignore */
+      }
+    }
+  };
+
+  window.risqueArtemisStripAttackSpectatorMapInteraction = function (gsOpt) {
+    var gs = gsOpt && typeof gsOpt === "object" ? gsOpt : window.gameState;
+    if (typeof window.risqueArtemisCancelAttackMapRouting === "function") {
+      window.risqueArtemisCancelAttackMapRouting();
+    }
+    if (typeof window.risqueTeardownAttackPhaseControlListeners === "function") {
+      window.risqueTeardownAttackPhaseControlListeners();
+    }
+    window.handleTerritoryClick = function (_label, _owner, _troops, ev) {
+      if (typeof window.risqueArtemisNotifyAttackSpectatorBlocked === "function") {
+        window.risqueArtemisNotifyAttackSpectatorBlocked(gs || window.gameState, ev);
+      }
+    };
+    if (window.gameUtils && gs) {
+      try {
+        if (typeof window.gameUtils.renderTerritories === "function") {
+          window.gameUtils.renderTerritories(null, gs);
+        }
+      } catch (eClrMap) {
+        /* ignore */
+      }
+    }
+  };
+
+  /** Host or ARTEMIS client laptop — not a passive public-TV mirror tab. */
+  window.risqueArtemisLaptopCanRunWayback = function () {
+    if (!window.risqueArtemisMode) return !window.risqueDisplayIsPublic;
+    if (!window.risqueDisplayIsPublic) return true;
+    return !!(window.risqueArtemisNetClient && !window.risqueArtemisHost);
+  };
+
+  /** Postgame: every remaining player gets host-style toggles + optional Wayback (at their own pace). */
+  window.risqueArtemisEnterPostgamePlayMode = function () {
+    if (!window.risqueArtemisMode) return;
+    window.risqueArtemisPostgameInteractive = true;
+    try {
+      document.documentElement.classList.add("risque-view-host");
+      document.body.classList.add("risque-view-host");
+      document.body.setAttribute("data-risque-phase", "postgame");
+    } catch (ePgCls) {
+      /* ignore */
+    }
+    if (typeof window.risqueArtemisHideLoginPanel === "function") {
+      window.risqueArtemisHideLoginPanel();
+    }
+    if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.ensure === "function") {
+      var uio = document.getElementById("ui-overlay");
+      if (uio) window.risqueRuntimeHud.ensure(uio);
+    }
+    if (typeof window.risqueArtemisEnsureHudTogglesVisible === "function") {
+      window.risqueArtemisEnsureHudTogglesVisible();
+    }
+    if (typeof window.risqueWireArtemisHudTogglesOnce === "function") {
+      window.risqueWireArtemisHudTogglesOnce();
+    }
+    if (typeof window.risqueArtemisScheduleLayoutSync === "function") {
+      window.risqueArtemisScheduleLayoutSync();
+    }
+  };
+
+  /** Strip login chrome and mark lobby live before postgame HUD (game win / soft-nav). */
+  window.risqueArtemisPreparePostgameEntry = function (gsOpt) {
+    window.risqueArtemisLobbyStarted = true;
+    if (typeof window.risqueArtemisHideLoginPanel === "function") {
+      window.risqueArtemisHideLoginPanel();
+    }
+    try {
+      document.documentElement.classList.remove("risque-artemis-login-active");
+      document.documentElement.classList.remove("risque-artemis-login-confirmed");
+      document.body.classList.remove("risque-public-login-active");
+      var hudRoot = document.getElementById("runtime-hud-root");
+      if (hudRoot) hudRoot.classList.remove("runtime-hud-root--login");
+      var legacyLogin = document.getElementById("risque-login-hud-root");
+      if (legacyLogin && legacyLogin.parentNode) legacyLogin.parentNode.removeChild(legacyLogin);
+    } catch (ePg) {
+      /* ignore */
+    }
+    var gs = gsOpt && typeof gsOpt === "object" ? gsOpt : window.gameState;
+    if (gs && typeof gs === "object") {
+      gs.phase = "postgame";
+      try {
+        localStorage.setItem("gameState", JSON.stringify(gs));
+      } catch (eLs) {
+        /* ignore */
+      }
+    }
+    if (typeof window.risqueArtemisEnterPostgamePlayMode === "function") {
+      window.risqueArtemisEnterPostgamePlayMode();
+    }
   };
 
   window.risqueArtemisShouldHostMountReinforce = function (gs) {
@@ -2788,7 +2954,13 @@
         if (!window.risqueArtemisMode) return;
         var gs = window.gameState;
         if (!gs || String(gs.phase || "") !== "attack") return;
-        if (typeof window.risqueArtemisIsMyTurn === "function" && !window.risqueArtemisIsMyTurn(gs)) {
+        if (
+          typeof window.risqueArtemisAttackSpectatorClickBlocked === "function" &&
+          window.risqueArtemisAttackSpectatorClickBlocked(gs)
+        ) {
+          if (typeof window.risqueArtemisNotifyAttackSpectatorBlocked === "function") {
+            window.risqueArtemisNotifyAttackSpectatorBlocked(gs, ev);
+          }
           return;
         }
         if (typeof window.risqueArtemisCanLocalPlay === "function" && !window.risqueArtemisCanLocalPlay()) {

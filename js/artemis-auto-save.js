@@ -409,10 +409,17 @@
     return !!resolveAutoSaveId();
   };
 
-  window.risqueArtemisConquerAutoSaveId = function (scenario) {
+  window.risqueArtemisConquerAutoSaveId = function (scenario, entry) {
     scenario = Number(scenario) || 1;
-    if (scenario === 1) return "conquer-guido";
-    if (scenario === 2) return "conquer-mictor-guido";
-    return "conquer-mictor-nooch";
+    entry = entry === "cardplay" ? "cardplay" : "attack";
+    var base =
+      scenario === 1
+        ? "conquer-guido"
+        : scenario === 2
+          ? "conquer-mictor-guido"
+          : scenario === 3
+            ? "conquer-mictor-nooch"
+            : "conquer-nooch-guido";
+    return entry === "cardplay" ? base + "-cardplay" : base;
   };
 })();

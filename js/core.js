@@ -2075,6 +2075,17 @@ window.gameUtils = {
         if (useGlobalTerritoryHandler) {
           const troopsForHandler = playerName ? Number(troops) || 1 : 1;
           territoryClickHandler = e => {
+            if (
+              window.risqueArtemisMode &&
+              isAttackUi &&
+              typeof window.risqueArtemisAttackSpectatorClickBlocked === 'function' &&
+              window.risqueArtemisAttackSpectatorClickBlocked(gameState)
+            ) {
+              if (typeof window.risqueArtemisNotifyAttackSpectatorBlocked === 'function') {
+                window.risqueArtemisNotifyAttackSpectatorBlocked(gameState, e);
+              }
+              return;
+            }
             risqueCoreDebugLog(`[Core] Territory hit: ${label}`);
             window.handleTerritoryClick(label, playerName || 'None', troopsForHandler, e);
             if (isMockGameMaker && e && typeof e.stopPropagation === 'function') e.stopPropagation();
@@ -2082,6 +2093,17 @@ window.gameUtils = {
           territoryKeydownHandler = e => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
+              if (
+                window.risqueArtemisMode &&
+                isAttackUi &&
+                typeof window.risqueArtemisAttackSpectatorClickBlocked === 'function' &&
+                window.risqueArtemisAttackSpectatorClickBlocked(gameState)
+              ) {
+                if (typeof window.risqueArtemisNotifyAttackSpectatorBlocked === 'function') {
+                  window.risqueArtemisNotifyAttackSpectatorBlocked(gameState, e);
+                }
+                return;
+              }
               risqueCoreDebugLog(`[Core] Territory keydown: ${label}`);
               window.handleTerritoryClick(label, playerName || 'None', troopsForHandler, e);
               if (isMockGameMaker && typeof e.stopPropagation === 'function') e.stopPropagation();

@@ -1,7 +1,92 @@
 {
+  "selectionPhase": "firstCard",
+  "round": 6,
+  "setupComplete": true,
+  "aerialAttack": false,
+  "aerialAttackEligible": false,
+  "aerialBridge": null,
+  "conquered": false,
+  "conqueredThisTurn": false,
+  "cardplayConquered": false,
+  "cardEarnedViaAttack": false,
+  "cardEarnedViaCardplay": false,
+  "cardAwardedThisTurn": false,
+  "bookPlayedThisTurn": false,
+  "bookValue": 0,
+  "lastCardDrawn": null,
+  "defeatedPlayer": null,
+  "winner": null,
+  "attackingTerritory": null,
+  "acquiredTerritory": null,
+  "minTroopsToTransfer": 0,
+  "transferredCardCount": 0,
+  "pendingNewContinents": [],
+  "isInitialDeploy": false,
+  "discardPile": [],
+  "continentsSnapshot": {},
+  "continentCollectionCounts": {
+    "south_america": 0,
+    "north_america": 0,
+    "africa": 0,
+    "europe": 0,
+    "asia": 0,
+    "australia": 0
+  },
+  "risquePlayedCardsGallery": [],
+  "risqueLuckyLedger": {
+    "byPlayer": {
+      "GUIDO": {
+        "dice": 0,
+        "sixes": 0,
+        "roundWins": 0,
+        "roundLosses": 0,
+        "roundTies": 0
+      },
+      "MICTOR": {
+        "dice": 0,
+        "sixes": 0,
+        "roundWins": 0,
+        "roundLosses": 0,
+        "roundTies": 0
+      },
+      "NOOCH": {
+        "dice": 0,
+        "sixes": 0,
+        "roundWins": 0,
+        "roundLosses": 0,
+        "roundTies": 0
+      }
+    }
+  },
+  "risqueLuckySessionRoster": [
+    "GUIDO",
+    "MICTOR",
+    "NOOCH"
+  ],
+  "risqueArtemisAutoSaveId": "conquer-mictor-guido",
+  "risqueArtemisAutoSaveLabel": "CONQUER TEST — Mictor eliminates Guido, then Nooch (attack)",
+  "artemisRoster": [
+    {
+      "slot": 1,
+      "name": "GUIDO",
+      "color": "red"
+    },
+    {
+      "slot": 2,
+      "name": "MICTOR",
+      "color": "blue"
+    },
+    {
+      "slot": 3,
+      "name": "NOOCH",
+      "color": "green"
+    }
+  ],
+  "artemisControlSlot": 2,
+  "risqueArtemisControlSeq": 2,
+  "risqueConquestChainActive": true,
   "phase": "attack",
   "attackPhase": "attack",
-  "selectionPhase": "firstCard",
   "players": [
     {
       "name": "GUIDO",
@@ -10,19 +95,27 @@
       "bookValue": 0,
       "continentValues": {},
       "bankValue": 0,
-      "cardCount": 3,
+      "cardCount": 5,
       "cards": [
         {
           "name": "greenland",
-          "id": "386b8981-ba93-43c6-9f20-8fab8bb013bf"
+          "id": "8cd942d8-a3a7-4319-bd40-45ff4f0729c9"
         },
         {
           "name": "ontario",
-          "id": "939d4b71-d057-4331-aae5-24a4384d8375"
+          "id": "62fce333-4548-470e-99b7-2126e16c7f62"
         },
         {
           "name": "quebec",
-          "id": "8cc1ad24-1476-4b6d-ac8b-d92484adb723"
+          "id": "9e91c50f-1038-48a3-8765-15d26a869ea9"
+        },
+        {
+          "name": "alberta",
+          "id": "7dd41353-c69a-4860-ae09-a6980fb68fc7"
+        },
+        {
+          "name": "japan",
+          "id": "21e74118-bb00-4989-9790-7e67e7b94532"
         }
       ],
       "territories": [
@@ -41,27 +134,23 @@
       "bookValue": 0,
       "continentValues": {},
       "bankValue": 0,
-      "cardCount": 5,
+      "cardCount": 4,
       "cards": [
         {
           "name": "argentina",
-          "id": "0692d880-2d06-4b9f-9fdb-4e0cf11b33ac"
+          "id": "73625308-0271-4884-96dd-45442fa95ae2"
         },
         {
           "name": "brazil",
-          "id": "5c28c00a-648a-42a5-b671-94d961f652a1"
+          "id": "fae011d3-198b-4271-92b2-172f4241b3f2"
         },
         {
           "name": "peru",
-          "id": "af7f2222-dafb-48ef-a54c-87eb5fcfd5f2"
+          "id": "5f7c310d-938c-4c7d-884c-95096f694c99"
         },
         {
-          "name": "venezuela",
-          "id": "4020c300-45a4-417e-8c59-12963f8ec21b"
-        },
-        {
-          "name": "japan",
-          "id": "9b92cd9d-4727-4642-87fb-2514ac25b166"
+          "name": "alaska",
+          "id": "639c7ce5-eca3-4d82-8717-f32034127b9b"
         }
       ],
       "territories": [
@@ -236,19 +325,27 @@
       "bookValue": 0,
       "continentValues": {},
       "bankValue": 0,
-      "cardCount": 3,
+      "cardCount": 5,
       "cards": [
         {
           "name": "eastern_australia",
-          "id": "7d29f545-8adb-434d-8583-42fd6b0b5ff5"
+          "id": "cca405e9-5f2b-4144-9bf9-2af77fc36e89"
         },
         {
           "name": "new_guinea",
-          "id": "bc228edd-df56-40da-83a2-97fc2ddf537f"
+          "id": "e8d70018-831a-4083-bf81-6942c98209a3"
         },
         {
           "name": "siam",
-          "id": "15cda6ad-c027-4e5e-b2b3-f3cd7dcc43e3"
+          "id": "21f46b50-be4a-45ab-8daa-97f033c5ecce"
+        },
+        {
+          "name": "madagascar",
+          "id": "bf4322d2-3358-4296-896d-f8d5bc4b74c3"
+        },
+        {
+          "name": "congo",
+          "id": "1bb04a8f-9d0d-4783-af77-29598fa0abeb"
         }
       ],
       "territories": [
@@ -267,35 +364,10 @@
     "NOOCH"
   ],
   "currentPlayer": "MICTOR",
-  "round": 6,
-  "setupComplete": true,
-  "aerialAttack": false,
-  "aerialAttackEligible": false,
-  "aerialBridge": null,
-  "conquered": false,
-  "conqueredThisTurn": false,
-  "cardplayConquered": false,
-  "cardEarnedViaAttack": false,
-  "cardEarnedViaCardplay": false,
-  "cardAwardedThisTurn": false,
-  "bookPlayedThisTurn": false,
-  "bookValue": 0,
-  "lastCardDrawn": null,
-  "defeatedPlayer": null,
-  "winner": null,
-  "attackingTerritory": null,
-  "acquiredTerritory": null,
-  "minTroopsToTransfer": 0,
-  "transferredCardCount": 0,
-  "pendingNewContinents": [],
-  "isInitialDeploy": false,
   "deck": [
     "afghanistan",
-    "alaska",
-    "alberta",
     "central_america",
     "china",
-    "congo",
     "east_africa",
     "eastern_united_states",
     "egypt",
@@ -305,7 +377,6 @@
     "indonesia",
     "irkutsk",
     "kamchatka",
-    "madagascar",
     "middle_east",
     "mongolia",
     "north_africa",
@@ -317,6 +388,7 @@
     "southern_europe",
     "ukraine",
     "ural",
+    "venezuela",
     "western_australia",
     "western_europe",
     "western_united_states",
@@ -324,7 +396,6 @@
     "wildcard1",
     "wildcard2"
   ],
-  "discardPile": [],
   "continents": {
     "south_america": {
       "territories": [
@@ -398,66 +469,5 @@
       ],
       "bonus": 2
     }
-  },
-  "continentsSnapshot": {},
-  "continentCollectionCounts": {
-    "south_america": 0,
-    "north_america": 0,
-    "africa": 0,
-    "europe": 0,
-    "asia": 0,
-    "australia": 0
-  },
-  "risquePlayedCardsGallery": [],
-  "risqueLuckyLedger": {
-    "byPlayer": {
-      "GUIDO": {
-        "dice": 0,
-        "sixes": 0,
-        "roundWins": 0,
-        "roundLosses": 0,
-        "roundTies": 0
-      },
-      "MICTOR": {
-        "dice": 0,
-        "sixes": 0,
-        "roundWins": 0,
-        "roundLosses": 0,
-        "roundTies": 0
-      },
-      "NOOCH": {
-        "dice": 0,
-        "sixes": 0,
-        "roundWins": 0,
-        "roundLosses": 0,
-        "roundTies": 0
-      }
-    }
-  },
-  "risqueLuckySessionRoster": [
-    "GUIDO",
-    "MICTOR",
-    "NOOCH"
-  ],
-  "risqueArtemisAutoSaveId": "conquer-mictor-guido",
-  "risqueArtemisAutoSaveLabel": "CONQUER TEST — Mictor eliminates Guido, then Nooch",
-  "artemisRoster": [
-    {
-      "slot": 1,
-      "name": "GUIDO",
-      "color": "red"
-    },
-    {
-      "slot": 2,
-      "name": "MICTOR",
-      "color": "blue"
-    },
-    {
-      "slot": 3,
-      "name": "NOOCH",
-      "color": "green"
-    }
-  ],
-  "artemisControlSlot": 2,
-  "risqueArtemisControlSeq": 2
+  }
 }

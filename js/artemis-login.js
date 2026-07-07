@@ -312,8 +312,28 @@
     document.documentElement.classList.remove("risque-artemis-login-active");
   }
 
-  /** Game already past sign-in — do not resurrect login chrome over setup/cardplay. */
+  /** Game already past sign-in — do not resurrect login chrome over setup/cardplay/postgame. */
   function isPastArtemisLoginPhase() {
+    try {
+      var q = new URLSearchParams(window.location.search);
+      var forced = String(q.get("phase") || "");
+      if (forced === "postgame") return true;
+    } catch (eQ) {
+      /* ignore */
+    }
+    if (window.gameState) {
+      var livePh = String(window.gameState.phase || "");
+      if (livePh === "postgame") return true;
+    }
+    try {
+      var raw = localStorage.getItem("gameState");
+      if (raw) {
+        var st = JSON.parse(raw);
+        if (st && String(st.phase || "") === "postgame") return true;
+      }
+    } catch (eLs) {
+      /* ignore */
+    }
     if (!window.risqueArtemisLobbyStarted) return false;
     var ph = window.gameState ? String(window.gameState.phase || "") : "";
     return !!ph && ph !== "login";
@@ -1054,24 +1074,37 @@
     mode: null,
     rigSlot: 1,
     mockFirstSlot: 1,
-    conquerScenario: 1
+    conquerScenario: 1,
+    conquerEntry: "attack"
   };
 
   function conquerScenarioLabel(scenario) {
     scenario = Number(scenario) || 1;
     if (scenario === 1) return "Guido → Mictor → Nooch";
     if (scenario === 2) return "Mictor → Guido → Nooch";
-    return "Mictor → Nooch → Guido";
+    if (scenario === 3) return "Mictor → Nooch → Guido";
+    return "Nooch → Mictor → Guido";
   }
 
-  function conquerScenarioSaveId(scenario) {
+  function conquerEntryLabel(entry) {
+    return entry === "cardplay" ? "Card win" : "From attack";
+  }
+
+  function conquerScenarioSaveId(scenario, entry) {
+    entry = entry === "cardplay" ? "cardplay" : "attack";
     if (typeof window.risqueArtemisConquerAutoSaveId === "function") {
-      return window.risqueArtemisConquerAutoSaveId(scenario);
+      return window.risqueArtemisConquerAutoSaveId(scenario, entry);
     }
     scenario = Number(scenario) || 1;
-    if (scenario === 1) return "conquer-guido";
-    if (scenario === 2) return "conquer-mictor-guido";
-    return "conquer-mictor-nooch";
+    var base =
+      scenario === 1
+        ? "conquer-guido"
+        : scenario === 2
+          ? "conquer-mictor-guido"
+          : scenario === 3
+            ? "conquer-mictor-nooch"
+            : "conquer-nooch-guido";
+    return entry === "cardplay" ? base + "-cardplay" : base;
   }
 
   function slotPlayerLabel(slot) {
@@ -1086,6 +1119,7 @@
     hostLauncherState.rigSlot = 1;
     hostLauncherState.mockFirstSlot = 1;
     hostLauncherState.conquerScenario = 1;
+    hostLauncherState.conquerEntry = "attack";
   }
 
   function refreshHostLauncherUi() {
@@ -1129,6 +1163,13 @@
         mode === "conquer" && scenario === hostLauncherState.conquerScenario
       );
     });
+    hostLauncherOverlay.querySelectorAll("[data-host-launch-conquer-entry]").forEach(function (btn) {
+      var entry = btn.getAttribute("data-host-launch-conquer-entry") || "attack";
+      btn.classList.toggle(
+        "risque-artemis-host-launcher-chip--selected",
+        mode === "conquer" && entry === hostLauncherState.conquerEntry
+      );
+    });
 
     var goBtn = hostLauncherOverlay.querySelector("#risque-artemis-host-launcher-go");
     if (goBtn) {
@@ -1143,7 +1184,10 @@
         goBtn.textContent = "Launch — Rigged for " + slotPlayerLabel(hostLauncherState.rigSlot);
       } else if (mode === "conquer") {
         goBtn.textContent =
-          "Launch — Conquer test: " + conquerScenarioLabel(hostLauncherState.conquerScenario);
+          "Launch — Conquer test: " +
+          conquerScenarioLabel(hostLauncherState.conquerScenario) +
+          " · " +
+          conquerEntryLabel(hostLauncherState.conquerEntry);
       } else {
         goBtn.textContent = "Launch — Mock, " + slotPlayerLabel(hostLauncherState.mockFirstSlot) + " starts";
       }
@@ -1212,8 +1256,11 @@
       "</section>" +
       '<section class="risque-artemis-host-launcher-sub" data-host-launch-panel="conquer" hidden>' +
       '<h3 class="risque-artemis-host-launcher-heading">Conquer chain</h3>' +
-      '<p class="risque-artemis-host-launcher-hint">Each victim is down to one border territory. Attack to trigger celebration → card transfer.</p>' +
+      '<p class="risque-artemis-host-launcher-hint">From attack: one border territory each — attack to celebrate → card transfer. Card win: cardplay with 2 books + finisher card on victim&apos;s last territory.</p>' +
+      '<p class="risque-artemis-host-launcher-subheading">Chain</p>' +
       '<div data-host-launch-conquer-row></div>' +
+      '<p class="risque-artemis-host-launcher-subheading">Start at</p>' +
+      '<div data-host-launch-conquer-entry-row></div>' +
       "</section>" +
       '<button type="button" class="risque-artemis-host-launcher-go" id="risque-artemis-host-launcher-go" disabled>Choose a mode above</button>' +
       "</div>";
@@ -1240,7 +1287,7 @@
       var conquerRow = document.createElement("div");
       conquerRow.className =
         "risque-artemis-host-launcher-row risque-artemis-host-launcher-row--stack";
-      [1, 2, 3].forEach(function (scenario) {
+      [1, 2, 3, 4].forEach(function (scenario) {
         var btn = document.createElement("button");
         btn.type = "button";
         btn.className =
@@ -1254,6 +1301,23 @@
         conquerRow.appendChild(btn);
       });
       conquerContainer.appendChild(conquerRow);
+      var entryRow = document.createElement("div");
+      entryRow.className =
+        "risque-artemis-host-launcher-row risque-artemis-host-launcher-row--stack";
+      ["attack", "cardplay"].forEach(function (entry) {
+        var ebtn = document.createElement("button");
+        ebtn.type = "button";
+        ebtn.className =
+          "risque-artemis-host-launcher-chip risque-artemis-host-launcher-chip--wide";
+        ebtn.setAttribute("data-host-launch-conquer-entry", entry);
+        ebtn.textContent = conquerEntryLabel(entry);
+        ebtn.addEventListener("click", function () {
+          hostLauncherState.conquerEntry = entry;
+          refreshHostLauncherUi();
+        });
+        entryRow.appendChild(ebtn);
+      });
+      conquerContainer.appendChild(entryRow);
     }
 
     hostLauncherOverlay.querySelectorAll("[data-host-launch-mode]").forEach(function (btn) {
@@ -1302,7 +1366,10 @@
     if (mode === "mock") {
       window.risqueArtemisAutoSave = "cards";
     } else if (mode === "conquer") {
-      window.risqueArtemisAutoSave = conquerScenarioSaveId(hostLauncherState.conquerScenario);
+      window.risqueArtemisAutoSave = conquerScenarioSaveId(
+        hostLauncherState.conquerScenario,
+        hostLauncherState.conquerEntry
+      );
     } else {
       try {
         delete window.risqueArtemisAutoSave;
@@ -1338,7 +1405,10 @@
       mode === "mock"
         ? "Mock — " + slotPlayerLabel(mockSlot) + " starts"
         : mode === "conquer"
-        ? "Conquer test — " + conquerScenarioLabel(hostLauncherState.conquerScenario)
+        ? "Conquer test — " +
+          conquerScenarioLabel(hostLauncherState.conquerScenario) +
+          " · " +
+          conquerEntryLabel(hostLauncherState.conquerEntry)
         : mode === "rigged"
         ? "Rigged for " + slotPlayerLabel(rigSlot)
         : "Normal play (random)";

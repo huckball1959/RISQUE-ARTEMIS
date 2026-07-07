@@ -1211,7 +1211,11 @@
   function risqueOpenReplayMachineFromHost(opts) {
     opts = opts || {};
     var prep = Promise.resolve();
-    if (!window.risqueDisplayIsPublic) {
+    var canPrepWayback =
+      typeof window.risqueArtemisLaptopCanRunWayback === "function"
+        ? window.risqueArtemisLaptopCanRunWayback()
+        : !window.risqueDisplayIsPublic;
+    if (canPrepWayback) {
       var gsReplay = getActiveGameStateSnapshot();
       if (gsReplay && Array.isArray(gsReplay.players) && gsReplay.players.length) {
         prep = prep
@@ -9660,7 +9664,8 @@
         phArtemisPortable === "deploy" ||
         phArtemisPortable === "attack" ||
         phArtemisPortable === "reinforce" ||
-        phArtemisPortable === "receivecard"
+        phArtemisPortable === "receivecard" ||
+        phArtemisPortable === "postgame"
       ) {
         if (typeof window.risqueArtemisSyncFromState === "function") {
           try {
@@ -14640,7 +14645,8 @@
       ph !== "con-cardtransfer" &&
       ph !== "con-cardplay" &&
       ph !== "con-deploy" &&
-      ph !== "con-transfertroops"
+      ph !== "con-transfertroops" &&
+      ph !== "postgame"
     ) {
       return false;
     }
@@ -15239,6 +15245,44 @@
       try {
         logEvent("Soft navigate (same document)", { phase: ph, url: nextUrl });
       } catch (eLCtt) {}
+      return true;
+    }
+
+    if (ph === "postgame") {
+      if (
+        !window.risquePhases ||
+        !window.risquePhases.postgame ||
+        typeof window.risquePhases.postgame.mount !== "function"
+      ) {
+        return false;
+      }
+      loginMounted = false;
+      if (typeof window.risqueArtemisPreparePostgameEntry === "function") {
+        window.risqueArtemisPreparePostgameEntry(state);
+      }
+      phaseLabelEl.textContent = "Phase: postgame";
+      appEl.innerHTML = "";
+      state.phase = "postgame";
+      window.gameState = state;
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (ePgLs) {
+        /* ignore */
+      }
+      window.risquePhases.postgame.mount(stageHost, {
+        onLog: function (msg, data) {
+          logEvent(msg, data);
+        }
+      });
+      refreshVisuals("Postgame mounted (same-document)");
+      if (!window.risqueDisplayIsPublic && typeof window.risqueMirrorPushGameState === "function") {
+        try {
+          window.risqueMirrorPushGameState();
+        } catch (eMpPg) {}
+      }
+      try {
+        logEvent("Soft navigate (same document)", { phase: ph, url: nextUrl });
+      } catch (eLPg) {}
       return true;
     }
 
@@ -17830,6 +17874,9 @@
     });
     refreshVisuals("Receive card mounted");
   } else if (forcedPhase === "postgame" && window.risquePhases && window.risquePhases.postgame) {
+    if (typeof window.risqueArtemisPreparePostgameEntry === "function") {
+      window.risqueArtemisPreparePostgameEntry(state);
+    }
     document.body.classList.add("risque-setup-fullstage");
     phaseLabelEl.textContent = "Phase: postgame";
     appEl.innerHTML = "";
@@ -17863,6 +17910,9 @@
     window.risquePhases.postgame &&
     typeof window.risquePhases.postgame.mount === "function"
   ) {
+    if (typeof window.risqueArtemisPreparePostgameEntry === "function") {
+      window.risqueArtemisPreparePostgameEntry(state);
+    }
     document.body.classList.add("risque-setup-fullstage");
     phaseLabelEl.textContent = "Phase: postgame";
     appEl.innerHTML = "";

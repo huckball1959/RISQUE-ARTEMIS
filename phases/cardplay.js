@@ -2394,76 +2394,135 @@
       const noCardsMessage = document.getElementById('no-cards-message');
       if (!noCardsMessage || !isCardplayHudCompact()) return;
       const unplayedCards = getUnplayedCards();
+      var hintText = "";
       if (unplayedCards.length === 0) {
         if (!processingBook) {
           var stEmpty = getCompactStagingCardRefs();
           if (stEmpty.refs.length > 0 && stEmpty.dimmed) {
-            noCardsMessage.textContent =
+            hintText =
               stEmpty.refs.length === 1
                 ? "Card below — CONFIRM when ready, or RST."
                 : "Plays below — CONFIRM when ready, or RST.";
-            noCardsMessage.hidden = false;
-            return;
           }
         }
-        if (window.risqueArtemisMode) {
-          noCardsMessage.textContent = "";
-          noCardsMessage.hidden = true;
-          return;
+        if (!hintText && !window.risqueArtemisMode) {
+          hintText = "No cards in hand.";
         }
-        noCardsMessage.textContent = "No cards in hand.";
-        noCardsMessage.hidden = false;
-        return;
-      }
-      noCardsMessage.hidden = false;
-      if (isBookSelectionMode) {
+      } else if (isBookSelectionMode) {
         if (processingBook) {
-          noCardsMessage.textContent = "Processing book…";
-          return;
-        }
-        const n = selectedCards.length;
-        if (n === 0) {
-          noCardsMessage.textContent = "Select the first of 3 cards for a valid book.";
-        } else if (n === 1) {
-          noCardsMessage.textContent =
-            "Select the second of 3 — or tap your pick below to send it back up.";
-        } else if (n === 2) {
-          noCardsMessage.textContent =
-            "Select the third of 3 — or tap any card below to send that one back up.";
+          hintText = "Processing book…";
         } else {
-          var names3 = selectedCards.map(function (sc) {
-            return sc.card;
-          });
-          if (validateBook(names3)) {
-            noCardsMessage.textContent =
-              "Valid book below — PROCESS to play, RST clears all, or tap any card below to return just that one.";
+          const n = selectedCards.length;
+          if (n === 0) {
+            hintText = "Select the first of 3 cards for a valid book.";
+          } else if (n === 1) {
+            hintText = "Select the second of 3 — or tap your pick below to send it back up.";
+          } else if (n === 2) {
+            hintText = "Select the third of 3 — or tap any card below to send that one back up.";
           } else {
-            noCardsMessage.textContent =
-              "Not a valid book — tap a card below to return one and swap a pick, or RST.";
+            var names3 = selectedCards.map(function (sc) {
+              return sc.card;
+            });
+            if (validateBook(names3)) {
+              hintText =
+                "Valid book below — PROCESS to play, RST clears all, or tap any card below to return just that one.";
+            } else {
+              hintText =
+                "Not a valid book — tap a card below to return one and swap a pick, or RST.";
+            }
           }
         }
-        return;
-      }
-      if (isIndividualSelectionMode) {
+      } else if (isIndividualSelectionMode) {
         if (selectedCards.length === 0) {
-          noCardsMessage.textContent = "Select a card to play.";
+          hintText = "Select a card to play.";
         } else {
-          noCardsMessage.textContent =
-            "Card below — PROCESS to play, RST to clear, or tap the card below to return it.";
+          hintText = "Card below — PROCESS to play, RST to clear, or tap the card below to return it.";
         }
-        return;
-      }
-      if (!processingBook) {
+      } else if (!processingBook) {
         var stRem = getCompactStagingCardRefs();
         if (stRem.refs.length > 0 && stRem.dimmed) {
-          noCardsMessage.textContent =
+          hintText =
             stRem.refs.length === 1
               ? "Card below — CONFIRM when ready, or RST."
               : "Plays below — CONFIRM when ready, or RST.";
-          return;
+        } else {
+          hintText = "CARD (one card) or BOOK (three cards), then tap below.";
         }
       }
-      noCardsMessage.textContent = "CARD (one card) or BOOK (three cards), then tap below.";
+      if (window.risqueArtemisMode) {
+        noCardsMessage.hidden = true;
+        if (typeof window.risqueArtemisSyncCardplayInstructionVoice === "function") {
+          window.risqueArtemisSyncCardplayInstructionVoice(hintText);
+        }
+        return;
+      }
+      if (!hintText && unplayedCards.length === 0) {
+        noCardsMessage.hidden = true;
+        return;
+      }
+      noCardsMessage.hidden = false;
+      noCardsMessage.textContent = hintText;
+    }
+
+    function finishCardplayAfterDefenderElimination(owner, currentPlayer, defenderEliminated) {
+      if (!defenderEliminated || !window.gameState || !currentPlayer) return;
+      var gs = window.gameState;
+      var gameWon = gs.turnOrder && gs.turnOrder.length === 1;
+      if (gameWon) {
+        gs.players = gs.players.filter(function (p) {
+          return p && p.name !== owner;
+        });
+        gs.winner = currentPlayer.name;
+        gs.risqueGameWinImmediate = true;
+        delete gs.defeatedPlayer;
+        delete gs.risquePublicEliminationBanner;
+        try {
+          localStorage.setItem("gameState", JSON.stringify(gs));
+        } catch (eWinLs) {
+          /* ignore */
+        }
+        if (typeof window.risqueMirrorPushGameState === "function") {
+          window.risqueMirrorPushGameState();
+        }
+        if (typeof window.risqueReplayEnsureLatestBoardFrame === "function") {
+          try {
+            window.risqueReplayEnsureLatestBoardFrame(gs);
+          } catch (eLbWin) {
+            /* ignore */
+          }
+        }
+        var winSave =
+          typeof window.risqueRoundAutosaveOnGameWin === "function"
+            ? window.risqueRoundAutosaveOnGameWin(gs)
+            : Promise.resolve();
+        Promise.resolve(winSave)
+          .catch(function () {
+            /* non-fatal */
+          })
+          .then(function () {
+            if (typeof window.risqueMirrorPushGameState === "function") {
+              window.risqueMirrorPushGameState();
+            }
+            setTimeout(function () {
+              if (typeof window.risqueMountImmediateGameWinOverlay === "function") {
+                window.risqueMountImmediateGameWinOverlay(currentPlayer.name);
+              }
+            }, 1200);
+          });
+        return;
+      }
+      setTimeout(function () {
+        var g2 = window.gameState;
+        if (!g2) return;
+        var ownerPl = g2.players.find(function (p) {
+          return p && p.name === owner;
+        });
+        if (typeof window.risqueConquerStartEliminationFlow === "function") {
+          window.risqueConquerStartEliminationFlow(currentPlayer, ownerPl || { name: owner });
+        } else {
+          window.location.href = risqueCardplayDoc("conquer");
+        }
+      }, 2000);
     }
 
     function wireCardplayCardClicks(root) {
@@ -3538,6 +3597,10 @@
       localStorage.setItem('gameState', JSON.stringify(window.gameState));
     }
 
+    window.risqueArtemisRequestCardplayHintRefresh = function () {
+      refreshCardplayHudHint();
+    };
+
     function clearCardplayLocalPrompt() {
       const host = document.getElementById('cardplay-local-prompt');
       const t = document.getElementById('cardplay-local-prompt-text');
@@ -4222,6 +4285,10 @@
       pendingElimination = null;
       if (type === 'book') {
         currentBookCardIndex++;
+        if (defenderEliminated && window.gameState.turnOrder.length === 1) {
+          finishCardplayAfterDefenderElimination(owner, currentPlayer, true);
+          return;
+        }
         if (abortStaleBookEffect(bookPlayedCard)) return;
         await processBookCardEffect(bookPlayedCard);
         return;
@@ -4233,9 +4300,9 @@
       updateSummaryDisplay();
       checkCardStatus();
       localStorage.setItem('gameState', JSON.stringify(window.gameState));
-      setTimeout(function () {
-        window.location.href = risqueCardplayDoc("conquer");
-      }, 2000);
+      if (defenderEliminated) {
+        finishCardplayAfterDefenderElimination(owner, currentPlayer, defenderEliminated);
+      }
     }
 
     function collectFlatCardIdsForPublicRecapAnim(list) {
