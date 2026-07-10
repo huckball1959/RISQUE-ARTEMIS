@@ -1287,6 +1287,12 @@
     }
     var mySlot = Number(window.risqueArtemisPlayerSlot) || 0;
     if (mode === "client" && mySlot >= 1 && senderSlot >= 1 && mySlot === senderSlot) return;
+    var incomingSeq = Number(msg.seq) || 0;
+    if (incomingSeq > 0) {
+      var lastAppliedSeq = Number(window.__risqueArtemisLastAppliedAttackLiveSeq) || 0;
+      if (lastAppliedSeq > 0 && incomingSeq < lastAppliedSeq) return;
+      window.__risqueArtemisLastAppliedAttackLiveSeq = incomingSeq;
+    }
     var patch = msg.patch;
     var gs;
     try {
@@ -1373,14 +1379,12 @@
         if (!hp) return;
         hp.bankValue = cp.bankValue;
         hp.troopsTotal = cp.troopsTotal;
-        if (Array.isArray(cp.territories) && Array.isArray(hp.territories)) {
-          cp.territories.forEach(function (ct) {
-            if (!ct || !ct.name) return;
-            var ht = hp.territories.find(function (t) {
-              return t && t.name === ct.name;
-            });
-            if (ht) ht.troops = ct.troops;
-          });
+        if (Array.isArray(cp.territories)) {
+          try {
+            hp.territories = JSON.parse(JSON.stringify(cp.territories));
+          } catch (eTerrClone) {
+            hp.territories = cp.territories.slice();
+          }
         }
       });
     }
@@ -1430,6 +1434,15 @@
       delete gs.risqueTransferPulse;
     } catch (eClrPulse) {
       /* ignore */
+    }
+    if (
+      String(gs.attackPhase || "") === "pending_transfer" &&
+      gs.acquiredTerritory &&
+      gs.acquiredTerritory.name
+    ) {
+      if (!gs.risquePublicAttackTransferSummary) {
+        gs.risquePublicAttackSelectionLine = "";
+      }
     }
     try {
       localStorage.setItem("gameState", JSON.stringify(gs));
@@ -2900,6 +2913,108 @@
     window.__risqueArtemisHostAttackSpinUntil = Date.now() + (Number(ms) || 520);
   }
 
+  function artemisHostSpectatingClientAttack(gsOpt) {
+    if (!window.risqueArtemisHost || window.risqueArtemisNetClient) return false;
+    var gs = gsOpt || window.gameState;
+    if (!gs || String(gs.phase || "") !== "attack") return false;
+    if (
+      typeof window.risqueArtemisShouldHostMountAttack === "function" &&
+      window.risqueArtemisShouldHostMountAttack(gs)
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  function artemisPlayerOwnsTerritory(gs, playerName, territoryName) {
+    if (!gs || !playerName || !territoryName || !Array.isArray(gs.players)) return false;
+    var wantP = normDeployName(playerName);
+    var wantT = String(territoryName);
+    var pl = gs.players.find(function (p) {
+      return normDeployName(p && p.name) === wantP;
+    });
+    if (!pl || !Array.isArray(pl.territories)) return false;
+    return pl.territories.some(function (t) {
+      return t && t.name === wantT;
+    });
+  }
+
+  /** True when attack state reflects a dice capture waiting on troop transfer. */
+  function artemisAttackBoardCaptureApplied(gs) {
+    if (!gs || String(gs.phase || "") !== "attack") return false;
+    if (String(gs.attackPhase || "") !== "pending_transfer") return false;
+    if (!gs.acquiredTerritory || !gs.acquiredTerritory.name || !gs.currentPlayer) return false;
+    return artemisPlayerOwnsTerritory(gs, gs.currentPlayer, gs.acquiredTerritory.name);
+  }
+
+  /**
+   * Host/client spectator: incoming mirror or player_state regressed past a live attack_live capture
+   * (common when a pre-capture player_state arrives after post-capture attack_live).
+   */
+  function artemisAttackLiveBoardRegression(liveGs, incomingGs) {
+    if (!liveGs || !incomingGs) return false;
+    if (String(liveGs.phase || "") !== "attack" || String(incomingGs.phase || "") !== "attack") {
+      return false;
+    }
+    if (!artemisAttackBoardCaptureApplied(liveGs)) return false;
+    if (artemisAttackBoardCaptureApplied(incomingGs)) return false;
+    var acq = String(liveGs.acquiredTerritory.name);
+    var cp = String(liveGs.currentPlayer || "");
+    if (artemisPlayerOwnsTerritory(incomingGs, cp, acq)) return false;
+    return true;
+  }
+
+  window.risqueArtemisAttackLiveBoardRegression = artemisAttackLiveBoardRegression;
+  window.risqueArtemisAttackBoardCaptureApplied = artemisAttackBoardCaptureApplied;
+
+  function artemisMergePreferLiveAttackBoard(gsIncoming) {
+    if (!gsIncoming || !artemisHostSpectatingClientAttack()) return;
+    var live = window.gameState;
+    if (!live || !artemisAttackLiveBoardRegression(live, gsIncoming)) return;
+    try {
+      gsIncoming.players = JSON.parse(JSON.stringify(live.players));
+    } catch (ePl) {
+      if (Array.isArray(live.players)) {
+        gsIncoming.players = live.players.slice();
+      }
+    }
+    gsIncoming.attackPhase = live.attackPhase;
+    try {
+      gsIncoming.attackingTerritory = live.attackingTerritory
+        ? JSON.parse(JSON.stringify(live.attackingTerritory))
+        : live.attackingTerritory;
+      gsIncoming.defendingTerritory = live.defendingTerritory
+        ? JSON.parse(JSON.stringify(live.defendingTerritory))
+        : live.defendingTerritory;
+      gsIncoming.acquiredTerritory = live.acquiredTerritory
+        ? JSON.parse(JSON.stringify(live.acquiredTerritory))
+        : live.acquiredTerritory;
+    } catch (eTerr) {
+      gsIncoming.attackingTerritory = live.attackingTerritory;
+      gsIncoming.defendingTerritory = live.defendingTerritory;
+      gsIncoming.acquiredTerritory = live.acquiredTerritory;
+    }
+    gsIncoming.risquePublicAttackSelectionLine =
+      live.risquePublicAttackSelectionLine != null ? live.risquePublicAttackSelectionLine : "";
+    if (live.risquePublicAttackTransferSummary != null) {
+      gsIncoming.risquePublicAttackTransferSummary = live.risquePublicAttackTransferSummary;
+    }
+    if (live.risqueAttackOutcomeAcquisition != null) {
+      gsIncoming.risqueAttackOutcomeAcquisition = live.risqueAttackOutcomeAcquisition;
+    }
+    if (live.risqueAttackOutcomePrimary != null) {
+      gsIncoming.risqueAttackOutcomePrimary = live.risqueAttackOutcomePrimary;
+    }
+    if (live.risqueAttackOutcomeReport != null) {
+      gsIncoming.risqueAttackOutcomeReport = live.risqueAttackOutcomeReport;
+    }
+    try {
+      delete gsIncoming.risqueTransferPulse;
+    } catch (eClrPulse) {
+      /* ignore */
+    }
+  }
+
   /** Host spectating client attack: never let stale player_state clobber a live spin from attack_live. */
   function artemisMergePreferLiveAttackDice(gsIncoming, live) {
     if (!gsIncoming || !live) return;
@@ -3056,6 +3171,7 @@
       window.risqueArtemisEnsurePublicIncomeBreakdown(gs);
     }
     artemisPreserveHostAttackSpectatorLive(gs);
+    artemisMergePreferLiveAttackBoard(gs);
     if (
       String(gs.phase || "") === "attack" &&
       window.risqueArtemisHost &&

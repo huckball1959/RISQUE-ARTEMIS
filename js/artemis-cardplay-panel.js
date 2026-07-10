@@ -666,6 +666,7 @@
     if (!window.risqueArtemisMode || !gs) return;
     stopCardplayWatchdog();
     window.gameState = gs;
+    artemisClearCardplaySpectatorVoiceBacks();
     artemisTeardownPortableCardplayPrivateUi();
     artemisEnsureCardplayOmniHudShell(gs);
     ensureArtemisCardplayHudClasses(gs);

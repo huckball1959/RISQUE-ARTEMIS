@@ -110,6 +110,31 @@
     return players[Math.floor(Math.random() * players.length)];
   }
 
+  function shufflePlayersForTurnOrder(players) {
+    var out = (players || []).slice();
+    for (var i = out.length - 1; i > 0; i -= 1) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = out[i];
+      out[i] = out[j];
+      out[j] = tmp;
+    }
+    return out;
+  }
+
+  function buildTurnOrderAfterRouletteWinner(win, players, selectKind) {
+    var rest = (players || []).filter(function (p) {
+      return p && p.name && p.name !== win.name;
+    });
+    if (setupRigUsesRandom(selectKind) && rest.length > 1) {
+      rest = shufflePlayersForTurnOrder(rest);
+    }
+    return [win.name].concat(
+      rest.map(function (p) {
+        return p.name;
+      })
+    );
+  }
+
   /**
    * Inject after random pick: replace whoever won with the configured slot (default Nooch).
    * Roulette animation may have landed on Guido — game state from here on uses the swap target.
@@ -566,15 +591,7 @@
             }
           }
           gameState.currentPlayer = win.name;
-          gameState.turnOrder = [win.name].concat(
-            players
-              .filter(function (p) {
-                return p.name !== win.name;
-              })
-              .map(function (p) {
-                return p.name;
-              })
-          );
+          gameState.turnOrder = buildTurnOrderAfterRouletteWinner(win, players, selectKind);
           var cardPlayEntry =
             window.risqueArtemisMode
               ? "game.html?phase=cardplay&legacyNext=income.html&postReceive=1"

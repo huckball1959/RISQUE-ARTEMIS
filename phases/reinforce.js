@@ -675,7 +675,7 @@ window.risqueReinforceHostApplyPrompt = function (buttons) {
   var a3 = document.getElementById('reinforce-btn-allbut3');
   var cm = document.getElementById('reinforce-btn-confirm-move');
   var holder = document.getElementById('reinforce-troops-holder');
-  /* Must be #troops-input row — attack toolbar also has .ucp-slot-strip-num-wrap (#cond-threshold). */
+  /* Must be #troops-input row — not other number fields. */
   var nw = document.querySelector('#ucp-slot-strip .ucp-slot-strip-num-wrap');
   if (!r1) return;
 

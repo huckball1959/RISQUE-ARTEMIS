@@ -438,7 +438,13 @@
         clearInterval(hostAttackDicePaintTimer);
         hostAttackDicePaintTimer = null;
       }
-      var live = gsReveal || window.gameState;
+      /* Always prefer live window.gameState — gsReveal is often a pre-capture snapshot from the
+       * dice-resolve attack_live. A later post-capture attack_live updates the host map, then this
+       * ~520ms timer used to re-paint the stale board and hide the acquisition until CONFIRM. */
+      var live =
+        window.gameState && String(window.gameState.phase || "") === "attack"
+          ? window.gameState
+          : gsReveal || window.gameState;
       if (live && typeof window.risquePublicApplyDiceAndBattleReadout === "function") {
         window.risquePublicApplyDiceAndBattleReadout(live);
       }

@@ -6087,6 +6087,7 @@
       typeof window.risqueArtemisIsMyTurn === "function" &&
       !window.risqueArtemisIsMyTurn(gs) &&
       hasCardplayTvRecapContent &&
+      !risquePublicRecapShelfAnimOwnsCardStrip(gs) &&
       typeof window.risqueArtemisInjectCardplaySpectatorVoiceBacks === "function"
     ) {
       window.risqueArtemisInjectCardplaySpectatorVoiceBacks(gs);
@@ -10005,6 +10006,20 @@
         return true;
       }
       if (!window.risqueArtemisClientPlaying) {
+        var mySlotAtkSpec = Number(window.risqueArtemisPlayerSlot) || 0;
+        var ctrlAtkSpec =
+          Number((incomingGs && incomingGs.artemisControlSlot) || 0) ||
+          Number(localAtk && localAtk.artemisControlSlot) ||
+          0;
+        if (
+          mySlotAtkSpec >= 1 &&
+          ctrlAtkSpec >= 1 &&
+          mySlotAtkSpec !== ctrlAtkSpec &&
+          typeof window.risqueArtemisAttackLiveBoardRegression === "function" &&
+          window.risqueArtemisAttackLiveBoardRegression(localAtk, incomingGs)
+        ) {
+          return false;
+        }
         return true;
       }
       var mySlotAtk = Number(window.risqueArtemisPlayerSlot) || 0;

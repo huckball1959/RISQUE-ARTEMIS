@@ -239,8 +239,8 @@ let campaignQDevMode = false;
 window.risqueCampaignTroubleshootLog = window.risqueCampaignTroubleshootLog || [];
 
 /**
- * Attack toolbar: two six-slot rows above control voice. Row 1 = roll/blitz/campaign/clear + stacked aerial or Q blitz;
- * row 2 = Q camp + cond threshold. Shared by runtime HUD and attack fallback mount.
+ * Attack toolbar above control voice: roll / blitz / campaign / clear / aerial.
+ * Shared by runtime HUD and attack fallback mount.
  * @param {{ includeReinforceInStrip?: boolean }} opts
  */
 function buildAttackToolbarStripButtonsInnerHtml(opts) {
@@ -290,20 +290,16 @@ function buildAttackToolbarStripButtonsInnerHtml(opts) {
 }
 window.buildAttackToolbarStripButtonsInnerHtml = buildAttackToolbarStripButtonsInnerHtml;
 
-function buildAttackDevRowInnerHtml() {
+/** Hidden COND stop-at field (no DEV ROW UI). Value 0 → default 5 via {@link readCondThresholdFromInput}. */
+function buildAttackCondThresholdHiddenHtml() {
   return (
-    '<div class="ucp-slot-strip-buttons attack-dev-row-buttons">' +
-    '<button type="button" class="attack-ctl-btn attack-ctl-dev-label" id="attack-dev-row-label" disabled tabindex="-1" aria-disabled="true" title="Developer controls row">DEV ROW</button>' +
-    '<button id="q-blitz-l3" class="attack-ctl-btn attack-ctl-qdev" type="button" title="Instant blitz, then leave 3 troops on the attacking territory" hidden aria-hidden="true">Q BLITZ L3</button>' +
-    '<button id="q-blitz-t3" class="attack-ctl-btn attack-ctl-qdev" type="button" title="Instant blitz, then move up to 3 troops onto the capture" hidden aria-hidden="true">Q BLITZ T3</button>' +
-    '<button id="q-camp" class="attack-ctl-btn attack-ctl-qdev" type="button" title="Plan campaign on map (leave 1 each capture), then Confirm to start">Q CAMP</button>' +
-    '</div>' +
-    '<div class="ucp-slot-strip-num-wrap attack-dev-row-cond">' +
-    '<input id="cond-threshold" class="ucp-slot-strip-number" type="number" min="0" value="0" title="Stop blitz when your troops on the attacking territory reach this number (0 = default 5)" aria-label="Conditional blitz stop-at troop count on attacker" />' +
-    '</div>'
+    '<input id="cond-threshold" class="attack-cond-threshold-hidden" type="number" min="0" value="0" ' +
+    'hidden aria-hidden="true" tabindex="-1" ' +
+    'title="Stop blitz when attacking stack reaches this number (0 = default 5)" ' +
+    'aria-label="Conditional blitz stop-at troop count on attacker" />'
   );
 }
-window.buildAttackDevRowInnerHtml = buildAttackDevRowInnerHtml;
+window.buildAttackCondThresholdHiddenHtml = buildAttackCondThresholdHiddenHtml;
 
 const elements = {};
 
@@ -323,9 +319,6 @@ function cacheElements() {
   elements.campaignDropdown = document.getElementById('campaign-dropdown');
   elements.campaignWrap = document.querySelector('.attack-campaign-wrap');
   elements.newAttack = document.getElementById('new-attack');
-  elements.qBlitzL3 = document.getElementById('q-blitz-l3');
-  elements.qBlitzT3 = document.getElementById('q-blitz-t3');
-  elements.qCamp = document.getElementById('q-camp');
   elements.reinforce = document.getElementById('reinforce');
   elements.aerialAttack = document.getElementById('aerial-attack');
   elements.aerialAttack2 = document.getElementById('aerial-attack-2');
@@ -1525,20 +1518,6 @@ function syncAttackPhaseActionLocks() {
   if (rollEl) rollEl.disabled = !!pending || !hasPair;
   if (blitzEl) blitzEl.disabled = !!pending || !hasPair;
   if (campaignEl) campaignEl.disabled = !!pending;
-  const qBlitzL3El = document.getElementById('q-blitz-l3');
-  const qBlitzT3El = document.getElementById('q-blitz-t3');
-  const qCampEl = document.getElementById('q-camp');
-  const qCampPlanning =
-    campaignQDevMode &&
-    campaignType === 'instant' &&
-    (campaignMode === 'instant_launch' || campaignMode === 'instant_extend');
-  const qBlitzDisabled = !!pending || !hasPair || !!qCampPlanning;
-  if (qBlitzL3El) qBlitzL3El.disabled = qBlitzDisabled;
-  if (qBlitzT3El) qBlitzT3El.disabled = qBlitzDisabled;
-  if (qCampEl) {
-    qCampEl.disabled = !!pending;
-    qCampEl.textContent = 'Q CAMP';
-  }
   const uses =
     window.gameUtils && typeof window.gameUtils.getAerialAttackUsesRemaining === 'function'
       ? window.gameUtils.getAerialAttackUsesRemaining(gs)
@@ -1553,21 +1532,6 @@ function syncAttackPhaseActionLocks() {
     !aerialUnlockedForUi || isSelectingAerialSource || isSelectingAerialTarget || isAwaitingAerialConfirm;
   if (aerialEl) aerialEl.disabled = !!pending || aerialBaseGrey || uses < 1;
   if (aerialEl2) aerialEl2.disabled = !!pending || aerialBaseGrey || uses < 2;
-  const showQBlitzInDevRow = !(aerialUnlockedForUi && uses >= 1);
-  function setDevRowBtnVisible(el, show) {
-    if (!el) return;
-    if (show) {
-      el.hidden = false;
-      el.removeAttribute('hidden');
-      el.setAttribute('aria-hidden', 'false');
-    } else {
-      el.hidden = true;
-      el.setAttribute('hidden', 'hidden');
-      el.setAttribute('aria-hidden', 'true');
-    }
-  }
-  setDevRowBtnVisible(qBlitzL3El, showQBlitzInDevRow);
-  setDevRowBtnVisible(qBlitzT3El, showQBlitzInDevRow);
   if (reinforceEl) reinforceEl.disabled = !!pending || guidedPromptActive;
 }
 
@@ -2503,6 +2467,7 @@ function applyBattleRoundAfterRoll(snap, opts) {
       if (typeof window.risqueMirrorPushGameState === 'function') {
         window.risqueMirrorPushGameState();
       }
+      pushArtemisClientAttackLiveMirror();
       window.gameUtils.renderTerritories(null, window.gameState);
       window.gameUtils.renderStats(window.gameState);
       /* Battle tape: capture frame above + autoCompleteTroopTransferLeaveBehind's record — avoid third duplicate here. */
@@ -3020,15 +2985,11 @@ function readCondThresholdFromInput() {
 }
 
 /**
- * Same strip field as Blitz Step Con ({@link readCondThresholdFromInput}) but no default —
- * returns null if empty or invalid so the host must enter a number.
+ * Same strip field as Blitz Step Con ({@link readCondThresholdFromInput}).
+ * With the DEV ROW gone, empty/invalid falls back to the default stop-at (5).
  */
 function readCondThresholdFromInputRequired() {
-  const thresholdInput = document.getElementById('cond-threshold');
-  const raw = thresholdInput && thresholdInput.value !== '' ? thresholdInput.value : '';
-  const v = parseInt(raw, 10);
-  if (raw === '' || isNaN(v) || v < 1) return null;
-  return Math.max(1, Math.min(99, v));
+  return readCondThresholdFromInput();
 }
 
 function beginConditionalBlitzPrep(mode) {
@@ -4573,7 +4534,7 @@ function renderAfterCampaignWarpathSync() {
 function startInstantCondConditionFlow() {
   const cur = window.gameState && window.gameState.currentPlayer ? window.gameState.currentPlayer : '';
   const condEl = document.getElementById('cond-threshold');
-  if (condEl) condEl.value = '';
+  if (condEl) condEl.value = '0';
   showPrompt(
     'Set the condition.',
     [
@@ -4581,10 +4542,6 @@ function startInstantCondConditionFlow() {
         label: 'Confirmed',
         onClick: () => {
           const req = readCondThresholdFromInputRequired();
-          if (req == null) {
-            prependCombatLog('INSTANT COND: enter a condition (1–99) in the strip, then Confirmed.', 'system');
-            return;
-          }
           campaignCondThreshold = req;
           const condN = campaignCondThreshold;
           showPrompt(
@@ -4713,9 +4670,12 @@ function performInstantCommitFromKeys() {
 
   if (campaignType === 'cond' && campaignCondFromPauseRow) {
     campaignMode = 'cond_await_condition';
-    prependCombatLog(`Campaign Step CON: path locked (${pathLine}). Set condition (strip), then Confirm.`, 'system');
+    prependCombatLog(
+      `Campaign Step CON: path locked (${pathLine}). Confirm condition (default stop-at 5), then Begin attack.`,
+      'system'
+    );
     const curAwait = window.gameState && window.gameState.currentPlayer ? window.gameState.currentPlayer : '';
-    paintInstantCampaignHud('Use the pulsing number in the strip, then Confirm below.', {
+    paintInstantCampaignHud('Confirm the condition (default stop-at 5), then Begin attack.', {
       mirrorPrimary: curAwait ? `${curAwait} is setting the Campaign Step condition` : campaignTypeDisplayName(),
       mirrorReport: 'Stop when attacker troops reach the chosen number or below'
     });
@@ -4728,11 +4688,11 @@ function performInstantCommitFromKeys() {
     campaignMode = 'cond_await_condition';
     campaignCondThreshold = null;
     prependCombatLog(
-      `INSTANT COND: path locked (${pathLine}). Set condition (strip) → Confirmed → Begin attack.`,
+      `INSTANT COND: path locked (${pathLine}). Confirm condition (default stop-at 5) → Begin attack.`,
       'system'
     );
     const curAwait = window.gameState && window.gameState.currentPlayer ? window.gameState.currentPlayer : '';
-    paintInstantCampaignHud('Use the pulsing number in the strip, then Confirmed, then Begin attack below.', {
+    paintInstantCampaignHud('Confirm the condition (default stop-at 5), then Begin attack.', {
       mirrorPrimary: curAwait ? `${curAwait} is setting the Instant COND condition` : campaignTypeDisplayName(),
       mirrorReport: 'Stop when attacker troops reach the chosen number or below'
     });
@@ -5664,7 +5624,7 @@ function startInstantCondCampaignPlanning() {
   if (g && g.parentNode) g.parentNode.removeChild(g);
   clearInstantCampaignWarpath();
   prependCombatLog(
-    'INSTANT COND: same map flow as Campaign Instant — Commit, then set condition in the strip (Confirmed → Begin attack); Leave = garrison (default 1).',
+    'INSTANT COND: same map flow as Campaign Instant — Commit, then Confirm condition (default stop-at 5) → Begin attack; Leave = garrison (default 1).',
     'system'
   );
   campaignTrace('instantCond:start', {});
@@ -6174,7 +6134,7 @@ function startCampaignCheckConPlanning() {
   if (g && g.parentNode) g.parentNode.removeChild(g);
   clearInstantCampaignWarpath();
   prependCombatLog(
-    'Campaign Step CON: build path on the map — Commit, set condition (strip), Confirm, then Begin attack.',
+    'Campaign Step CON: build path on the map — Commit, Confirm condition (default stop-at 5), then Begin attack.',
     'system'
   );
   campaignTrace('campCheckCon:start', {});
@@ -6964,27 +6924,6 @@ function initAttackPhase(mountEpoch) {
     isAerialAttackEnabled = !!aerialBridge || aerialUsesInit > 0;
 
     elements.roll.addEventListener('click', () => rollDice(), { signal: acSig });
-    if (elements.qBlitzL3) {
-      elements.qBlitzL3.addEventListener(
-        'click',
-        () => {
-          void executeQBlitzQuick('leave3');
-        },
-        { signal: acSig }
-      );
-    }
-    if (elements.qBlitzT3) {
-      elements.qBlitzT3.addEventListener(
-        'click',
-        () => {
-          void executeQBlitzQuick('take3');
-        },
-        { signal: acSig }
-      );
-    }
-    if (elements.qCamp) {
-      elements.qCamp.addEventListener('click', onQCampDevClick, { signal: acSig });
-    }
     elements.blitz.addEventListener(
       'click',
       (e) => {
@@ -7378,11 +7317,9 @@ window.initAttackPhase = initAttackPhase;
             '</div>' +
             '</div>' +
           '</div>' +
-          '<div id="attack-dev-row-strip" class="ucp-slot-strip attack-dev-row-strip" aria-label="Developer controls">' +
-            '<div class="ucp-slot-strip-main">' +
-            (typeof buildAttackDevRowInnerHtml === 'function' ? buildAttackDevRowInnerHtml() : '') +
-            '</div>' +
-          '</div>' +
+          (typeof buildAttackCondThresholdHiddenHtml === 'function'
+            ? buildAttackCondThresholdHiddenHtml()
+            : '<input id="cond-threshold" type="number" hidden aria-hidden="true" value="0" />') +
           '<div id="log-text" class="ucp-terminal ucp-combat-log" aria-live="polite"></div>' +
         '</div>';
     }

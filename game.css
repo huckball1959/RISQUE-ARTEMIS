@@ -5499,7 +5499,25 @@ body.risque-view-host:not([data-risque-phase="attack"])
   max-width: none;
 }
 
-/* Developer row: below prompt slot strip; cond threshold at end (green column) */
+/* Developer row removed (m344) — keep hide rule if stale DOM appears */
+#attack-dev-row-strip,
+.attack-dev-row-strip {
+  display: none !important;
+}
+
+.attack-cond-threshold-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Legacy developer-row styles (unused; kept inert under hide rule above) */
 .attack-dev-row-strip {
   width: 100%;
   margin: 4px 0 6px;
@@ -8858,6 +8876,23 @@ html.risque-view-public[data-risque-phase="attack"] .ucp-voice-report.ucp-voice-
   background: #14532d;
   color: #86efac;
   min-width: 8px;
+}
+
+/* Idle empty prompt slots under CV: hide placeholders and collapse the strip (m345). */
+.attack-control-panel .ucp-slot-ctl.ucp-slot-empty {
+  display: none !important;
+}
+
+.attack-control-panel #ucp-slot-strip:not(.ucp-slot-strip-active) .ucp-slot-strip-num-wrap {
+  display: none !important;
+}
+
+.attack-control-panel
+  #ucp-slot-strip:not(.ucp-slot-strip-active):not(:has(.ucp-slot-ctl:not(.ucp-slot-empty))) {
+  display: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
 }
 
 @keyframes risque-slot-prompt-pulse {

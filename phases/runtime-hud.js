@@ -1,7 +1,6 @@
 /**
  * Persistent right-column HUD: full game panel (stats, control voice, combat log, phase slot).
- * Setup phases use .runtime-hud-root--setup (attack row, dev row, slot strip, combat log, and voice report hidden via CSS).
- * #attack-dev-row-strip is shown only during data-risque-phase="attack" (see game.css).
+ * Setup phases use .runtime-hud-root--setup (attack row, slot strip, combat log, and voice report hidden via CSS).
  */
 (function () {
   "use strict";
@@ -105,13 +104,9 @@
         "</div>" +
         "</div>" +
       "</div>" +
-      '<div id="attack-dev-row-strip" class="ucp-slot-strip attack-dev-row-strip" aria-label="Developer controls">' +
-        '<div class="ucp-slot-strip-main">' +
-        (typeof window.buildAttackDevRowInnerHtml === "function"
-          ? window.buildAttackDevRowInnerHtml()
-          : "") +
-        "</div>" +
-      "</div>" +
+      (typeof window.buildAttackCondThresholdHiddenHtml === "function"
+        ? window.buildAttackCondThresholdHiddenHtml()
+        : '<input id="cond-threshold" type="number" hidden aria-hidden="true" value="0" />') +
       '<div id="log-text" class="ucp-terminal ucp-combat-log" aria-live="polite"></div>' +
       '<div class="attack-reinforce-footer" role="group" aria-label="Reinforcement phase">' +
       '<button id="reinforce" class="attack-ctl-btn attack-ctl-reinforce" type="button" title="Continue to reinforcement phase">CONTINUE TO REINFORCEMENT</button>' +
