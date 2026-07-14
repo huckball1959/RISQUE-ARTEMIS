@@ -106,7 +106,7 @@
     var acks = msg.acks || {};
     var slots = msg.slots || {};
     var parts = [];
-    [1, 2, 3].forEach(function (s) {
+    [1, 2, 3, 4, 5, 6].forEach(function (s) {
       var ack = acks[String(s)] || acks[s];
       var row = slots[String(s)] || slots[s];
       var name = slotLabel(s);

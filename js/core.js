@@ -1566,6 +1566,8 @@ window.gameUtils = {
        * territory iteration already removes its own prior circle/text/satellite before drawing. */
       const territoryNames = Object.keys(this.territories);
       const renderTerritories = changedLabel ? [changedLabel] : territoryNames;
+      /* Must live outside the per-territory loop — hit-layer wrap after forEach also uses it. */
+      const risqueSvgNs = 'http://www.w3.org/2000/svg';
       renderTerritories.forEach(label => {
         if (label === 'wildcard1' || label === 'wildcard2') return;
         const territory = this.territories[label];
@@ -2013,7 +2015,6 @@ window.gameUtils = {
             ringRForMarker,
           };
         }
-        const risqueSvgNs = 'http://www.w3.org/2000/svg';
         const numberTextContent = (
           playerName
             ? Number(troops) || 1

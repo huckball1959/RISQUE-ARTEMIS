@@ -27,14 +27,23 @@
   }
   if (mode !== "host" && mode !== "client") return;
 
+  if (window.risqueArtemisHostDrivenLogin !== false) {
+    try {
+      document.documentElement.classList.add("risque-artemis-host-driven-login");
+    } catch (eHd) {
+      /* ignore */
+    }
+  }
+
   var playerSlot = parseInt(String(q.get("slot") || ""), 10);
-  if (!playerSlot || playerSlot < 1 || playerSlot > 3) {
+  var maxSlots = Math.max(2, Math.min(6, Number(window.risqueArtemisMaxSlots) || 6));
+  if (!playerSlot || playerSlot < 1 || playerSlot > maxSlots) {
     playerSlot = mode === "host" ? 1 : 0;
   }
   if (mode === "host" && playerSlot !== 1) {
     playerSlot = 1;
   }
-  if (mode === "client" && (playerSlot < 2 || playerSlot > 3)) {
+  if (mode === "client" && (playerSlot < 2 || playerSlot > maxSlots)) {
     playerSlot = 0;
   }
 
@@ -128,7 +137,7 @@
   function rigSetupLabelFromState() {
     if (window.risqueArtemisRigSetupRandom) return "True random";
     var slot = Number(window.risqueArtemisRigSetupSlot) || 0;
-    if (slot >= 1 && slot <= 3) {
+    if (slot >= 1 && slot <= (window.risqueArtemisMaxSlots || 6)) {
       return "Rigged — " + (RIG_SLOT_NAMES[slot] || "P" + slot);
     }
     return "";
@@ -142,7 +151,7 @@
         return;
       }
       var slot = Number(window.risqueArtemisRigSetupSlot) || 0;
-      if (slot >= 1 && slot <= 3) {
+      if (slot >= 1 && slot <= (window.risqueArtemisMaxSlots || 6)) {
         sessionStorage.removeItem("risqueArtemisRigSetupRandom");
         sessionStorage.setItem("risqueArtemisRigSetupSlot", String(slot));
       }
@@ -154,7 +163,7 @@
   function rigSetupPayloadFromGlobals() {
     if (window.risqueArtemisRigSetupRandom) return { random: true };
     var slot = Number(window.risqueArtemisRigSetupSlot) || 0;
-    if (slot >= 1 && slot <= 3) return { slot: slot };
+    if (slot >= 1 && slot <= (window.risqueArtemisMaxSlots || 6)) return { slot: slot };
     return null;
   }
 
@@ -162,7 +171,7 @@
     if (!gs || !gs.risqueArtemisRigSetup || typeof gs.risqueArtemisRigSetup !== "object") return null;
     if (gs.risqueArtemisRigSetup.random) return { random: true };
     var gsSlot = Number(gs.risqueArtemisRigSetup.slot) || 0;
-    if (gsSlot >= 1 && gsSlot <= 3) return { slot: gsSlot };
+    if (gsSlot >= 1 && gsSlot <= (window.risqueArtemisMaxSlots || 6)) return { slot: gsSlot };
     return null;
   }
 
@@ -183,7 +192,7 @@
       return;
     }
     var slot = Number(payload.slot) || 0;
-    if (slot < 1 || slot > 3) return;
+    if (slot < 1 || slot > (window.risqueArtemisMaxSlots || 6)) return;
     window.risqueArtemisRigSetupSlot = slot;
     window.risqueArtemisRigSetupRandom = false;
     window.RISQUE_POST_ROULETTE_SWAP_SLOT = slot;
@@ -232,7 +241,7 @@
     if (window.risqueArtemisRigSetupUsesRandom(gsOpt)) return 0;
     if (typeof window.risqueArtemisRigSetupSlot === "number") {
       var rigWin = Number(window.risqueArtemisRigSetupSlot);
-      if (rigWin >= 1 && rigWin <= 3) return rigWin;
+      if (rigWin >= 1 && rigWin <= (window.risqueArtemisMaxSlots || 6)) return rigWin;
     }
     try {
       var ssRig = sessionStorage.getItem("risqueArtemisRigSetupSlot");
@@ -251,7 +260,7 @@
     }
     if (typeof window.RISQUE_POST_ROULETTE_SWAP_SLOT === "number") {
       var w = Number(window.RISQUE_POST_ROULETTE_SWAP_SLOT);
-      if (w >= 1 && w <= 3) return w;
+      if (w >= 1 && w <= (window.risqueArtemisMaxSlots || 6)) return w;
     }
     return 0;
   };
@@ -302,7 +311,7 @@
       label = "True random";
     } else {
       var slot = Number(opts.slot) || 0;
-      if (slot < 1 || slot > 3) return "";
+      if (slot < 1 || slot > (window.risqueArtemisMaxSlots || 6)) return "";
       window.risqueArtemisRigSetupSlot = slot;
       window.risqueArtemisRigSetupRandom = false;
       window.RISQUE_POST_ROULETTE_SWAP_SLOT = slot;
@@ -360,7 +369,7 @@
       return;
     }
     var slot = Number(msg.slot) || 0;
-    if (slot >= 1 && slot <= 3) {
+    if (slot >= 1 && slot <= (window.risqueArtemisMaxSlots || 6)) {
       window.risqueArtemisApplyRigSetup({ slot: slot, fromNetwork: true });
     }
   }
@@ -455,11 +464,11 @@
   window.risqueArtemisEnsureClientSlot = function () {
     if (!window.risqueArtemisNetClient) return;
     var slot = Number(window.risqueArtemisPlayerSlot);
-    if (slot >= 2 && slot <= 3) return;
+    if (slot >= 2 && slot <= (window.risqueArtemisMaxSlots || 6)) return;
     try {
       var q = new URL(window.location.href).searchParams;
       var fromUrl = parseInt(String(q.get("slot") || ""), 10);
-      if (fromUrl >= 2 && fromUrl <= 3) {
+      if (fromUrl >= 2 && fromUrl <= (window.risqueArtemisMaxSlots || 6)) {
         window.risqueArtemisPlayerSlot = fromUrl;
         playerSlot = fromUrl;
         persistArtemisSession();
@@ -497,7 +506,7 @@
         u.searchParams.delete("rigCardPlay");
       } else {
         var rigStored = window.risqueArtemisRigSetupSlot;
-        if (typeof rigStored === "number" && rigStored >= 1 && rigStored <= 3) {
+        if (typeof rigStored === "number" && rigStored >= 1 && rigStored <= (window.risqueArtemisMaxSlots || 6)) {
           u.searchParams.set("rigSetup", String(rigStored));
           u.searchParams.delete("rigCardPlay");
         }
@@ -596,9 +605,13 @@
 
   function lobbyCounts(lobby) {
     var slots = (lobby && lobby.slots) || [];
+    var n = Math.max(
+      2,
+      Math.min(6, Number((lobby && lobby.expectedPlayers) || window.risqueArtemisExpectedPlayers || 3))
+    );
     var connected = 0;
     var ready = 0;
-    [1, 2, 3].forEach(function (slotNum) {
+    for (var slotNum = 1; slotNum <= n; slotNum += 1) {
       var s = slots.find(function (x) {
         return x.slot === slotNum;
       });
@@ -606,8 +619,8 @@
         connected += 1;
         if (s.ready) ready += 1;
       }
-    });
-    return { connected: connected, ready: ready };
+    }
+    return { connected: connected, ready: ready, expected: n };
   }
 
   function tryHostAutoStartLobby(lobby) {
@@ -615,10 +628,18 @@
       return;
     }
     var c = lobbyCounts(lobby);
-    if (c.connected < 3 || c.ready < 3) {
+    if (c.connected < c.expected || c.ready < c.expected) {
       setTopStatus(
-        "ARTEMIS — waiting for JOIN (" + c.connected + "/3 connected, " + c.ready + "/3 ready)",
-        c.connected >= 3 ? "ok" : "wait"
+        "ARTEMIS — waiting for JOIN (" +
+          c.connected +
+          "/" +
+          c.expected +
+          " connected, " +
+          c.ready +
+          "/" +
+          c.expected +
+          " ready)",
+        c.connected >= c.expected ? "ok" : "wait"
       );
       return;
     }
@@ -626,10 +647,12 @@
     if (lobbyAutoStartSent) return;
     lobbyAutoStartSent = true;
     sendJson({ type: "lobby_start" });
-    logArtemis("fast boot — auto lobby_start (3/3 ready)");
+    logArtemis("fast boot — auto lobby_start (" + c.expected + "/" + c.expected + " ready)");
   }
 
   function autoSendFixedLoginProfile() {
+    if (window.risqueArtemisLobbyMode === "open") return;
+    if (window.risqueArtemisHostDrivenLogin !== false) return;
     if (!artemisFastBootEnabled() || !playerSlot) return;
     if (window.risqueArtemisFastBootLoginSent) return;
     var prof = fixedProfileForSlot(playerSlot);
@@ -759,8 +782,36 @@
         window.risqueArtemisLobbyHide();
       }
       setTopStatus("ARTEMIS host — login", "ok");
-      if (artemisFastBootEnabled()) {
-        autoSendFixedLoginProfile();
+      if (window.risqueArtemisHostDrivenLogin !== false) {
+        document.documentElement.classList.add("risque-artemis-host-driven-login");
+        document.documentElement.classList.remove("risque-artemis-login-active");
+        try {
+          var root = document.getElementById("risque-login-hud-root");
+          var needsMount =
+            !root ||
+            root.classList.contains("risque-artemis-host-login-stub") ||
+            root.hidden ||
+            !root.querySelector("#login-button-js");
+          if (
+            needsMount &&
+            window.risquePhases &&
+            window.risquePhases.login &&
+            typeof window.risquePhases.login.mount === "function"
+          ) {
+            var uio =
+              document.getElementById("risque-ui-overlay") ||
+              document.querySelector(".risque-ui-overlay") ||
+              document.body;
+            window.risquePhases.login.mount(uio, {});
+          }
+        } catch (eMount) {
+          /* ignore */
+        }
+      } else {
+        /* Open lobby: host signs in on the overlay like clients (no fixed auto-login). */
+        if (typeof window.risqueArtemisShowLoginPanel === "function") {
+          window.risqueArtemisShowLoginPanel();
+        }
       }
       if (typeof window.risqueSyncBoardCornerArtemisStart === "function") {
         window.risqueSyncBoardCornerArtemisStart();
@@ -839,24 +890,22 @@
       window.risqueArtemisLobbyHide();
     }
     dispatchLobbyStartedEvent();
-    var reconnect = artemisClientSessionWasStarted();
     clearClientPersistedGameCache();
-    if (artemisFastBootEnabled()) {
+    if (window.risqueArtemisHostDrivenLogin !== false) {
       markArtemisClientSessionStarted();
-      setTopStatus("ARTEMIS — auto sign-in…", "wait");
-      autoSendFixedLoginProfile();
+      setTopStatus("ARTEMIS — connected; waiting for host roster…", "wait");
+      if (typeof window.risqueArtemisShowLoginPanel === "function") {
+        window.risqueArtemisShowLoginPanel();
+      }
       flushPendingPublicStates();
       flushPendingClientOutbound();
       return;
     }
-    if (!reconnect) {
-      markArtemisClientSessionStarted();
-      setTopStatus("ARTEMIS — sign in below", "wait");
-      if (typeof window.risqueArtemisShowLoginPanel === "function") {
-        window.risqueArtemisShowLoginPanel();
-      }
-    } else {
-      setTopStatus("ARTEMIS — synced with host", "ok");
+    /* Open lobby: each client types name + color. */
+    markArtemisClientSessionStarted();
+    setTopStatus("ARTEMIS — open lobby; sign in below", "wait");
+    if (typeof window.risqueArtemisShowLoginPanel === "function") {
+      window.risqueArtemisShowLoginPanel();
     }
     flushPendingPublicStates();
     flushPendingClientOutbound();
@@ -901,7 +950,7 @@
     if (!slot && typeof window.risqueArtemisActivePlayerSlot === "function") {
       slot = Number(window.risqueArtemisActivePlayerSlot(gs)) || 0;
     }
-    if (slot >= 1 && slot <= 3) {
+    if (slot >= 1 && slot <= (window.risqueArtemisMaxSlots || 6)) {
       gs.artemisControlSlot = slot;
     }
     return slot;
@@ -935,14 +984,22 @@
     opts = opts || {};
     var incomingPh = String(gs.phase || "");
     var fwdSelectKind = artemisIncomingPlayerSelectKind(gs);
+    var flashFinal =
+      gs.risquePublicPlayerSelectFlash &&
+      (gs.risquePublicPlayerSelectFlash.final === true ||
+        gs.risquePublicPlayerSelectFlash.final === "true" ||
+        gs.risquePublicPlayerSelectFlash.final === 1);
     var forwardSetupSelect =
-      incomingPh === "playerSelect" &&
-      (fwdSelectKind === "cardPlay" || fwdSelectKind === "deployOrder");
+      flashFinal ||
+      (incomingPh === "playerSelect" &&
+        (fwdSelectKind === "cardPlay" ||
+          fwdSelectKind === "deployOrder" ||
+          fwdSelectKind === "firstCard"));
     if (!forwardSetupSelect && !opts.preservePlayerSelectMirror) {
       delete gs.risquePublicPlayerSelectFlash;
       delete gs.risquePublicUiSelectKind;
     }
-    if (forwardSetupSelect) {
+    if (forwardSetupSelect && !flashFinal) {
       try {
         delete gs.risqueMirrorDeployRoute;
       } catch (eRouteClr) {
@@ -1537,7 +1594,7 @@
         hostGs.currentPlayer = clientGs.currentPlayer;
       }
       var clientCtrl = Number(clientGs.artemisControlSlot) || 0;
-      if (clientCtrl >= 1 && clientCtrl <= 3) {
+      if (clientCtrl >= 1 && clientCtrl <= (window.risqueArtemisMaxSlots || 6)) {
         hostGs.artemisControlSlot = clientCtrl;
       }
       var clientSeq = deployControlSeq(clientGs);
@@ -3173,6 +3230,17 @@
     artemisPreserveHostAttackSpectatorLive(gs);
     artemisMergePreferLiveAttackBoard(gs);
     if (
+      typeof window.risqueMergePlayedCardsGalleryMonotonic === "function" &&
+      window.gameState
+    ) {
+      try {
+        /* Incoming keeps the longer gallery (host or client). */
+        window.risqueMergePlayedCardsGalleryMonotonic(gs, window.gameState);
+      } catch (eGalHost) {
+        /* ignore */
+      }
+    }
+    if (
       String(gs.phase || "") === "attack" &&
       window.risqueArtemisHost &&
       !window.risqueArtemisNetClient &&
@@ -3189,6 +3257,51 @@
       window.risqueHostReplaceShellGameState(gs);
     } else {
       window.gameState = gs;
+    }
+    if (
+      (String(gs.phase || "") === "cardplay" || String(gs.phase || "") === "con-cardplay") &&
+      window.risqueArtemisHost
+    ) {
+      try {
+        if (
+          gs.risquePublicBookProcessing &&
+          Array.isArray(gs.risquePublicBookProcessing.steps) &&
+          gs.risquePublicBookProcessing.steps.length &&
+          typeof window.risqueArtemisSeedLiveBoardFromBookProc === "function"
+        ) {
+          window.risqueArtemisSeedLiveBoardFromBookProc(gs, gs.risquePublicBookProcessing);
+        }
+      } catch (eSeedHostCp) {
+        /* ignore */
+      }
+      try {
+        if (
+          typeof window.risqueRenderHostCardsPlayedPanel === "function" &&
+          Array.isArray(gs.risquePlayedCardsGallery) &&
+          gs.risquePlayedCardsGallery.length
+        ) {
+          window.risqueRenderHostCardsPlayedPanel(gs);
+        }
+      } catch (eGalHostPaint) {
+        /* ignore */
+      }
+      /* Paint live board when recap isn't mid-step (anim owns the map during summary/step). */
+      var bookPh =
+        typeof window.risquePublicBookSequencePhase === "function"
+          ? String(window.risquePublicBookSequencePhase() || "")
+          : "idle";
+      if (
+        bookPh !== "summary" &&
+        bookPh !== "step" &&
+        window.gameUtils &&
+        typeof window.gameUtils.renderTerritories === "function"
+      ) {
+        try {
+          window.gameUtils.renderTerritories(null, gs);
+        } catch (eMapHostCp) {
+          /* ignore */
+        }
+      }
     }
     if (
       String(gs.phase || "") === "deploy" &&
@@ -3808,6 +3921,56 @@
           /* ignore */
         }
       }
+      /* Reject stale pre-acquire pushes that arrive after host already has the post-book board. */
+      if (
+        window.gameState &&
+        Array.isArray(window.gameState.players) &&
+        Array.isArray(gs.players) &&
+        (window.gameState.bookPlayedThisTurn ||
+          (Array.isArray(window.gameState.risquePlayedCardsGallery) &&
+            window.gameState.risquePlayedCardsGallery.length > 0))
+      ) {
+        var hostCurP = artemisPlayerByName(window.gameState, curNm || window.gameState.currentPlayer);
+        var inCurP = artemisPlayerByName(gs, curNm || gs.currentPlayer);
+        var hostTerrN =
+          hostCurP && Array.isArray(hostCurP.territories) ? hostCurP.territories.length : 0;
+        var inTerrN = inCurP && Array.isArray(inCurP.territories) ? inCurP.territories.length : 0;
+        var hostAhead =
+          hostTerrN > inTerrN ||
+          (hostTerrN > 0 &&
+            hostCurP.territories.some(function (ht) {
+              if (!ht || !ht.name || !inCurP || !Array.isArray(inCurP.territories)) return false;
+              return !inCurP.territories.some(function (it) {
+                return it && it.name === ht.name;
+              });
+            }));
+        if (hostAhead) {
+          try {
+            console.warn(
+              "[ARTEMIS] reject regressive cardplay board from P" + senderSlot
+            );
+          } catch (eRejBoard) {
+            /* ignore */
+          }
+          if (typeof window.risqueArtemisDiag === "function") {
+            try {
+              window.risqueArtemisDiag(
+                "cardplay_board_reject",
+                "Host rejected stale pre-acquire cardplay board from P" + senderSlot,
+                {
+                  senderSlot: senderSlot,
+                  currentPlayer: curNm,
+                  hostTerrN: hostTerrN,
+                  inTerrN: inTerrN
+                }
+              );
+            } catch (eDiagBoardRej) {
+              /* ignore */
+            }
+          }
+          return;
+        }
+      }
       /* m298 trace: a cardplay→cardplay push that reached here was NOT rejected, so the host is
        * about to adopt it. Record the host's current vs incoming hand count for the active player
        * to confirm whether the played-card reduction actually lands on the authoritative state. */
@@ -4005,7 +4168,7 @@
         /* ignore */
       }
       var roster = [];
-      [1, 2, 3].forEach(function (slot) {
+      [1, 2, 3, 4, 5, 6].forEach(function (slot) {
         var prof = incoming[String(slot)] || incoming[slot];
         if (prof && prof.name && prof.color) {
           roster.push({
@@ -4042,7 +4205,23 @@
   }
 
   function renderLobbyState(lobby) {
-    if (!lobby || window.risqueArtemisLobbyStarted) return;
+    if (!lobby) return;
+    window.risqueArtemisLastLobbyState = lobby;
+    if (lobby.expectedPlayers) {
+      window.risqueArtemisExpectedPlayers = lobby.expectedPlayers;
+    }
+    if (lobby.lobbyMode === "open" || lobby.lobbyMode === "quick") {
+      if (typeof window.risqueArtemisApplyLobbyMode === "function") {
+        window.risqueArtemisApplyLobbyMode(lobby.lobbyMode, {
+          broadcast: false,
+          remount: !!window.risqueArtemisLobbyStarted
+        });
+      } else {
+        window.risqueArtemisLobbyMode = lobby.lobbyMode;
+        window.risqueArtemisHostDrivenLogin = lobby.lobbyMode !== "open";
+      }
+    }
+    if (window.risqueArtemisLobbyStarted) return;
     if (typeof window.risqueArtemisLobbyRender === "function") {
       window.risqueArtemisLobbyRender(lobby);
     }
@@ -4276,6 +4455,119 @@
     return state;
   }
 
+  /** Same stale-mirror class as book hands: protect cardplay acquires/troop edits on the active client. */
+  function artemisCardplayBoardOwnershipMap(players) {
+    var map = {};
+    (players || []).forEach(function (pl) {
+      if (!pl || !pl.name || !Array.isArray(pl.territories)) return;
+      pl.territories.forEach(function (t) {
+        if (!t || !t.name) return;
+        map[String(t.name)] = {
+          owner: pl.name,
+          troops: Number(t.troops) || 1
+        };
+      });
+    });
+    return map;
+  }
+
+  function artemisCardplayBoardRegressed(state, stamp) {
+    if (!state || !stamp || !Array.isArray(stamp.players)) return false;
+    var want = artemisCardplayBoardOwnershipMap(stamp.players);
+    var got = artemisCardplayBoardOwnershipMap(state.players);
+    var keys = Object.keys(want);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (!got[k]) return true;
+      if (artemisNormPlayerName(got[k].owner) !== artemisNormPlayerName(want[k].owner)) return true;
+    }
+    return false;
+  }
+
+  function artemisProtectLocalCardplayBoardMirror(state) {
+    if (mode !== "client" || !state || !window.__risqueArtemisLocalCardplayBoard) return state;
+    var stamp = window.__risqueArtemisLocalCardplayBoard;
+    if (Date.now() - (Number(stamp.at) || 0) > 10 * 60 * 1000) {
+      try {
+        delete window.__risqueArtemisLocalCardplayBoard;
+      } catch (eOldBoardStamp) {
+        /* ignore */
+      }
+      return state;
+    }
+    if (artemisNormPlayerName(state.currentPlayer) !== artemisNormPlayerName(stamp.player)) {
+      try {
+        delete window.__risqueArtemisLocalCardplayBoard;
+      } catch (eClrBoardTurn) {
+        /* ignore */
+      }
+      return state;
+    }
+    var ph = String(state.phase || "");
+    if (
+      ph !== "cardplay" &&
+      ph !== "con-cardplay" &&
+      ph !== "income" &&
+      ph !== "con-income" &&
+      ph !== "deploy" &&
+      ph !== "con-deploy"
+    ) {
+      try {
+        delete window.__risqueArtemisLocalCardplayBoard;
+      } catch (eClrBoardPh) {
+        /* ignore */
+      }
+      return state;
+    }
+    if (!artemisCardplayBoardRegressed(state, stamp)) return state;
+    (stamp.players || []).forEach(function (sp) {
+      if (!sp || !sp.name) return;
+      var lp = artemisPlayerByName(state, sp.name);
+      if (!lp) return;
+      try {
+        lp.territories = JSON.parse(JSON.stringify(sp.territories || []));
+      } catch (eCopyTerr) {
+        lp.territories = Array.isArray(sp.territories) ? sp.territories.slice() : [];
+      }
+      lp.troopsTotal = Number(sp.troopsTotal) || 0;
+    });
+    try {
+      localStorage.setItem("gameState", JSON.stringify(state));
+    } catch (eSaveBoardGuard) {
+      /* ignore */
+    }
+    if (typeof window.risqueArtemisDiag === "function") {
+      try {
+        window.risqueArtemisDiag(
+          "cardplay_board_guard",
+          "Preserved local cardplay board against stale mirror",
+          {
+            player: stamp.player,
+            phase: ph,
+            stampedTerritories: (stamp.players || []).reduce(function (n, p) {
+              return n + (p && Array.isArray(p.territories) ? p.territories.length : 0);
+            }, 0)
+          }
+        );
+      } catch (eDiagBoardGuard) {
+        /* ignore */
+      }
+    }
+    return state;
+  }
+
+  function artemisProtectLocalPlayedCardsGalleryMirror(state) {
+    if (mode !== "client" || !state || !window.gameState) return state;
+    if (typeof window.risqueMergePlayedCardsGalleryMonotonic === "function") {
+      try {
+        window.risqueMergePlayedCardsGalleryMonotonic(state, window.gameState);
+      } catch (eGalProt) {
+        /* ignore */
+      }
+    }
+    return state;
+  }
+
   function flushPendingPublicStates() {
     if (mode !== "client") return;
     if (!window.risqueArtemisLobbyStarted) return;
@@ -4341,6 +4633,8 @@
             ? window.gameState.currentPlayer
             : null;
         artemisProtectLocalBookCommitMirror(item.state);
+        artemisProtectLocalCardplayBoardMirror(item.state);
+        artemisProtectLocalPlayedCardsGalleryMirror(item.state);
         var mirrorApplied =
           typeof window.risquePublicMirrorGameState === "function" &&
           window.risquePublicMirrorGameState(item.state) === true;
@@ -4914,7 +5208,7 @@
       return;
     }
     if (mode === "client" && !playerSlot) {
-      setTopStatus("ARTEMIS — add slot=2 or slot=3 to the URL", "err");
+      setTopStatus("ARTEMIS — add slot=2..6 to the URL", "err");
       return;
     }
     var url = wsUrl();
@@ -4941,6 +5235,16 @@
         name: playerName,
         slot: playerSlot,
       });
+      if (mode === "host") {
+        var exp = Math.max(
+          2,
+          Math.min(6, Number(window.risqueArtemisExpectedPlayers) || 3)
+        );
+        var lobbyMode =
+          window.risqueArtemisLobbyMode === "open" ? "open" : "quick";
+        sendJson({ type: "lobby_set_expected", count: exp, lobbyMode: lobbyMode });
+        sendJson({ type: "lobby_set_mode", mode: lobbyMode });
+      }
       if (mode === "host" && window.risqueArtemisLobbyStarted) {
         flushPendingMirrorPayloads();
         setTopStatus("ARTEMIS host — broadcasting", "ok");
@@ -4990,6 +5294,20 @@
       }
       if (msg.type === "lobby_state") {
         renderLobbyState(msg.lobby);
+        return;
+      }
+      if (msg.type === "lobby_mode") {
+        if (msg.mode === "open" || msg.mode === "quick") {
+          if (typeof window.risqueArtemisApplyLobbyMode === "function") {
+            window.risqueArtemisApplyLobbyMode(msg.mode, {
+              broadcast: false,
+              remount: !!window.risqueArtemisLobbyStarted
+            });
+          } else {
+            window.risqueArtemisLobbyMode = msg.mode;
+            window.risqueArtemisHostDrivenLogin = msg.mode !== "open";
+          }
+        }
         return;
       }
       if (msg.type === "lobby_started") {

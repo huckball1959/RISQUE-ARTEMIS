@@ -98,7 +98,7 @@ function launcherManifest() {
   clientFiles.sort();
   const mode = getActiveMode();
   const routed = {};
-  for (const seat of ["host", "p2", "p3"]) {
+  for (const seat of ["host", "p2", "p3", "p4", "p5", "p6"]) {
     const resolved = resolveProfileKey(seat);
     routed[seat] = resolved
       ? { profile: resolved, joinPath: `/join/${seat}`, resolvesTo: `/join/${resolved}` }

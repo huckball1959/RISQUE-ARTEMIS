@@ -259,7 +259,7 @@
       window.risqueArtemisBeatSyncOnStatus(msg);
     }
     var parts = [];
-    [1, 2, 3].forEach(function (s) {
+    [1, 2, 3, 4, 5, 6].forEach(function (s) {
       var row = msg.slots[String(s)] || msg.slots[s];
       if (!row) return;
       var seqGap = Number(row.seqGap) || 0;

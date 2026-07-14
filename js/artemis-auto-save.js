@@ -40,13 +40,13 @@
   function readMockFirstSlot() {
     if (window.risqueArtemisMockFirstSlot) {
       var fromWin = Number(window.risqueArtemisMockFirstSlot) || 0;
-      if (fromWin >= 1 && fromWin <= 3) return fromWin;
+      if (fromWin >= 1 && fromWin <= (window.risqueArtemisMaxSlots || 6)) return fromWin;
     }
     try {
       var s = sessionStorage.getItem("risqueArtemisMockFirstSlot");
       if (s) {
         var fromSs = Number(s) || 0;
-        if (fromSs >= 1 && fromSs <= 3) return fromSs;
+        if (fromSs >= 1 && fromSs <= (window.risqueArtemisMaxSlots || 6)) return fromSs;
       }
     } catch (eSs) {
       /* ignore */
@@ -56,7 +56,7 @@
 
   function playerNameForSlot(out, slot) {
     slot = Number(slot) || 1;
-    if (slot < 1 || slot > 3) slot = 1;
+    if (slot < 1 || slot > (window.risqueArtemisMaxSlots || 6)) slot = 1;
     var roster = Array.isArray(out.artemisRoster) ? out.artemisRoster : [];
     var fromRoster = roster.find(function (r) {
       return r && Number(r.slot) === slot && r.name;

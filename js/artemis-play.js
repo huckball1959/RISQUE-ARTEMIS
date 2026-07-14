@@ -212,7 +212,7 @@
     }
     if (typeof window.risqueArtemisRigSetupSlot === "number") {
       var rigStored = Number(window.risqueArtemisRigSetupSlot);
-      if (rigStored >= 1 && rigStored <= 3) return rigStored;
+      if (rigStored >= 1 && rigStored <= (window.risqueArtemisMaxSlots || 6)) return rigStored;
     }
     try {
       var ssRig = sessionStorage.getItem("risqueArtemisRigSetupSlot");
@@ -228,7 +228,7 @@
     }
     if (typeof window.RISQUE_POST_ROULETTE_SWAP_SLOT === "number") {
       var w = Number(window.RISQUE_POST_ROULETTE_SWAP_SLOT);
-      if (w >= 1 && w <= 3) return w;
+      if (w >= 1 && w <= (window.risqueArtemisMaxSlots || 6)) return w;
     }
     return 0;
   }
@@ -282,14 +282,21 @@
     var prev = gs.currentPlayer;
     gs.currentPlayer = String(forced.name);
     if (Array.isArray(players) && players.length) {
+      var restForced = players.filter(function (p) {
+        return p && p.name !== forced.name;
+      });
+      if (restForced.length > 1) {
+        for (var iShuffle = restForced.length - 1; iShuffle > 0; iShuffle -= 1) {
+          var jShuffle = Math.floor(Math.random() * (iShuffle + 1));
+          var tmpShuffle = restForced[iShuffle];
+          restForced[iShuffle] = restForced[jShuffle];
+          restForced[jShuffle] = tmpShuffle;
+        }
+      }
       gs.turnOrder = [forced.name].concat(
-        players
-          .filter(function (p) {
-            return p && p.name !== forced.name;
-          })
-          .map(function (p) {
-            return p.name;
-          })
+        restForced.map(function (p) {
+          return p.name;
+        })
       );
     }
     gs.artemisControlSlot = slot;
@@ -319,7 +326,7 @@
     /* keep rig from host picker / URL */
   } else if (typeof window.risqueArtemisResolveRigSwapSlot === "function") {
     var bootSlot = window.risqueArtemisResolveRigSwapSlot();
-    if (bootSlot >= 1 && bootSlot <= 3) {
+    if (bootSlot >= 1 && bootSlot <= (window.risqueArtemisMaxSlots || 6)) {
       window.RISQUE_POST_ROULETTE_SWAP_SLOT = bootSlot;
     }
   }
@@ -344,7 +351,7 @@
       return !!window.risqueArtemisForcePostRouletteWinner(gs, "deployOrder");
     }
     var resolvedPlayer = null;
-    if (slot >= 1 && slot <= 3) {
+    if (slot >= 1 && slot <= (window.risqueArtemisMaxSlots || 6)) {
       resolvedPlayer = playerObjectForArtemisSlot(gs, slot);
     }
     if (!resolvedPlayer && Array.isArray(gs.players)) {
@@ -353,7 +360,7 @@
       });
     }
     gs.currentPlayer = resolvedPlayer && resolvedPlayer.name ? resolvedPlayer.name : winner;
-    if (slot >= 1 && slot <= 3) {
+    if (slot >= 1 && slot <= (window.risqueArtemisMaxSlots || 6)) {
       gs.artemisControlSlot = slot;
     } else if (typeof window.risqueArtemisForceControlSlotFromCurrentPlayer === "function") {
       window.risqueArtemisForceControlSlotFromCurrentPlayer(gs);
@@ -392,7 +399,7 @@
         slot = myLocalSlot();
       }
     }
-    if (slot >= 1 && slot <= 3) {
+    if (slot >= 1 && slot <= (window.risqueArtemisMaxSlots || 6)) {
       gs.artemisControlSlot = slot;
     }
     return slot;
@@ -440,7 +447,7 @@
     }
     bindIdentityFromRoster(gs);
     var slot = activePlayerSlot(gs);
-    if (slot >= 1 && slot <= 3) {
+    if (slot >= 1 && slot <= (window.risqueArtemisMaxSlots || 6)) {
       gs.artemisControlSlot = slot;
     }
   };
@@ -464,7 +471,7 @@
         Number(gs.risqueArtemisSetupDeploySlot) ||
         Number(gs.artemisControlSlot) ||
         postRouletteSwapSlot();
-      if (lockSlot >= 1 && lockSlot <= 3) {
+      if (lockSlot >= 1 && lockSlot <= (window.risqueArtemisMaxSlots || 6)) {
         gs.artemisControlSlot = lockSlot;
         return lockSlot;
       }
@@ -475,7 +482,7 @@
       gs.artemisControlSlot = fromPlayer;
       return fromPlayer;
     }
-    if (ctrl >= 1 && ctrl <= 3) return ctrl;
+    if (ctrl >= 1 && ctrl <= (window.risqueArtemisMaxSlots || 6)) return ctrl;
     return fromPlayer;
   };
 
@@ -778,13 +785,14 @@
       gs.artemisControlSlot = fromPlayer;
       ctrl = fromPlayer;
     }
-    if (ctrl >= 1 && ctrl <= 3) {
+    if (ctrl >= 1 && ctrl <= (window.risqueArtemisMaxSlots || 6)) {
       if (ctrl !== local) return false;
       if (
         typeof window.risqueArtemisIsSetupDeploy === "function" &&
         window.risqueArtemisIsSetupDeploy(gs)
       ) {
-        return true;
+        /* Must own the named deployer — stale artemisControlSlot=1 used to leave Guido with Nooch's turn. */
+        return artemisLocalSlotOwnsCurrentPlayer(gs, local);
       }
       if (String(gs.phase || "") === "cardplay") {
         return artemisLocalSlotOwnsCurrentPlayer(gs, local);
@@ -1031,7 +1039,7 @@
     if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
       ctrl = Number(window.risqueArtemisResolveOwnerSlot(gs)) || ctrl;
     }
-    return ctrl >= 1 && ctrl <= 3 && ctrl === local;
+    return ctrl >= 1 && ctrl <= (window.risqueArtemisMaxSlots || 6) && ctrl === local;
   }
 
   function artemisClientIsActivePlayer(gs) {
@@ -2033,7 +2041,7 @@
     var local = myLocalSlot();
     if (!local) return false;
     var owner = Number(ownerSlotOpt) || 0;
-    if (owner >= 1 && owner <= 3) {
+    if (owner >= 1 && owner <= (window.risqueArtemisMaxSlots || 6)) {
       return owner === local;
     }
     return false;

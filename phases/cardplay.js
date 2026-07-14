@@ -216,6 +216,47 @@
     /** Cleared on mount / reset — do not use persisted risqueCardplayTvRecapPublished alone or a stale disk flag can skip publishing and jump to income. */
     let recapMirrorSentForCommit = false;
     let pendingElimination = null;
+    /**
+     * Client-only: stamp post-cardplay board so stale host mirrors cannot rewind acquires
+     * (m328 already protects spent book cards; this covers territory ownership / troops).
+     */
+    function stampArtemisLocalCardplayBoard() {
+      if (!window.risqueArtemisNetClient || window.risqueArtemisHost) return;
+      if (!window.gameState || !Array.isArray(window.gameState.players)) return;
+      var cur = window.gameState.currentPlayer;
+      if (!cur) return;
+      try {
+        window.__risqueArtemisLocalCardplayBoard = {
+          at: Date.now(),
+          player: cur,
+          controlSeq: Number(window.gameState.risqueArtemisControlSeq) || 0,
+          players: window.gameState.players.map(function (p) {
+            return {
+              name: p && p.name,
+              troopsTotal: p ? Number(p.troopsTotal) || 0 : 0,
+              territories: Array.isArray(p && p.territories)
+                ? JSON.parse(JSON.stringify(p.territories))
+                : []
+            };
+          })
+        };
+      } catch (eStampBoard) {
+        /* ignore */
+      }
+      /* Push live board to host — coalesce so multi-effect books don't spam full-state sync. */
+      if (!window.__risqueArtemisCardplayBoardFlushT) {
+        window.__risqueArtemisCardplayBoardFlushT = setTimeout(function () {
+          window.__risqueArtemisCardplayBoardFlushT = null;
+          if (typeof window.risqueArtemisFlushClientStatePush === "function" && window.gameState) {
+            try {
+              window.risqueArtemisFlushClientStatePush(window.gameState);
+            } catch (eFlushBoard) {
+              /* ignore */
+            }
+          }
+        }, 80);
+      }
+    }
     const cardPositions = [
       { x: 1409, y: 263, width: 150, height: 200 },
       { x: 1566, y: 263, width: 150, height: 200 },
@@ -321,6 +362,17 @@
      */
     function captureCardplayPublicBoardSnapshot() {
       if (!window.gameState || window.risqueDisplayIsPublic) return;
+      /* Kitchen-table ARTEMIS: never freeze the pre-play board. Freeze races made acquires
+       * flash correct then snap back while Cards Played stayed right. */
+      if (window.risqueArtemisMode) {
+        try {
+          delete window.gameState.risqueCardplayUseFrozenPublicMirror;
+          delete window.gameState.risqueCardplayPublicMirrorSnapshot;
+        } catch (eNoFreeze) {
+          /* ignore */
+        }
+        return;
+      }
       try {
         window.gameState.risqueCardplayUseFrozenPublicMirror = true;
         window.gameState.risqueCardplayPublicMirrorSnapshot = {
@@ -1713,6 +1765,9 @@
         labels = [];
       } else {
         return;
+      }
+      if (action === "acquire" || action === "add_troops" || action === "remove_troops") {
+        stampArtemisLocalCardplayBoard();
       }
       setCardplayPublicSpectator(primary, report, labels);
     }
@@ -4225,6 +4280,17 @@
       if (typeof window.risqueMirrorPushGameState === "function") {
         window.risqueMirrorPushGameState();
       }
+      if (
+        window.risqueArtemisNetClient &&
+        !window.risqueArtemisHost &&
+        typeof window.risqueArtemisFlushClientStatePush === "function"
+      ) {
+        try {
+          window.risqueArtemisFlushClientStatePush(window.gameState);
+        } catch (eFlushCommit) {
+          /* ignore */
+        }
+      }
       logToStorage('Played card summaries committed', { actions: unconfirmedActions });
     }
 
@@ -4240,6 +4306,7 @@
       var defenderEliminated = !ownerPlayer.territories || ownerPlayer.territories.length === 0;
       window.gameState.conqueredThisTurn = true;
       window.gameState.cardEarnedViaCardplay = true;
+      stampArtemisLocalCardplayBoard();
       if (defenderEliminated) {
         var transferredCards = ownerPlayer.cards ? ownerPlayer.cards.slice() : [];
         currentPlayer.cards = (currentPlayer.cards || []).concat(

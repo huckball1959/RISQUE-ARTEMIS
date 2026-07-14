@@ -1,7 +1,8 @@
 @echo off
 setlocal EnableDelayedExpansion
-title ARTEMIS - START HOST
-REM Host PC only. Double-click to start server + open your game.
+title ARTEMIS - START CARDPLAY TEST
+REM Optional mock path (not default). Writes cardplay-test mode then starts like START-ARTEMIS.
+REM Host test launcher UI was removed in m346; this batch still boots cards.json via join URL.
 
 cd /d "%~dp0"
 
@@ -23,10 +24,10 @@ if not exist "%ARTEMIS_GAME_ROOT%\artemis-server\server.js" (
   exit /b 1
 )
 
-(echo normal)> "%ARTEMIS_GAME_ROOT%\launchers\active-mode.txt"
+(echo cardplay-test)> "%ARTEMIS_GAME_ROOT%\launchers\active-mode.txt"
 
 echo.
-echo  Starting server window...
+echo  Starting server window ^(CARDPLAY TEST MODE^)...
 start "ARTEMIS Server - DO NOT CLOSE" /D "%ARTEMIS_GAME_ROOT%" cmd /k call "%~dp0_run-server.bat"
 
 echo  Waiting for server...
@@ -57,29 +58,13 @@ if exist "%~dp0..\LAPTOP 3\" (echo !ARTEMIS_LAN_IP!)> "%~dp0..\LAPTOP 3\artemis-
 cls
 echo.
 echo  ============================================================
-echo   ARTEMIS HOST IS RUNNING
+echo   ARTEMIS CARDPLAY TEST HOST
 echo  ============================================================
 echo.
-echo   Keep "ARTEMIS Server - DO NOT CLOSE" window open.
-echo.
-echo   Fullscreen in game: Ctrl+Shift+F toggle, Esc exit
-echo.
-echo   Game folder: %ARTEMIS_GAME_ROOT%
-echo   ^(from artemis-game-path.txt in this SERVER folder^)
+echo   Join URLs use artemisAutoSave=cards ^(round-4 mock^).
+echo   For normal play use START-ARTEMIS.bat instead.
 echo.
 echo   Host IP: !ARTEMIS_LAN_IP!
-echo   ^(saved into LAPTOP 2 and LAPTOP 3 folders automatically^)
-echo.
-echo   Mode: NORMAL PLAY
-echo   START -^> sync -^> welcome -^> rig picker -^> roulettes -^> deal
-echo   ^(Host test launcher removed m346 — archive: dev\archived\host-test-launcher-m306-m330^)
-echo   Mock cardplay test: START-CARDPLAY-TEST.bat instead of this file
-echo   Auto-diagnostics: logs\artemis-last-report.json
-echo.
-echo   Copy to clients ^(whole folder each time IP changes, or once if IP stable^):
-echo     scripts\LAPTOP 2  -^>  Mictor desktop  -^>  JOIN.bat
-echo     scripts\LAPTOP 3  -^>  Nooch desktop   -^>  JOIN.bat
-echo.
 echo  ============================================================
 pause
 endlocal

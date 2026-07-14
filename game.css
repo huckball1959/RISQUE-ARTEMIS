@@ -955,6 +955,57 @@ html.risque-artemis-client body[data-risque-phase="con-cardplay"] .runtime-hud-r
   line-height: 1.2;
   animation: risque-player-select-cycle-blink 0.45s ease-in-out infinite;
 }
+
+#control-voice-text .player-select-cycle-name--winner {
+  animation: none;
+}
+
+#control-voice-text .player-select-turn-order--row {
+  display: block;
+  margin-top: 10px;
+  text-align: center;
+  max-width: 100%;
+}
+
+#control-voice-text .player-select-turn-order-title {
+  display: block;
+  font-size: clamp(11px, 1.2vw, 13px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #86efac;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+#control-voice-text .player-select-turn-order-track {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+#control-voice-text .player-select-turn-order-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+#control-voice-text .player-select-turn-order-chip-ord {
+  font-size: clamp(11px, 1.2vw, 13px);
+  font-weight: 900;
+  opacity: 0.75;
+}
+
+#control-voice-text .player-select-turn-order-chip-name {
+  font-size: clamp(14px, 1.7vw, 19px);
+  font-weight: 900;
+}
 .risque-phase-content #risque-player-select-root .title-text {
   position: static;
   transform: none;
@@ -1557,12 +1608,103 @@ html.risque-view-public .risque-public-ghost-replay-save {
 
 #risque-login-hud-root .risque-login-preset-bar {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr)) minmax(72px, min(32%, 140px));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 4px;
   width: 100%;
   margin-top: 8px;
   align-items: stretch;
   box-sizing: border-box;
+}
+
+#risque-login-hud-root .risque-login-preset-bar--quick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  grid-template-columns: none;
+}
+
+#risque-login-hud-root .risque-login-preset-bar > .risque-login-mode-toggle {
+  grid-column: 1 / -1;
+}
+#risque-login-hud-root .risque-login-mode-toggle,
+.risque-artemis-lobby-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 2px;
+}
+
+#risque-login-hud-root .risque-login-mode-btn {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 2px solid #14532d;
+  border-radius: 8px;
+  background: #bbf7d0;
+  color: #052e16;
+  font-family: Arial, sans-serif;
+  font-weight: 800;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+#risque-login-hud-root .risque-login-mode-btn.is-active {
+  background: #00ff00;
+  border-color: #166534;
+}
+
+#risque-login-hud-root .risque-login-quick-friends {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+#risque-login-hud-root .risque-login-quick-friends-label {
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #052e16;
+}
+
+#risque-login-hud-root .risque-login-quick-friends-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#risque-login-hud-root .risque-login-quick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 4px 10px;
+  border: 2px solid #334155;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #f8fafc;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  user-select: none;
+}
+
+#risque-login-hud-root .risque-login-quick-chip input {
+  width: 16px;
+  height: 16px;
+  accent-color: #22c55e;
+}
+
+#risque-login-hud-root .risque-login-quick-chip--blue { border-color: #2563eb; }
+#risque-login-hud-root .risque-login-quick-chip--red { border-color: #dc2626; }
+#risque-login-hud-root .risque-login-quick-chip--yellow { border-color: #ca8a04; color: #111; background: #fef08a; }
+#risque-login-hud-root .risque-login-quick-chip--pink { border-color: #db2777; }
+#risque-login-hud-root .risque-login-quick-chip--white { border-color: #e2e8f0; color: #0f172a; background: #f8fafc; }
+#risque-login-hud-root .risque-login-quick-chip.is-host {
+  opacity: 0.95;
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.7);
 }
 
 #risque-login-hud-root .risque-login-preset-slot {
@@ -1642,39 +1784,6 @@ html.risque-view-public .risque-public-ghost-replay-save {
 }
 
 #risque-login-hud-root .login-button.fade-out {
-  opacity: 0;
-}
-
-#risque-login-hud-root .risque-login-random-order--bar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 48px;
-  margin: 0;
-  padding: 4px 6px;
-  font-size: clamp(9px, 2vw, 12px);
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  line-height: 1.15;
-  border: 2px solid #14532d;
-  border-radius: 8px;
-  cursor: pointer;
-  background: #00ff00;
-  color: #000000;
-  font-family: Arial, sans-serif;
-  text-align: center;
-  text-transform: uppercase;
-  transition: background 0.15s ease, opacity 1.5s ease, border-color 0.15s ease;
-  box-sizing: border-box;
-  min-width: 0;
-}
-
-#risque-login-hud-root .risque-login-random-order--bar:hover:not(:disabled) {
-  background: #00cc00;
-  border-color: #166534;
-}
-
-#risque-login-hud-root .risque-login-random-order--bar.fade-out {
   opacity: 0;
 }
 
@@ -6013,6 +6122,49 @@ body[data-risque-phase="attack"] #hud-attack-chrome {
   overflow-y: visible;
   flex-shrink: 0 !important;
   --risque-voice-panel-height: auto;
+}
+
+/* Setup roulette final reveal: grow CV so winner + THEN chips are fully visible */
+.ucp-control-voice.ucp-control-voice--roulette-reveal {
+  height: auto !important;
+  min-height: 230px !important;
+  max-height: min(46vh, 340px) !important;
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+  flex-shrink: 0 !important;
+  --risque-voice-panel-height: auto;
+  --risque-voice-font-size: clamp(18px, 1.9vw, 26px);
+  --risque-voice-line-height: 1.25;
+}
+
+.ucp-control-voice.ucp-control-voice--roulette-reveal .ucp-voice-body,
+.ucp-control-voice.ucp-control-voice--roulette-reveal .ucp-voice-messages {
+  overflow: visible !important;
+  flex: 0 1 auto !important;
+  min-height: auto !important;
+  justify-content: flex-start;
+}
+
+.ucp-control-voice.ucp-control-voice--roulette-reveal #control-voice-text .player-select-voice-instruction {
+  font-size: clamp(12px, 1.3vw, 16px);
+  margin-bottom: 4px;
+}
+
+.ucp-control-voice.ucp-control-voice--roulette-reveal #control-voice-text .player-select-cycle-name--hud-primary {
+  font-size: clamp(22px, 2.6vw, 32px);
+  line-height: 1.15;
+}
+
+.ucp-control-voice.ucp-control-voice--roulette-reveal #control-voice-text .player-select-turn-order--row {
+  margin-top: 6px;
+}
+
+.ucp-control-voice.ucp-control-voice--roulette-reveal #control-voice-text .player-select-turn-order-track {
+  gap: 6px 10px;
+}
+
+.ucp-control-voice.ucp-control-voice--roulette-reveal #control-voice-text .player-select-turn-order-chip-name {
+  font-size: clamp(13px, 1.5vw, 17px);
 }
 
 .ucp-control-voice.ucp-control-voice--campaign-instant .ucp-voice-body {
@@ -11925,6 +12077,38 @@ html.risque-artemis-client .risque-artemis-host-bar {
   margin-bottom: 16px;
 }
 
+.risque-artemis-lobby-expected {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.risque-artemis-lobby-expected-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #cbd5e1;
+  margin-right: 4px;
+}
+
+.risque-artemis-lobby-exp-btn {
+  min-width: 36px;
+  height: 36px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.risque-artemis-lobby-exp-btn.is-active {
+  background: #0ea5e9;
+  border-color: #38bdf8;
+  color: #0f172a;
+}
+
 .risque-artemis-lobby-btn {
   flex: 1;
   padding: 12px 16px;
@@ -11971,313 +12155,7 @@ html.risque-artemis-client .risque-artemis-host-bar {
   color: #94a3b8;
 }
 
-/* ARTEMIS — host setup rig picker (login idle, before START) */
-.risque-artemis-rig-picker {
-  position: fixed;
-  inset: 0;
-  z-index: 100060;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(2, 6, 23, 0.92);
-  backdrop-filter: blur(10px);
-}
-
-.risque-artemis-rig-picker[hidden] {
-  display: none !important;
-}
-
-.risque-artemis-rig-picker-card {
-  width: min(560px, 100%);
-  padding: 32px 36px;
-  border-radius: 18px;
-  background: linear-gradient(165deg, #0f172a 0%, #1e293b 100%);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.5);
-  color: #f1f5f9;
-}
-
-.risque-artemis-rig-picker-title {
-  margin: 0 0 10px;
-  font-size: 28px;
-  font-weight: 800;
-  color: #38bdf8;
-  text-align: center;
-}
-
-.risque-artemis-rig-picker-lead {
-  margin: 0 0 24px;
-  font-size: 16px;
-  line-height: 1.5;
-  color: #cbd5e1;
-  text-align: center;
-}
-
-.risque-artemis-rig-picker-options {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.risque-artemis-rig-picker-btn {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-  padding: 14px 18px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  border-radius: 12px;
-  background: rgba(15, 23, 42, 0.85);
-  color: #f8fafc;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
-}
-
-.risque-artemis-rig-picker-btn:hover {
-  border-color: #38bdf8;
-  background: rgba(30, 41, 59, 0.95);
-  transform: translateY(-1px);
-}
-
-.risque-artemis-rig-picker-btn-num {
-  flex: 0 0 36px;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: #38bdf8;
-  color: #0f172a;
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.risque-artemis-rig-picker-btn-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.risque-artemis-rig-picker-btn-label {
-  font-size: 17px;
-  font-weight: 700;
-}
-
-.risque-artemis-rig-picker-btn-hint {
-  font-size: 13px;
-  color: #94a3b8;
-  line-height: 1.35;
-}
-
-/* ARTEMIS — host test launcher (after START, before game begins) */
-.risque-artemis-host-launcher {
-  position: fixed;
-  inset: 0;
-  /* Above the near-max-z wayback badge (2147483646) so nothing overlaps Launch. */
-  z-index: 2147483647;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(2, 6, 23, 0.94);
-  backdrop-filter: blur(10px);
-}
-
-.risque-artemis-host-launcher[hidden] {
-  display: none !important;
-}
-
-/* Keep the low-left "SAVE FOLDER NOT CONNECTED" wayback badge (z-index ~max)
-   from floating over the launcher's Launch button while the menu is open. */
-html.risque-artemis-host-launcher-active #risque-wayback-connected-flag {
-  display: none !important;
-}
-
-.risque-artemis-host-launcher-card {
-  width: min(680px, 100%);
-  max-height: min(92vh, 900px);
-  overflow-y: auto;
-  padding: 28px 32px 32px;
-  border-radius: 18px;
-  background: linear-gradient(165deg, #0f172a 0%, #1e293b 100%);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.5);
-  color: #f1f5f9;
-}
-
-.risque-artemis-host-launcher-modes {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.risque-artemis-host-launcher-mode {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-  padding: 14px 18px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  border-radius: 12px;
-  background: rgba(15, 23, 42, 0.85);
-  color: #f8fafc;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
-}
-
-.risque-artemis-host-launcher-mode:hover {
-  border-color: #38bdf8;
-  background: rgba(30, 41, 59, 0.95);
-  transform: translateY(-1px);
-}
-
-.risque-artemis-host-launcher-mode--selected {
-  border-color: #38bdf8;
-  background: rgba(14, 165, 233, 0.2);
-  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.45);
-}
-
-.risque-artemis-host-launcher-mode-num {
-  flex: 0 0 36px;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: #38bdf8;
-  color: #0f172a;
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.risque-artemis-host-launcher-mode-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.risque-artemis-host-launcher-mode-label {
-  font-size: 17px;
-  font-weight: 700;
-}
-
-.risque-artemis-host-launcher-mode-hint {
-  font-size: 13px;
-  color: #94a3b8;
-  line-height: 1.35;
-}
-
-.risque-artemis-host-launcher-sub {
-  margin-bottom: 20px;
-  padding: 16px 18px;
-  border-radius: 12px;
-  background: rgba(2, 6, 23, 0.55);
-  border: 1px solid rgba(56, 189, 248, 0.22);
-}
-
-.risque-artemis-host-launcher-sub[hidden] {
-  display: none !important;
-}
-
-.risque-artemis-host-launcher-heading {
-  margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #94a3b8;
-}
-
-.risque-artemis-host-launcher-hint {
-  margin: 0 0 10px;
-  font-size: 13px;
-  line-height: 1.4;
-  color: #94a3b8;
-}
-
-.risque-artemis-host-launcher-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.risque-artemis-host-launcher-row--stack {
-  flex-direction: column;
-  align-items: stretch;
-}
-
-.risque-artemis-host-launcher-chip {
-  flex: 1 1 140px;
-  min-width: 0;
-  padding: 12px 14px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  border-radius: 10px;
-  background: rgba(15, 23, 42, 0.85);
-  color: #f8fafc;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.35;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-}
-
-.risque-artemis-host-launcher-chip--rig {
-  flex: 1 1 calc(50% - 10px);
-  font-size: 13px;
-}
-
-.risque-artemis-host-launcher-chip--wide {
-  width: 100%;
-  flex: 1 1 100%;
-  font-size: 0.88rem;
-  line-height: 1.35;
-  padding: 10px 14px;
-}
-
-.risque-artemis-host-launcher-chip:hover {
-  border-color: #38bdf8;
-  background: rgba(30, 41, 59, 0.95);
-}
-
-.risque-artemis-host-launcher-chip--selected {
-  border-color: #38bdf8;
-  background: rgba(14, 165, 233, 0.18);
-  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
-}
-
-.risque-artemis-host-launcher-go {
-  display: block;
-  width: 100%;
-  margin-top: 8px;
-  padding: 16px 20px;
-  border: none;
-  border-radius: 12px;
-  background: #0284c7;
-  color: #f8fafc;
-  font-size: 18px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
-}
-
-.risque-artemis-host-launcher-go:hover:not(:disabled) {
-  background: #0369a1;
-  transform: translateY(-1px);
-}
-
-.risque-artemis-host-launcher-go:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
+/* Setup rig picker CSS removed (m349) — see dev/archived/setup-rig-picker-m349/ */
 
 /* ARTEMIS M2b — per-laptop login panel (clients) */
 .risque-artemis-login {
@@ -12417,6 +12295,41 @@ html.risque-artemis-host-launcher-active #risque-wayback-connected-flag {
 html.risque-artemis-host.risque-artemis-login-active #risque-login-hud-root,
 html.risque-artemis-host.risque-artemis-login-active .risque-login-preset-bar,
 html.risque-artemis-host.risque-artemis-login-active #risque-login-hud-root .color-swatches {
+  display: none !important;
+}
+
+/* Host-driven roster (m348): show hot-seat form + presets only while login form is active. */
+html.risque-artemis-host.risque-artemis-host-driven-login:not(.risque-artemis-setup-started) #risque-login-hud-root,
+html.risque-artemis-host.risque-artemis-host-driven-login:not(.risque-artemis-setup-started) .risque-login-preset-bar,
+html.risque-artemis-host.risque-artemis-host-driven-login:not(.risque-artemis-setup-started) #risque-login-hud-root .color-swatches,
+html.risque-artemis-host.risque-artemis-host-driven-login:not(.risque-artemis-setup-started) #risque-login-hud-root .risque-login-primary-footer {
+  display: block !important;
+}
+
+html.risque-artemis-host.risque-artemis-host-driven-login:not(.risque-artemis-setup-started) #risque-login-hud-root .risque-login-preset-bar {
+  display: grid !important;
+}
+
+html.risque-artemis-host.risque-artemis-host-driven-login:not(.risque-artemis-setup-started) #risque-login-hud-root .risque-login-preset-bar--quick {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+html.risque-artemis-host.risque-artemis-host-driven-login:not(.risque-artemis-setup-started) #risque-login-hud-root .color-swatches {
+  display: flex !important;
+}
+
+/* After START: never keep the preset form on top of welcome/setup. */
+html.risque-artemis-host.risque-artemis-setup-started #risque-login-hud-root {
+  display: none !important;
+}
+
+/* Clients waiting: do not force the name/color form back on (overrides !important show rules). */
+html.risque-artemis-client.risque-artemis-host-driven-login.risque-artemis-login-active #risque-artemis-login-form,
+html.risque-artemis-client.risque-artemis-host-driven-login.risque-artemis-login-active .risque-artemis-login-colors,
+html.risque-artemis-client.risque-artemis-host-driven-login.risque-artemis-login-active .risque-artemis-login-color,
+html.risque-artemis-client.risque-artemis-host-driven-login.risque-artemis-login-active #risque-artemis-login-btn,
+html.risque-artemis-client.risque-artemis-host-driven-login.risque-artemis-login-active .risque-artemis-login-name {
   display: none !important;
 }
 
@@ -15248,14 +15161,6 @@ html.risque-artemis-host
   white-space: pre-wrap !important;
 }
 
-.risque-artemis-host-launcher-subheading {
-  margin: 10px 0 6px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #94a3b8;
-}
 
 /* m335 — cardplay upper hand (#cardplay-card-grid): 5×2 grid, scaled thumbs (conquest 4–9 card hands).
  * Previous flex-wrap + fixed 120×186 / 213px slots clipped row 2 behind overflow:hidden on the 50% pane. */

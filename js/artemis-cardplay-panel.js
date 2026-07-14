@@ -136,7 +136,7 @@
     if (!gs) return 0;
     if (typeof window.risqueArtemisResolveOwnerSlot === "function") {
       var resolved = Number(window.risqueArtemisResolveOwnerSlot(gs)) || 0;
-      if (resolved >= 1 && resolved <= 3) return resolved;
+      if (resolved >= 1 && resolved <= (window.risqueArtemisMaxSlots || 6)) return resolved;
     }
     var fromPlayer = 0;
     if (typeof window.risqueArtemisActivePlayerSlot === "function") {
@@ -146,7 +146,7 @@
     if (fromPlayer >= 1 && ctrl >= 1 && fromPlayer !== ctrl) {
       return fromPlayer;
     }
-    if (ctrl >= 1 && ctrl <= 3) return ctrl;
+    if (ctrl >= 1 && ctrl <= (window.risqueArtemisMaxSlots || 6)) return ctrl;
     return fromPlayer;
   }
 
@@ -177,7 +177,7 @@
     var local = myLocalSlot();
     if (!local) return false;
     var owner = ownerSlot(gs);
-    return owner >= 1 && owner <= 3 && owner === local;
+    return owner >= 1 && owner <= (window.risqueArtemisMaxSlots || 6) && owner === local;
   }
 
   function activeHandCount(gs) {

@@ -20,7 +20,9 @@ const PORT = parseInt(process.env.ARTEMIS_PORT || "5700", 10);
 const BIND = process.env.ARTEMIS_BIND || "0.0.0.0";
 const GAME_ROOT = path.resolve(__dirname, "..");
 const PROTOCOL_VERSION = 2;
-const PLAYER_SLOTS = [1, 2, 3];
+const PLAYER_SLOTS = [1, 2, 3, 4, 5, 6];
+const MAX_PLAYERS = 6;
+const MIN_PLAYERS = 2;
 const MAX_STATE_BYTES = 4 * 1024 * 1024;
 
 const MIME = {
@@ -52,6 +54,10 @@ const session = {
   attackLiveSeq: 0,
   lobby: {
     status: "waiting",
+    /** How many seats must connect before lobby can start (2–6). Host sets via lobby_set_expected. */
+    expectedPlayers: 3,
+    /** quick = host roster/checkboxes; open = each laptop types name+color */
+    lobbyMode: "quick",
     /** @type {{ slot: number, clientId: string|null, name: string, ready: boolean }[]} */
     slots: PLAYER_SLOTS.map((slot) => ({
       slot,
@@ -438,9 +444,16 @@ function loginProfilesPayload() {
   return out;
 }
 
+function expectedPlayerCount() {
+  const n = parseInt(String(session.lobby.expectedPlayers || 3), 10);
+  if (!Number.isFinite(n)) return 3;
+  return Math.max(MIN_PLAYERS, Math.min(MAX_PLAYERS, n));
+}
+
 function buildArtemisRosterFromProfiles() {
+  const n = expectedPlayerCount();
   const roster = [];
-  for (const slot of PLAYER_SLOTS) {
+  for (let slot = 1; slot <= n; slot += 1) {
     const prof = session.loginProfiles[String(slot)];
     if (prof && prof.name && prof.color) {
       roster.push({
@@ -450,7 +463,7 @@ function buildArtemisRosterFromProfiles() {
       });
     }
   }
-  return roster.length === PLAYER_SLOTS.length ? roster : null;
+  return roster.length === n ? roster : null;
 }
 
 function injectArtemisRosterIntoState(state) {
@@ -468,7 +481,7 @@ function rigSetupBroadcastPayload() {
     return { type: "rig_setup", random: true, slot: 0 };
   }
   const slot = parseInt(String(session.rigSetup.slot || ""), 10);
-  if (slot >= 1 && slot <= 3) {
+  if (slot >= 1 && slot <= MAX_PLAYERS) {
     return { type: "rig_setup", random: false, slot };
   }
   return null;
@@ -487,11 +500,11 @@ function handleRigSetup(clientId, msg) {
     session.rigSetup = { random: true };
   } else {
     const slot = parseInt(String(msg.slot || ""), 10);
-    if (slot < 1 || slot > 3) {
+    if (slot < 1 || slot > MAX_PLAYERS) {
       sendJson(clients.get(clientId), {
         type: "error",
         code: "bad_rig",
-        message: "rig_setup requires slot 1, 2, or 3 (or random: true)",
+        message: "rig_setup requires slot 1–6 (or random: true)",
       });
       return;
     }
@@ -535,7 +548,9 @@ function handleLoginProfile(clientId, msg) {
     return;
   }
   const slot = parseInt(String(msg.slot || me.slot || ""), 10);
-  if (slot !== me.slot) {
+  const isHostClient = clientId === session.hostClientId;
+  /* Host-driven (m347): host may set any seat; clients only their own. */
+  if (!isHostClient && slot !== me.slot) {
     sendJson(clients.get(clientId), {
       type: "error",
       code: "bad_slot",
@@ -543,7 +558,7 @@ function handleLoginProfile(clientId, msg) {
     });
     return;
   }
-  if (slot === 1 && clientId !== session.hostClientId) {
+  if (slot === 1 && !isHostClient) {
     sendJson(clients.get(clientId), {
       type: "error",
       code: "bad_slot",
@@ -551,11 +566,11 @@ function handleLoginProfile(clientId, msg) {
     });
     return;
   }
-  if (slot !== 1 && clientId === session.hostClientId) {
+  if (slot < 1 || slot > MAX_PLAYERS) {
     sendJson(clients.get(clientId), {
       type: "error",
       code: "bad_slot",
-      message: "Host must use slot 1",
+      message: "Invalid player slot",
     });
     return;
   }
@@ -600,6 +615,72 @@ function handleLoginProfile(clientId, msg) {
   session.loginProfiles[String(slot)] = { name, color, clientId };
   broadcastLoginProfiles();
   log(`login_profile slot=${slot} name="${name}" color=${color} from ${clientId}`);
+}
+
+/** Host posts full roster for seats 1..N (kitchen-table login). */
+function handleLoginRoster(clientId, msg) {
+  if (clientId !== session.hostClientId) {
+    sendJson(clients.get(clientId), {
+      type: "error",
+      code: "not_host",
+      message: "Only the host can set the full login roster",
+    });
+    return;
+  }
+  if (session.lobby.status !== "started") {
+    sendJson(clients.get(clientId), {
+      type: "error",
+      code: "lobby_not_started",
+      message: "Wait until the lobby has started",
+    });
+    return;
+  }
+  const rows = Array.isArray(msg.players) ? msg.players : [];
+  if (rows.length < MIN_PLAYERS || rows.length > MAX_PLAYERS) {
+    sendJson(clients.get(clientId), {
+      type: "error",
+      code: "bad_roster",
+      message: "Roster must have 2–6 players",
+    });
+    return;
+  }
+  const next = {};
+  const names = new Set();
+  const colors = new Set();
+  for (let i = 0; i < rows.length; i += 1) {
+    const slot = i + 1;
+    const name = String((rows[i] && rows[i].name) || "")
+      .trim()
+      .slice(0, 32)
+      .toUpperCase();
+    const color = String((rows[i] && rows[i].color) || "")
+      .trim()
+      .toLowerCase();
+    if (!name || !ARTEMIS_COLORS.has(color)) {
+      sendJson(clients.get(clientId), {
+        type: "error",
+        code: "bad_roster",
+        message: "Each player needs a name and unique color",
+      });
+      return;
+    }
+    if (names.has(name) || colors.has(color)) {
+      sendJson(clients.get(clientId), {
+        type: "error",
+        code: "bad_roster",
+        message: "Duplicate names or colors in roster",
+      });
+      return;
+    }
+    names.add(name);
+    colors.add(color);
+    next[String(slot)] = { name, color, clientId };
+  }
+  session.lobby.expectedPlayers = rows.length;
+  session.loginProfiles = next;
+  broadcastLoginProfiles();
+  broadcastLobbyState();
+  log(`login_roster n=${rows.length} from host ${clientId}`);
 }
 
 function handlePlayerState(clientId, msg) {
@@ -886,16 +967,22 @@ function handleDeployFinish(clientId, msg) {
 
 function lobbyCanStart() {
   if (session.lobby.status !== "waiting") return false;
-  const occupied = session.lobby.slots.filter((s) => s.clientId);
-  if (!occupied.length) return false;
-  return occupied.every((s) => s.ready);
+  const n = expectedPlayerCount();
+  for (let slot = 1; slot <= n; slot += 1) {
+    const s = lobbySlotEntry(slot);
+    if (!s || !s.clientId || !s.ready) return false;
+  }
+  return true;
 }
 
 function lobbySnapshotFor(clientId) {
   const me = roster.get(clientId);
   const mySlot = me ? lobbySlotEntry(me.slot) : null;
+  const n = expectedPlayerCount();
   return {
     status: session.lobby.status,
+    expectedPlayers: n,
+    lobbyMode: session.lobby.lobbyMode === "open" ? "open" : "quick",
     slots: session.lobby.slots.map((s) => ({
       slot: s.slot,
       clientId: s.clientId,
@@ -1231,7 +1318,7 @@ wss.on("connection", (ws, req) => {
     v: PROTOCOL_VERSION,
     clientId,
     message:
-      'Send { type: "join", role: "host"|"client", name: "...", slot: 1|2|3 }.',
+      'Send { type: "join", role: "host"|"client", name: "...", slot: 1..6 }.',
   });
 
   ws.on("message", (data) => {
@@ -1255,7 +1342,7 @@ wss.on("connection", (ws, req) => {
         sendJson(ws, {
           type: "error",
           code: "bad_slot",
-          message: "join requires slot 1 (host), 2, or 3 (clients)",
+          message: "join requires slot 1 (host) or 2–6 (clients)",
         });
         return;
       }
@@ -1271,7 +1358,7 @@ wss.on("connection", (ws, req) => {
         sendJson(ws, {
           type: "error",
           code: "bad_slot",
-          message: "Clients must use slot=2 or slot=3",
+          message: "Clients must use slot=2 through slot=6",
         });
         return;
       }
@@ -1359,6 +1446,59 @@ wss.on("connection", (ws, req) => {
       log(`lobby_ready ${clientId} slot=${me.slot} ready=${slotEntry.ready}`);
       return;
     }
+    if (type === "lobby_set_expected") {
+      if (clientId !== session.hostClientId) {
+        sendJson(ws, {
+          type: "error",
+          code: "not_host",
+          message: "Only the host can set player count",
+        });
+        return;
+      }
+      if (session.lobby.status !== "waiting") {
+        sendJson(ws, {
+          type: "error",
+          code: "lobby_started",
+          message: "Player count is locked after the lobby starts",
+        });
+        return;
+      }
+      const n = parseInt(String(msg.count || msg.expectedPlayers || ""), 10);
+      if (!Number.isFinite(n) || n < MIN_PLAYERS || n > MAX_PLAYERS) {
+        sendJson(ws, {
+          type: "error",
+          code: "bad_count",
+          message: "expectedPlayers must be 2–6",
+        });
+        return;
+      }
+      session.lobby.expectedPlayers = n;
+      if (msg.lobbyMode === "open" || msg.lobbyMode === "quick") {
+        session.lobby.lobbyMode = msg.lobbyMode;
+      }
+      broadcastLobbyState();
+      log(`lobby_set_expected n=${n} mode=${session.lobby.lobbyMode} from host ${clientId}`);
+      return;
+    }
+    if (type === "lobby_set_mode") {
+      if (clientId !== session.hostClientId) {
+        sendJson(ws, {
+          type: "error",
+          code: "not_host",
+          message: "Only the host can set lobby mode",
+        });
+        return;
+      }
+      const mode = msg.mode === "open" ? "open" : "quick";
+      session.lobby.lobbyMode = mode;
+      broadcastLobbyState();
+      for (const [id, peer] of clients) {
+        if (!roster.has(id)) continue;
+        sendJson(peer, { type: "lobby_mode", mode: mode });
+      }
+      log(`lobby_set_mode mode=${mode} from host ${clientId}`);
+      return;
+    }
     if (type === "lobby_start") {
       if (clientId !== session.hostClientId) {
         sendJson(ws, {
@@ -1411,6 +1551,10 @@ wss.on("connection", (ws, req) => {
     }
     if (type === "login_profile") {
       handleLoginProfile(clientId, msg);
+      return;
+    }
+    if (type === "login_roster") {
+      handleLoginRoster(clientId, msg);
       return;
     }
     if (type === "player_state") {

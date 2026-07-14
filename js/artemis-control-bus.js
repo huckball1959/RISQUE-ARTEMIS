@@ -25,7 +25,7 @@
     var player = opts.player;
     if (!gs || !player) return null;
     var slot = Number(window.risqueArtemisPlayerSlot) || 0;
-    if (slot < 2 || slot > 3) return null;
+    if (slot < 2 || slot > (window.risqueArtemisMaxSlots || 6)) return null;
     if (typeof window.risqueArtemisStampDeployMirrorDraftOnState === "function") {
       window.risqueArtemisStampDeployMirrorDraftOnState(gs);
     }
@@ -78,7 +78,7 @@
     var player = opts.player;
     if (!gs || !player) return null;
     var slot = Number(window.risqueArtemisPlayerSlot) || 0;
-    if (slot < 2 || slot > 3) return null;
+    if (slot < 2 || slot > (window.risqueArtemisMaxSlots || 6)) return null;
     if (typeof window.risqueArtemisStampDeployMirrorDraftOnState === "function") {
       window.risqueArtemisStampDeployMirrorDraftOnState(gs);
     }

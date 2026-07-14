@@ -8,11 +8,19 @@ CLIENTS COPY ONE FILE: launchers/client/ARTEMIS-JOIN.bat
 
 TRAFFIC COP (host decides the test):
   launchers/active-mode.txt — written by host START scripts:
-    START-ARTEMIS.bat      → normal
-    START-CYCLE-PROBE.bat  → cycle
-    START-PROBE.bat        → turn-probe
+    START-ARTEMIS.bat           → normal  (default game night)
+    START-CARDPLAY-TEST.bat     → cardplay-test  (mock round-4; optional)
+    START-CYCLE-PROBE.bat       → cycle
+    START-PROBE.bat             → turn-probe
 
-  launchers/profiles.json modeMap routes p2/p3/host per mode.
+  Host-driven login (m347): host sets names/colors (hot-seat presets).
+  Clients bookmark /join/p2 … /join/p6 — no name entry on client.
+  Lobby "Players tonight" = 2–6 before everyone joins.
+
+  Host test launcher UI (START modal Normal/Rigged/Mock/Conquer) was REMOVED in m346.
+  Archive + restore notes: dev/archived/host-test-launcher-m306-m330/README.md
+
+  launchers/profiles.json modeMap routes host/p2–p6 per mode.
   Also edit profile params + cacheVersion here for ?v= and mock flags.
 
 Test:

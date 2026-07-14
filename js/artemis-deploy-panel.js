@@ -288,7 +288,7 @@
       return Number(window.risqueArtemisResolveOwnerSlot(gs)) || 0;
     }
     var ctrl = Number(gs.artemisControlSlot) || 0;
-    if (ctrl >= 1 && ctrl <= 3) {
+    if (ctrl >= 1 && ctrl <= (window.risqueArtemisMaxSlots || 6)) {
       return ctrl;
     }
     if (typeof window.risqueArtemisActivePlayerSlot === "function") {
@@ -327,7 +327,7 @@
     }
     var local = myLocalSlot();
     if (!local) return false;
-    if (owner >= 1 && owner <= 3) {
+    if (owner >= 1 && owner <= (window.risqueArtemisMaxSlots || 6)) {
       return owner === local;
     }
     if (typeof window.risqueArtemisIsMyTurn === "function") {
@@ -1281,7 +1281,7 @@
       }
     }
     var ctrl = Number(gs.artemisControlSlot) || 0;
-    if (ctrl >= 1 && ctrl <= 3) {
+    if (ctrl >= 1 && ctrl <= (window.risqueArtemisMaxSlots || 6)) {
       var roster = gs.artemisRoster;
       if (roster && Array.isArray(roster)) {
         var hit = roster.find(function (r) {

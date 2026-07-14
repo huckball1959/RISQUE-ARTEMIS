@@ -1,0 +1,205 @@
+﻿/* ARTEMIS â€” host test launcher (after START, before game begins) */
+.risque-artemis-host-launcher {
+  position: fixed;
+  inset: 0;
+  /* Above the near-max-z wayback badge (2147483646) so nothing overlaps Launch. */
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 6, 23, 0.94);
+  backdrop-filter: blur(10px);
+}
+
+.risque-artemis-host-launcher[hidden] {
+  display: none !important;
+}
+
+/* Keep the low-left "SAVE FOLDER NOT CONNECTED" wayback badge (z-index ~max)
+   from floating over the launcher's Launch button while the menu is open. */
+html.risque-artemis-host-launcher-active #risque-wayback-connected-flag {
+  display: none !important;
+}
+
+.risque-artemis-host-launcher-card {
+  width: min(680px, 100%);
+  max-height: min(92vh, 900px);
+  overflow-y: auto;
+  padding: 28px 32px 32px;
+  border-radius: 18px;
+  background: linear-gradient(165deg, #0f172a 0%, #1e293b 100%);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.5);
+  color: #f1f5f9;
+}
+
+.risque-artemis-host-launcher-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.risque-artemis-host-launcher-mode {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 18px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.risque-artemis-host-launcher-mode:hover {
+  border-color: #38bdf8;
+  background: rgba(30, 41, 59, 0.95);
+  transform: translateY(-1px);
+}
+
+.risque-artemis-host-launcher-mode--selected {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.2);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.45);
+}
+
+.risque-artemis-host-launcher-mode-num {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #38bdf8;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.risque-artemis-host-launcher-mode-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.risque-artemis-host-launcher-mode-label {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.risque-artemis-host-launcher-mode-hint {
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.35;
+}
+
+.risque-artemis-host-launcher-sub {
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+}
+
+.risque-artemis-host-launcher-sub[hidden] {
+  display: none !important;
+}
+
+.risque-artemis-host-launcher-heading {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.risque-artemis-host-launcher-hint {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #94a3b8;
+}
+
+.risque-artemis-host-launcher-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.risque-artemis-host-launcher-row--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.risque-artemis-host-launcher-chip {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.risque-artemis-host-launcher-chip--rig {
+  flex: 1 1 calc(50% - 10px);
+  font-size: 13px;
+}
+
+.risque-artemis-host-launcher-chip--wide {
+  width: 100%;
+  flex: 1 1 100%;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  padding: 10px 14px;
+}
+
+.risque-artemis-host-launcher-chip:hover {
+  border-color: #38bdf8;
+  background: rgba(30, 41, 59, 0.95);
+}
+
+.risque-artemis-host-launcher-chip--selected {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.18);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
+}
+
+.risque-artemis-host-launcher-go {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 16px 20px;
+  border: none;
+  border-radius: 12px;
+  background: #0284c7;
+  color: #f8fafc;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.risque-artemis-host-launcher-go:hover:not(:disabled) {
+  background: #0369a1;
+  transform: translateY(-1px);
+}
+
+.risque-artemis-host-launcher-go:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

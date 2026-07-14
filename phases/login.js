@@ -86,7 +86,7 @@
       "#risque-login-overlay .login-button{display:block;width:200px;padding:10px;font-size:16px;font-weight:bold;border:2px solid #14532d;border-radius:4px;cursor:pointer;pointer-events:auto;z-index:3;background:#00ff00;color:#000;margin:10px auto 0;transition:opacity 2s ease;text-transform:uppercase;}" +
       "#risque-login-overlay .login-button:hover{background:#00cc00;border-color:#166534;}" +
       "#risque-login-overlay .load-button{display:block;width:200px;padding:10px;font-size:16px;font-weight:bold;border:2px solid #854d0e;border-radius:4px;cursor:pointer;pointer-events:auto;z-index:3;background:#eab308;color:#000;margin:10px auto 0;transition:opacity 2s ease;text-transform:uppercase;}" +
-      "#risque-login-overlay .login-button.fade-out,#risque-login-overlay .load-button.fade-out,#risque-login-overlay .risque-login-random-order.fade-out,#risque-login-overlay .risque-login-preset-slot.fade-out{opacity:0;}" +
+      "#risque-login-overlay .login-button.fade-out,#risque-login-overlay .load-button.fade-out,#risque-login-overlay .risque-login-preset-slot.fade-out{opacity:0;}" +
       "#risque-login-overlay .login-docs-row{display:flex;justify-content:center;gap:10px;margin-top:6px;margin-bottom:2px;flex-wrap:wrap;}" +
       "#risque-login-overlay .login-doc-button{flex:1;min-width:120px;max-width:200px;padding:8px 10px;font-size:13px;font-weight:bold;border:2px solid #14532d;border-radius:4px;cursor:pointer;pointer-events:auto;background:#00ff00;color:#000;transition:opacity 2s ease,background .15s;text-transform:uppercase;}" +
       "#risque-login-overlay .login-doc-button:hover{background:#00cc00;border-color:#166534;}" +
@@ -95,13 +95,11 @@
       ".risque-login-center-move:hover{background:#1f2937;border-color:#fde047;}" +
       "#risque-login-overlay #login-js-error{color:#ff6b6b;text-align:center;margin-top:8px;font-size:14px;min-height:20px;}" +
       "#risque-login-overlay #load-game-input-js{display:none;}" +
-      "#risque-login-overlay .risque-login-preset-bar{display:grid;grid-template-columns:repeat(6,minmax(0,1fr)) minmax(0,min(140px,34%));gap:4px;width:100%;max-width:520px;margin:10px auto 0;align-items:stretch;box-sizing:border-box;}" +
+      "#risque-login-overlay .risque-login-preset-bar{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;width:100%;max-width:520px;margin:10px auto 0;align-items:stretch;box-sizing:border-box;}" +
       "#risque-login-overlay .risque-login-preset-slot{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:48px;padding:4px 2px;border:2px solid #14532d;border-radius:6px;cursor:pointer;background:#00ff00;color:#000;font-family:Arial,sans-serif;font-weight:900;text-transform:uppercase;transition:background .15s ease,border-color .15s ease;user-select:none;-webkit-user-select:none;touch-action:manipulation;}" +
       "#risque-login-overlay .risque-login-preset-slot:hover{background:#00cc00;border-color:#166534;}" +
       "#risque-login-overlay .risque-login-preset-slot-line{display:block;font-size:9px;letter-spacing:.04em;line-height:1.1;}" +
       "#risque-login-overlay .risque-login-preset-slot-num{display:block;font-size:14px;font-weight:900;line-height:1.1;margin-top:1px;}" +
-      "#risque-login-overlay .risque-login-random-order--bar{display:flex;align-items:center;justify-content:center;min-height:48px;padding:4px 6px;border:2px solid #14532d;border-radius:6px;cursor:pointer;background:#00ff00;color:#000;font-family:Arial,sans-serif;font-weight:800;font-size:11px;line-height:1.15;text-align:center;text-transform:uppercase;transition:background .15s ease,border-color .15s ease;}" +
-      "#risque-login-overlay .risque-login-random-order--bar:hover{background:#00cc00;border-color:#166534;}" +
       "#risque-login-overlay .risque-login-easy-hint{margin-top:10px;margin-bottom:0;font-size:12px;line-height:1.35;color:#94a3b8;text-align:center;max-width:100%;}";
     document.head.appendChild(s);
   }
@@ -250,7 +248,6 @@
         b.classList.add("fade-out");
       });
     }
-    if (ui.randomOrderBtn) ui.randomOrderBtn.classList.add("fade-out");
     if (ui.loginContainer) ui.loginContainer.classList.add("fade-out");
     if (ui.loadButton) ui.loadButton.classList.add("fade-out");
     if (ui.fadeRoot) {
@@ -806,48 +803,52 @@
     });
   }
 
-  /** Preset 1: four players; slots 5–6 empty. */
+  /** Preset 1: usual 3-player friends night (kept for car-radio / legacy). */
   var PRESET_ONE_PLAYERS = [
     { name: "Guido", color: "blue" },
-    { name: "Mickey", color: "red" },
-    { name: "Karl", color: "pink" },
+    { name: "Mictor", color: "red" },
     { name: "Nooch", color: "yellow" }
+  ];
+
+  /** Quick lobby friends — fixed laptop seats when present: 1 Guido, 2 Mictor, 3 Nooch, 4 Karl, 5 Laura. */
+  var QUICK_FRIENDS = [
+    { id: "guido", name: "Guido", color: "blue", host: true, seat: 1 },
+    { id: "mictor", name: "Mictor", color: "red", host: false, seat: 2 },
+    { id: "nooch", name: "Nooch", color: "yellow", host: false, seat: 3 },
+    { id: "karl", name: "Karl", color: "pink", host: false, seat: 4 },
+    { id: "laura", name: "Laura", color: "white", host: false, seat: 5 }
   ];
 
   /** Six roster shortcuts — index 0 = Preset 1 button, … index 5 = Preset 6. */
   var PRESET_PLAYERS_LIST = [
     PRESET_ONE_PLAYERS,
     [
-      { name: "Ace", color: "blue" },
-      { name: "Ben", color: "red" },
-      { name: "Cal", color: "pink" },
-      { name: "Don", color: "yellow" }
+      { name: "Guido", color: "blue" },
+      { name: "Mictor", color: "red" },
+      { name: "Nooch", color: "yellow" },
+      { name: "Karl", color: "pink" }
     ],
     [
-      { name: "Eli", color: "blue" },
-      { name: "Fay", color: "red" },
-      { name: "Gus", color: "green" },
-      { name: "Hal", color: "yellow" }
+      { name: "Guido", color: "blue" },
+      { name: "Mictor", color: "red" },
+      { name: "Nooch", color: "yellow" },
+      { name: "Karl", color: "pink" },
+      { name: "Laura", color: "white" }
     ],
     [
-      { name: "Ivy", color: "blue" },
-      { name: "Jay", color: "red" },
-      { name: "Kim", color: "pink" },
-      { name: "Lee", color: "white" }
+      { name: "Guido", color: "blue" },
+      { name: "Mictor", color: "red" },
+      { name: "Karl", color: "pink" }
     ],
     [
-      { name: "Mo", color: "blue" },
-      { name: "Ned", color: "red" },
-      { name: "Ola", color: "pink" },
-      { name: "Pat", color: "yellow" }
+      { name: "Guido", color: "blue" },
+      { name: "Nooch", color: "yellow" },
+      { name: "Laura", color: "white" }
     ],
     [
-      { name: "Quin", color: "blue" },
-      { name: "Rex", color: "red" },
-      { name: "Sid", color: "yellow" },
-      { name: "Tom", color: "green" },
-      { name: "Uma", color: "pink" },
-      { name: "Vic", color: "white" }
+      { name: "Guido", color: "blue" },
+      { name: "Mictor", color: "red" },
+      { name: "Laura", color: "white" }
     ]
   ];
 
@@ -1009,7 +1010,37 @@
     return true;
   }
 
+  function configureArtemisHostDrivenLogin(root, promptEl) {
+    if (!root) return;
+    root.classList.remove("risque-artemis-host-login-stub");
+    root.hidden = false;
+    Array.prototype.forEach.call(root.querySelectorAll(".player-row"), function (row) {
+      row.style.display = "";
+      row.classList.remove("risque-login-row--artemis-remote");
+      var input = row.querySelector("input");
+      if (input) {
+        input.readOnly = false;
+        input.disabled = false;
+        input.placeholder = "Enter name";
+        input.removeAttribute("title");
+      }
+      var colorField = row.querySelector(".color-field");
+      if (colorField) {
+        colorField.style.pointerEvents = "";
+      }
+    });
+    if (promptEl) {
+      promptEl.textContent =
+        "QUICK: check who's playing (3–5). Seats stay fixed — Guido P1 (host), Mictor P2, Nooch P3, Karl P4, Laura P5. Clients join those seats.";
+    }
+  }
+
   function configureArtemisHostLogin(root, promptEl) {
+    /* Legacy remote-row waiting UI — prefer host-driven (m347). */
+    if (window.risqueArtemisHostDrivenLogin !== false) {
+      configureArtemisHostDrivenLogin(root, promptEl);
+      return;
+    }
     var rows = root.querySelectorAll(".player-row");
     for (var i = 3; i < rows.length; i += 1) {
       rows[i].style.display = "none";
@@ -1053,11 +1084,6 @@
       presetBtn.disabled = true;
       presetBtn.title = "Presets are applied on the host computer";
     });
-    var randomOrderBtn = formRoot.querySelector("#risque-login-random-order");
-    if (randomOrderBtn) {
-      randomOrderBtn.disabled = true;
-      randomOrderBtn.title = "Turn order is set on the host computer";
-    }
   }
 
   function buildPlayerFormHtml() {
@@ -1081,9 +1107,152 @@
       .replace(/</g, "&lt;");
   }
 
+  function buildLoginModeToggleHtml() {
+    var mode =
+      typeof window.risqueArtemisGetLobbyMode === "function"
+        ? window.risqueArtemisGetLobbyMode()
+        : window.risqueArtemisLobbyMode === "open"
+          ? "open"
+          : "quick";
+    return (
+      '<div class="risque-login-mode-toggle" role="group" aria-label="Lobby mode">' +
+      '<button type="button" class="risque-login-mode-btn' +
+      (mode !== "open" ? " is-active" : "") +
+      '" data-lobby-mode="quick" title="Host picks friends with checkboxes; clients just connect">Quick</button>' +
+      '<button type="button" class="risque-login-mode-btn' +
+      (mode === "open" ? " is-active" : "") +
+      '" data-lobby-mode="open" title="Each laptop types a name and color; host starts when ready">Open lobby</button>' +
+      "</div>"
+    );
+  }
+
+  function buildQuickFriendsBarHtml() {
+    var defaults = { guido: true, mictor: true, nooch: true, karl: false, laura: false };
+    var parts = [
+      '<div class="risque-login-quick-friends" id="risque-login-quick-friends">' +
+        '<div class="risque-login-quick-friends-label">Who\'s playing tonight (3–5)</div>' +
+        '<div class="risque-login-quick-friends-list">'
+    ];
+    for (var i = 0; i < QUICK_FRIENDS.length; i += 1) {
+      var f = QUICK_FRIENDS[i];
+      var checked = !!defaults[f.id] || !!f.host;
+      parts.push(
+        '<label class="risque-login-quick-chip risque-login-quick-chip--' +
+          f.color +
+          (f.host ? " is-host" : "") +
+          '">' +
+          '<input type="checkbox" data-quick-friend="' +
+          f.id +
+          '"' +
+          (checked ? " checked" : "") +
+          (f.host ? " disabled" : "") +
+          " />" +
+          "<span>" +
+          f.name.toUpperCase() +
+          "</span>" +
+          "</label>"
+      );
+    }
+    parts.push("</div></div>");
+    return parts.join("");
+  }
+
+  function readQuickFriendsSelection(root) {
+    /* Always emit in fixed seat order (Guido→Mictor→Nooch→Karl→Laura), packing only checked players. */
+    var out = [];
+    for (var i = 0; i < QUICK_FRIENDS.length; i += 1) {
+      var f = QUICK_FRIENDS[i];
+      if (f.host) {
+        out.push({ name: f.name, color: f.color });
+        continue;
+      }
+      var inp = root.querySelector('input[data-quick-friend="' + f.id + '"]');
+      if (inp && inp.checked) out.push({ name: f.name, color: f.color });
+    }
+    return out;
+  }
+
+  function applyQuickFriendsSelection(root, onLog, onAfter) {
+    var pairs = readQuickFriendsSelection(root);
+    var elError = root.querySelector("#login-js-error-hud");
+    if (pairs.length < 3) {
+      if (elError) elError.textContent = "Pick at least 3 players (Guido + 2 friends).";
+      return false;
+    }
+    if (pairs.length > 5) {
+      if (elError) elError.textContent = "At most 5 players for testing.";
+      return false;
+    }
+    if (elError) elError.textContent = "";
+    applyFilledRowsInOrder(
+      root,
+      pairs,
+      onLog,
+      "Quick roster: " + pairs.map(function (p) { return p.name; }).join(", ")
+    );
+    window.risqueArtemisExpectedPlayers = pairs.length;
+    if (typeof window.risqueArtemisSend === "function" && window.risqueArtemisHost) {
+      try {
+        window.risqueArtemisSend({
+          type: "lobby_set_expected",
+          count: pairs.length,
+          lobbyMode: "quick"
+        });
+      } catch (eExp) {
+        /* ignore — may be past waiting lobby; roster length still drives START */
+      }
+    }
+    if (typeof onAfter === "function") onAfter();
+    if (typeof window.risqueSyncBoardCornerArtemisStart === "function") {
+      window.risqueSyncBoardCornerArtemisStart();
+    }
+    return true;
+  }
+
+  function wireQuickFriendsControls(root, onLog, onAfter) {
+    if (!root) return;
+    var box = root.querySelector("#risque-login-quick-friends");
+    if (!box || box.__risqueQuickWired) return;
+    box.__risqueQuickWired = true;
+    box.addEventListener("change", function (ev) {
+      var t = ev.target;
+      if (!t || !t.getAttribute || !t.getAttribute("data-quick-friend")) return;
+      var selected = readQuickFriendsSelection(root);
+      if (selected.length > 5 && t.checked) {
+        t.checked = false;
+        var elError = root.querySelector("#login-js-error-hud");
+        if (elError) elError.textContent = "At most 5 players for testing.";
+        return;
+      }
+      applyQuickFriendsSelection(root, onLog, onAfter);
+    });
+  }
+
+  function wireLobbyModeToggle(root) {
+    if (!root) return;
+    Array.prototype.forEach.call(root.querySelectorAll("[data-lobby-mode]"), function (btn) {
+      btn.addEventListener("click", function () {
+        var mode = btn.getAttribute("data-lobby-mode");
+        if (typeof window.risqueArtemisApplyLobbyMode === "function") {
+          window.risqueArtemisApplyLobbyMode(mode, { broadcast: true, remount: true });
+        }
+      });
+    });
+  }
+
   function buildLoginPresetBarHtml() {
+    var hostDriven =
+      !!window.risqueArtemisHost && window.risqueArtemisHostDrivenLogin !== false;
+    if (hostDriven) {
+      return (
+        '<div class="risque-login-preset-bar risque-login-preset-bar--quick">' +
+        buildLoginModeToggleHtml() +
+        buildQuickFriendsBarHtml() +
+        "</div>"
+      );
+    }
     ensureUserPresetsMapLoaded();
-    var parts = [];
+    var parts = [buildLoginModeToggleHtml()];
     for (var p = 0; p < 6; p += 1) {
       var rows = getPresetRowsEffective(p);
       var titleText = presetSlotTitleText(p, rows);
@@ -1100,11 +1269,6 @@
           "</button>"
       );
     }
-    parts.push(
-      "<button type=\"button\" class=\"risque-login-random-order risque-login-random-order--bar\" id=\"risque-login-random-order\" title=\"Shuffle who goes first — names keep their colors. Click again for another order.\">" +
-        "Random player turn" +
-        "</button>"
-    );
     return "<div class=\"risque-login-preset-bar\">" + parts.join("") + "</div>";
   }
 
@@ -1141,7 +1305,10 @@
       return;
     }
 
-    if (window.risqueArtemisHost) {
+    var hostDriven =
+      !!window.risqueArtemisHost && window.risqueArtemisHostDrivenLogin !== false;
+
+    if (window.risqueArtemisHost && !hostDriven) {
       if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.ensureLogin === "function") {
         window.risqueRuntimeHud.ensureLogin(uiOverlay);
       }
@@ -1171,10 +1338,16 @@
       "<div id=\"player-form-js\">" + buildPlayerFormHtml() + "</div>" +
       "<div id=\"login-js-error-hud\"></div>" +
       "<div class=\"risque-login-primary-footer\">" +
-      "<button type=\"button\" class=\"login-button\" id=\"login-button-js\">LOG IN</button>" +
+      "<button type=\"button\" class=\"login-button\" id=\"login-button-js\">" +
+      (hostDriven ? "START GAME" : "LOG IN") +
+      "</button>" +
       buildLoginPresetBarHtml() +
       "</div>" +
       "</div>";
+    if (hostDriven) {
+      document.documentElement.classList.add("risque-artemis-host-driven-login");
+      /* Do NOT set risque-artemis-login-active on host — that CSS hid the hot-seat HUD. */
+    }
 
     var formRoot = document.getElementById("risque-login-hud-root");
     if (!formRoot) return;
@@ -1184,7 +1357,9 @@
     if (welcomeTextEl) welcomeTextEl.textContent = welcomeTextContent;
     if (loginPromptEl) loginPromptEl.textContent = loginPromptContent;
 
-    if (!window.risqueDisplayIsPublic && window.risqueArtemisHost) {
+    if (hostDriven) {
+      configureArtemisHostDrivenLogin(formRoot, loginPromptEl);
+    } else if (!window.risqueDisplayIsPublic && window.risqueArtemisHost) {
       configureArtemisHostLogin(formRoot, loginPromptEl);
     }
 
@@ -1198,6 +1373,9 @@
         window.gameState.risquePublicLoginFormMirror = buildLoginFormMirrorPayload(formRoot);
         if (typeof window.risqueMirrorPushGameState === "function") {
           window.risqueMirrorPushGameState();
+        }
+        if (typeof window.risqueSyncBoardCornerArtemisStart === "function") {
+          window.risqueSyncBoardCornerArtemisStart();
         }
       }, 160);
     }
@@ -1294,34 +1472,20 @@
 
     attachCarRadioPresetControls(formRoot, onLog, elError, scheduleLoginMirrorPush);
     hydrateLoginPresetsFromDisk(formRoot, onLog);
+    wireLobbyModeToggle(formRoot);
+    wireQuickFriendsControls(formRoot, onLog, scheduleLoginMirrorPush);
 
-    var randomOrderBtn = formRoot.querySelector("#risque-login-random-order");
-    if (randomOrderBtn && !window.risqueDisplayIsPublic) {
-      randomOrderBtn.addEventListener("click", function () {
-        if (elError) elError.textContent = "";
-        var filled = readFilledRows();
-        if (filled.length < 2) {
-          if (elError) {
-            elError.textContent = "Enter at least two players with names and colors to shuffle turn order.";
-          }
-          onLog("Random order: need 2+ filled rows");
-          return;
-        }
-        var names = filled.map(function (x) { return x.name; });
-        var colors = filled.map(function (x) { return x.color; });
-        if (new Set(names).size !== names.length) {
-          if (elError) elError.textContent = "Fix duplicate names before shuffling order.";
-          return;
-        }
-        if (new Set(colors).size !== colors.length) {
-          if (elError) elError.textContent = "Colors must be unique before shuffling order.";
-          return;
-        }
-        var shuffled = shuffleArray(filled);
-        applyFilledRowsInOrder(formRoot, shuffled, onLog, "Shuffled turn order (names kept with colors)");
-        scheduleLoginMirrorPush();
-      });
+    /* Quick default: Guido + Mictor + Nooch via checkboxes. */
+    if (hostDriven && !window.risqueDisplayIsPublic) {
+      applyQuickFriendsSelection(formRoot, onLog, scheduleLoginMirrorPush);
+      onLog("Quick: loaded Guido / Mictor / Nooch");
+      scheduleLoginMirrorPush();
+      if (typeof window.risqueSyncBoardCornerArtemisStart === "function") {
+        window.risqueSyncBoardCornerArtemisStart();
+      }
     }
+
+    /* Turn order is set by setup roulettes (m355+) — no login-page shuffle button. */
 
     if (loginButton) {
       loginButton.addEventListener("click", function () {
@@ -1344,6 +1508,11 @@
           onLog("Login failed: colors not unique");
           return;
         }
+        /* ARTEMIS host-driven: START GAME uses the same map-corner start path. */
+        if (hostDriven && typeof window.risqueArtemisTryHostStartGame === "function") {
+          window.risqueArtemisTryHostStartGame();
+          return;
+        }
         commitNewGameLoginAfterRosterOk(filled, {
           legacyNext: legacyNext,
           redirectDelayMs: redirectDelayMs,
@@ -1354,7 +1523,6 @@
           welcomeText: welcomeText,
           loginButton: loginButton,
           fadeRoot: formRoot,
-          randomOrderBtn: randomOrderBtn,
           removeResizeListener: function () {
             window.removeEventListener("resize", onResizeHud);
           }
@@ -1498,34 +1666,6 @@
     if (opts.hideLoadGame && loadButton) loadButton.style.display = "none";
     if (opts.loadButtonLabel && loadButton) loadButton.textContent = opts.loadButtonLabel;
     attachCarRadioPresetControls(root, onLog, elError, null);
-    var randomOrderLegacy = root.querySelector("#risque-login-random-order");
-    if (randomOrderLegacy) {
-      randomOrderLegacy.addEventListener("click", function () {
-        elError.textContent = "";
-        var filled = readFilledRows();
-        if (filled.length < 2) {
-          elError.textContent = "Enter at least two players with names and colors to shuffle turn order.";
-          onLog("Random order: need 2+ filled rows");
-          return;
-        }
-        var names = filled.map(function (x) {
-          return x.name;
-        });
-        var colors = filled.map(function (x) {
-          return x.color;
-        });
-        if (new Set(names).size !== names.length) {
-          elError.textContent = "Fix duplicate names before shuffling order.";
-          return;
-        }
-        if (new Set(colors).size !== colors.length) {
-          elError.textContent = "Colors must be unique before shuffling order.";
-          return;
-        }
-        var shuffled = shuffleArray(filled);
-        applyFilledRowsInOrder(root, shuffled, onLog, "Shuffled turn order (names kept with colors)");
-      });
-    }
     if (loadButton && !opts.hideLoadGame) {
       loadButton.style.display = "block";
       loadButton.style.opacity = "1";
@@ -1834,30 +1974,6 @@
       loadButton.textContent = opts.loadButtonLabel;
     }
     attachCarRadioPresetControls(overlay, onLog, elError, null);
-    var randomOrderLegacy = overlay.querySelector("#risque-login-random-order");
-    if (randomOrderLegacy) {
-      randomOrderLegacy.addEventListener("click", function () {
-        elError.textContent = "";
-        var filled = readFilledRows();
-        if (filled.length < 2) {
-          elError.textContent = "Enter at least two players with names and colors to shuffle turn order.";
-          onLog("Random order: need 2+ filled rows");
-          return;
-        }
-        var names = filled.map(function (x) { return x.name; });
-        var colors = filled.map(function (x) { return x.color; });
-        if (new Set(names).size !== names.length) {
-          elError.textContent = "Fix duplicate names before shuffling order.";
-          return;
-        }
-        if (new Set(colors).size !== colors.length) {
-          elError.textContent = "Colors must be unique before shuffling order.";
-          return;
-        }
-        var shuffled = shuffleArray(filled);
-        applyFilledRowsInOrder(overlay, shuffled, onLog, "Shuffled turn order (names kept with colors)");
-      });
-    }
 
     if (loadButton && !opts.hideLoadGame) {
       // Force visibility in case external/global CSS interferes.
@@ -1924,7 +2040,6 @@
         loginButton: loginButton,
         fadeRoot: overlay,
         loginContainer: loginContainer,
-        randomOrderBtn: randomOrderLegacy,
         loadButton: loadButton,
         overlay: overlay,
         removeResizeListener: function () {
@@ -1985,7 +2100,6 @@
           Array.prototype.forEach.call(overlay.querySelectorAll(".risque-login-preset-slot"), function (b) {
             b.classList.add("fade-out");
           });
-          if (randomOrderLegacy) randomOrderLegacy.classList.add("fade-out");
           loadButton.classList.add("fade-out");
           Array.prototype.forEach.call(overlay.querySelectorAll(".login-doc-button"), function (b) {
             b.classList.add("fade-out");
@@ -2020,17 +2134,41 @@
 
   function commitArtemisRoster(profiles, opts) {
     opts = opts || {};
+    var maxSlots = Math.max(
+      2,
+      Math.min(6, Number(window.risqueArtemisMaxSlots) || 6)
+    );
     var filled = [];
     var s;
-    for (s = 1; s <= 3; s += 1) {
-      var p = profiles && (profiles[String(s)] || profiles[s]);
-      if (!p || !p.name || !p.color) {
-        return { ok: false, error: "All 3 players must sign in before starting." };
+    var profilesObj = profiles || {};
+    /* Accept either slot-keyed map or ordered array from host form. */
+    if (Array.isArray(profilesObj)) {
+      for (s = 0; s < profilesObj.length && s < maxSlots; s += 1) {
+        var row = profilesObj[s];
+        if (!row || !row.name || !row.color) {
+          return { ok: false, error: "Each player needs a name and color." };
+        }
+        filled.push({
+          name: String(row.name).trim().toUpperCase(),
+          color: String(row.color).trim().toLowerCase()
+        });
       }
-      filled.push({
-        name: String(p.name).trim().toUpperCase(),
-        color: String(p.color).trim().toLowerCase()
-      });
+    } else {
+      /* Contiguous seats 1..N only — stop at first gap. */
+      for (s = 1; s <= maxSlots; s += 1) {
+        var p2 = profilesObj[String(s)] || profilesObj[s];
+        if (!p2 || !p2.name || !p2.color) break;
+        filled.push({
+          name: String(p2.name).trim().toUpperCase(),
+          color: String(p2.color).trim().toLowerCase()
+        });
+      }
+    }
+    if (filled.length < 2) {
+      return { ok: false, error: "Need at least 2 players with names and colors." };
+    }
+    if (filled.length > maxSlots) {
+      return { ok: false, error: "Maximum " + maxSlots + " players." };
     }
     var names = filled.map(function (x) {
       return x.name;
@@ -2045,12 +2183,11 @@
       return { ok: false, error: "Each player needs a unique color." };
     }
     var artemisRoster = [];
-    for (s = 1; s <= 3; s += 1) {
-      var prof = profiles[String(s)] || profiles[s];
+    for (s = 0; s < filled.length; s += 1) {
       artemisRoster.push({
-        slot: s,
-        name: String(prof.name).trim().toUpperCase(),
-        color: String(prof.color).trim().toLowerCase()
+        slot: s + 1,
+        name: filled[s].name,
+        color: filled[s].color
       });
     }
     if (window.risqueArtemisHost && artemisRoster[0]) {
@@ -2060,6 +2197,19 @@
       sessionStorage.setItem("risqueArtemisRoster", JSON.stringify(artemisRoster));
     } catch (eRosStore) {
       /* ignore */
+    }
+    if (
+      window.risqueArtemisHost &&
+      typeof window.risqueArtemisSend === "function"
+    ) {
+      try {
+        window.risqueArtemisSend({
+          type: "login_roster",
+          players: filled
+        });
+      } catch (eRosSend) {
+        /* ignore */
+      }
     }
     commitNewGameLoginAfterRosterOk(filled, {
       legacyNext: opts.legacyNext,
@@ -2078,7 +2228,9 @@
     applyPublicLoginFormMirror: applyPublicLoginFormMirror,
     applyArtemisRemoteProfile: applyArtemisRemoteProfile,
     configureArtemisHostLogin: configureArtemisHostLogin,
+    configureArtemisHostDrivenLogin: configureArtemisHostDrivenLogin,
     commitArtemisRoster: commitArtemisRoster,
+    readFilledPlayerRows: readFilledPlayerRows,
     buildGameStateFromRows: buildGameStateFromRows,
     normalizeImportedGameState: normalizeImportedGameState,
     validateLoadedGameState: validateLoadedGameState,

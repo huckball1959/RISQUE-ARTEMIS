@@ -56,7 +56,7 @@
     }
     if (typeof window.risqueArtemisRigSetupSlot === "number") {
       var rigWin = Number(window.risqueArtemisRigSetupSlot);
-      if (rigWin >= 1 && rigWin <= 3) return rigWin;
+      if (rigWin >= 1 && rigWin <= (window.risqueArtemisMaxSlots || 6)) return rigWin;
     }
     try {
       var ssRig = sessionStorage.getItem("risqueArtemisRigSetupSlot");
@@ -121,11 +121,15 @@
     return out;
   }
 
+  /**
+   * After any roulette winner: full turn order is random (winner first, remaining seats shuffled).
+   * Applies to firstCard, deployOrder, and cardPlay — not just the named first player.
+   */
   function buildTurnOrderAfterRouletteWinner(win, players, selectKind) {
     var rest = (players || []).filter(function (p) {
-      return p && p.name && p.name !== win.name;
+      return p && p.name && win && p.name !== win.name;
     });
-    if (setupRigUsesRandom(selectKind) && rest.length > 1) {
+    if (rest.length > 1) {
       rest = shufflePlayersForTurnOrder(rest);
     }
     return [win.name].concat(
@@ -133,6 +137,119 @@
         return p.name;
       })
     );
+  }
+
+  function colorHexForSelect(color) {
+    if (window.gameUtils && window.gameUtils.colorMap && color && window.gameUtils.colorMap[color]) {
+      return window.gameUtils.colorMap[color];
+    }
+    return "#ffffff";
+  }
+
+  function playerByNameForSelect(players, name) {
+    var want = normSelectName(name);
+    return (players || []).find(function (p) {
+      return p && normSelectName(p.name) === want;
+    }) || null;
+  }
+
+  function rouletteOrderTitle(selectKind) {
+    if (selectKind === "firstCard") return "FIRST CARD";
+    if (selectKind === "deployOrder") return "FIRST TO DEPLOY";
+    if (selectKind === "cardPlay") return "PLAYER ONE";
+    return "PLAYER ORDER";
+  }
+
+  function appendRouletteOrderRow(parentEl, turnOrder, playersOrColors, opts) {
+    opts = opts || {};
+    if (!parentEl || !Array.isArray(turnOrder) || turnOrder.length < 2) return;
+    var row = document.createElement("div");
+    row.className = "player-select-turn-order player-select-turn-order--row";
+    var thenLab = document.createElement("div");
+    thenLab.className = "player-select-turn-order-title";
+    thenLab.textContent = opts.thenLabel || "THEN";
+    row.appendChild(thenLab);
+    var track = document.createElement("div");
+    track.className = "player-select-turn-order-track";
+    turnOrder.forEach(function (nm, idx) {
+      if (idx === 0) return;
+      var chip = document.createElement("span");
+      chip.className = "player-select-turn-order-chip";
+      var ord = document.createElement("span");
+      ord.className = "player-select-turn-order-chip-ord";
+      ord.textContent = String(idx + 1);
+      var nameEl = document.createElement("span");
+      nameEl.className = "player-select-turn-order-chip-name";
+      nameEl.textContent = String(nm || "").toUpperCase();
+      var colorName = "";
+      if (Array.isArray(playersOrColors)) {
+        if (playersOrColors[0] && typeof playersOrColors[0] === "object") {
+          var pl = playerByNameForSelect(playersOrColors, nm);
+          colorName = pl && pl.color ? String(pl.color) : "";
+          chip.style.color = colorHexForSelect(colorName);
+        } else {
+          colorName = playersOrColors[idx] != null ? String(playersOrColors[idx]) : "";
+          chip.style.color =
+            window.gameUtils && window.gameUtils.colorMap && window.gameUtils.colorMap[colorName]
+              ? window.gameUtils.colorMap[colorName]
+              : colorHexForSelect(colorName);
+        }
+      }
+      chip.appendChild(ord);
+      chip.appendChild(nameEl);
+      track.appendChild(chip);
+    });
+    row.appendChild(track);
+    parentEl.appendChild(row);
+  }
+
+  /** Temporarily grow control voice so winner + THEN chips are not clipped. */
+  function setRouletteRevealVoiceExpanded(on) {
+    var cv = document.getElementById("control-voice");
+    if (cv && cv.classList) {
+      if (on) cv.classList.add("ucp-control-voice--roulette-reveal");
+      else cv.classList.remove("ucp-control-voice--roulette-reveal");
+    }
+    try {
+      if (document.body && document.body.classList) {
+        document.body.classList.toggle("risque-roulette-reveal-cv", !!on);
+      }
+    } catch (eBody) {
+      /* ignore */
+    }
+  }
+  window.risqueSetRouletteRevealVoiceExpanded = setRouletteRevealVoiceExpanded;
+
+  /** Paint winner + remaining order side-by-side (host + local). */
+  function paintRouletteResultVoice(opts) {
+    opts = opts || {};
+    var win = opts.win;
+    var turnOrder = Array.isArray(opts.turnOrder) ? opts.turnOrder : [];
+    var players = opts.players || [];
+    var selectKind = String(opts.selectKind || "");
+    var instruction = String(opts.instruction || rouletteOrderTitle(selectKind)).trim();
+    var vt = document.getElementById("control-voice-text");
+    if (!vt || !win) return;
+    setRouletteRevealVoiceExpanded(true);
+    vt.innerHTML = "";
+    var ins = document.createElement("div");
+    ins.className = "player-select-voice-instruction";
+    ins.textContent = instruction;
+    vt.appendChild(ins);
+    var cyc = document.createElement("div");
+    cyc.className =
+      "player-select-cycle-name player-select-cycle-name--hud-primary player-select-cycle-name--winner";
+    cyc.textContent = String(win.name || "").toUpperCase();
+    cyc.style.color = colorHexForSelect(win.color);
+    cyc.style.animation = "none";
+    vt.appendChild(cyc);
+    appendRouletteOrderRow(vt, turnOrder, players, { thenLabel: "THEN" });
+    var vr = document.getElementById("control-voice-report");
+    if (vr) {
+      vr.textContent = "";
+      vr.style.display = "none";
+      vr.className = "ucp-voice-report";
+    }
   }
 
   /**
@@ -592,6 +709,13 @@
           }
           gameState.currentPlayer = win.name;
           gameState.turnOrder = buildTurnOrderAfterRouletteWinner(win, players, selectKind);
+          var orderColors = gameState.turnOrder.map(function (nm) {
+            var plOrd = playerByNameForSelect(players, nm);
+            return plOrd && plOrd.color ? String(plOrd.color) : "";
+          });
+          var resultInstruction = rouletteOrderTitle(selectKind);
+          var waitDeployLine =
+            "WAITING FOR " + String(win.name || "NEXT").toUpperCase() + " TO DEPLOY";
           var cardPlayEntry =
             window.risqueArtemisMode
               ? "game.html?phase=cardplay&legacyNext=income.html&postReceive=1"
@@ -601,14 +725,11 @@
             deployOrder: "game.html?phase=deploy&kind=setup",
             cardPlay: cardPlayEntry
           };
-          gameState.phase =
-            selectKind === "firstCard"
-              ? "deal"
-              : selectKind === "deployOrder"
-                ? "deploy"
-                : window.risqueArtemisMode && selectKind === "cardPlay"
-                  ? "playerSelect"
-                  : "cardplay";
+          /*
+           * Stay on playerSelect for the reveal hold. Jumping to deal/deploy immediately
+           * clears the flash and mounts deploy "WAITING FOR…" over the order UI.
+           */
+          gameState.phase = "playerSelect";
           gameState.selectionPhase =
             selectKind === "firstCard"
               ? "deployOrder"
@@ -622,41 +743,29 @@
 
           if (window.risqueArtemisMode && (selectKind === "deployOrder" || selectKind === "cardPlay")) {
             if (selectKind === "deployOrder") {
-              gameState.risqueMirrorDeployRoute = "setup";
               gameState.risqueArtemisControlSeq = Math.max(Number(gameState.risqueArtemisControlSeq) || 0, 1);
               gameState.risqueArtemisSetupDeployWinner = String(win.name || "").toUpperCase();
-              gameState.risqueArtemisSetupDeploySlot = swapSlotUsed;
-              if (!setupRigUsesRandom(selectKind)) {
+              if (!setupRigUsesRandom(selectKind) && swapSlotUsed >= 1) {
+                gameState.risqueArtemisSetupDeploySlot = swapSlotUsed;
                 gameState.artemisControlSlot = swapSlotUsed;
+              } else if (typeof window.risqueArtemisForceControlSlotFromCurrentPlayer === "function") {
+                /* Fair random: control must follow the named winner's roster seat (not stale host slot 1). */
+                var winSlot = window.risqueArtemisForceControlSlotFromCurrentPlayer(gameState);
+                gameState.risqueArtemisSetupDeploySlot = winSlot >= 1 ? winSlot : 0;
+              } else if (typeof window.risqueArtemisStampControlSlot === "function") {
+                window.risqueArtemisStampControlSlot(gameState);
+                gameState.risqueArtemisSetupDeploySlot = Number(gameState.artemisControlSlot) || 0;
               }
             }
             if (selectKind === "cardPlay" && typeof window.risqueArtemisStampControlSlot === "function") {
               window.risqueArtemisStampControlSlot(gameState);
             }
-            if (selectKind === "deployOrder") {
-              try {
-                delete gameState.risqueControlVoice;
-              } catch (eCv) {
-                /* ignore */
-              }
-              var waitDeployLine =
-                "WAITING FOR " + String(win.name || "NEXT").toUpperCase() + " TO DEPLOY";
-              try {
-                gameState.risquePublicDeployBanner = waitDeployLine;
-                gameState.risquePublicDeployReport = "";
-                gameState.risqueControlVoice = {
-                  primary: waitDeployLine,
-                  report: "",
-                  reportClass: "ucp-voice-report ucp-voice-report--public-deploy"
-                };
-              } catch (eDepBanner) {
-                /* ignore */
-              }
-            }
           }
 
           if (window.risqueArtemisMode && selectKind === "cardPlay") {
             gameState.risquePublicUiSelectKind = "cardPlay";
+          } else if (selectKind === "firstCard" || selectKind === "deployOrder") {
+            gameState.risquePublicUiSelectKind = selectKind;
           } else {
             delete gameState.risquePublicUiSelectKind;
           }
@@ -669,19 +778,25 @@
           if (typeof window.risqueHostReplaceShellGameState === "function") {
             window.risqueHostReplaceShellGameState(gameState);
           }
-          if (window.risqueArtemisMode && selectKind !== "deployOrder" && selectKind !== "cardPlay") {
-            gameState.risquePublicPlayerSelectFlash = {
-              name: String(win.name || ""),
-              color: String(win.color || ""),
-              selectKind: String(selectKind || "")
+          gameState.risquePublicPlayerSelectFlash = {
+            name: String(win.name || ""),
+            color: String(win.color || ""),
+            selectKind: String(selectKind || ""),
+            turnOrder: gameState.turnOrder.slice(),
+            turnOrderColors: orderColors,
+            instruction: resultInstruction,
+            final: true
+          };
+          try {
+            gameState.risqueControlVoice = {
+              primary: resultInstruction,
+              report: "",
+              reportClass: selectKind === "deployOrder"
+                ? "ucp-voice-report ucp-voice-report--public-deploy"
+                : ""
             };
-          }
-          if (window.risqueArtemisMode && selectKind === "cardPlay") {
-            try {
-              delete gameState.risquePublicPlayerSelectFlash;
-            } catch (eClrCpFlash) {
-              /* ignore */
-            }
+          } catch (eCvFinal) {
+            /* ignore */
           }
           if (useVoiceCycle) {
             if (nameCycle) {
@@ -692,41 +807,29 @@
               resultText.style.display = "none";
               resultText.textContent = "";
             }
+            paintRouletteResultVoice({
+              win: win,
+              turnOrder: gameState.turnOrder,
+              players: players,
+              selectKind: selectKind,
+              instruction: resultInstruction
+            });
           } else {
             nameCycle.style.display = "none";
             resultText.textContent = win.name + " Selected";
             resultText.style.color = colorHex(win.color);
             resultText.style.display = "block";
           }
-          if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.setControlVoiceText === "function") {
-            if (window.risqueArtemisMode && selectKind === "deployOrder") {
-              window.risqueRuntimeHud.setControlVoiceText(
-                "WAITING FOR " + String(win.name || "NEXT").toUpperCase() + " TO DEPLOY",
-                "",
-                { reportClass: "ucp-voice-report ucp-voice-report--public-deploy" }
-              );
-            } else {
-              window.risqueRuntimeHud.setControlVoiceText(win.name.toUpperCase() + " SELECTED", "");
-            }
-          }
           if (typeof window.risquePersistHostGameState === "function") {
             window.risquePersistHostGameState(gameState);
           }
           if (window.risqueArtemisMode && selectKind === "deployOrder") {
-            if (typeof window.risqueArtemisApplySetupDeployWinnerLock === "function") {
-              window.risqueArtemisApplySetupDeployWinnerLock(gameState);
-            }
-            if (typeof window.risqueSetMirrorDeployRoute === "function") {
-              window.risqueSetMirrorDeployRoute("setup");
-            }
+            /* Defer deploy chrome / wait banner until after reveal — only mirror the flash. */
             if (typeof window.risqueFlushMirrorPush === "function") {
-              window.__risqueArtemisForceDeployMirrorPush = true;
               try {
                 window.risqueFlushMirrorPush();
               } catch (eDepMir) {
                 /* ignore */
-              } finally {
-                window.__risqueArtemisForceDeployMirrorPush = false;
               }
             }
             if (typeof window.risqueArtemisSetupMilestone === "function") {
@@ -767,7 +870,7 @@
             }
           }
 
-          var navigateDelayMs = window.risqueArtemisMode ? 2200 : 1000;
+          var navigateDelayMs = window.risqueArtemisMode ? 3200 : 1800;
           scheduleSelect(function () {
             try {
               delete window.__risquePlayerSelectMountGuard;
@@ -779,22 +882,55 @@
             } catch (eFlashDel) {
               /* ignore */
             }
+            setRouletteRevealVoiceExpanded(false);
             if (window.risqueArtemisMode && selectKind === "cardPlay") {
               gameState.phase = "cardplay";
               if (typeof window.risquePersistHostGameState === "function") {
                 window.risquePersistHostGameState(gameState);
               }
             }
-            if (window.risqueArtemisMode && selectKind === "deployOrder") {
-              if (typeof window.risqueFlushMirrorPush === "function") {
-                window.__risqueArtemisForceDeployMirrorPush = true;
+            if (selectKind === "firstCard") {
+              gameState.phase = "deal";
+              if (typeof window.risquePersistHostGameState === "function") {
+                window.risquePersistHostGameState(gameState);
+              }
+            }
+            if (selectKind === "deployOrder") {
+              gameState.phase = "deploy";
+              if (window.risqueArtemisMode) {
+                gameState.risqueMirrorDeployRoute = "setup";
                 try {
-                  window.risqueFlushMirrorPush();
-                } catch (eDepMirNav) {
+                  gameState.risquePublicDeployBanner = waitDeployLine;
+                  gameState.risquePublicDeployReport = "";
+                  gameState.risqueControlVoice = {
+                    primary: waitDeployLine,
+                    report: "",
+                    reportClass: "ucp-voice-report ucp-voice-report--public-deploy"
+                  };
+                } catch (eDepBannerNav) {
                   /* ignore */
-                } finally {
-                  window.__risqueArtemisForceDeployMirrorPush = false;
                 }
+                if (typeof window.risqueArtemisApplySetupDeployWinnerLock === "function") {
+                  window.risqueArtemisApplySetupDeployWinnerLock(gameState);
+                }
+                if (typeof window.risqueSetMirrorDeployRoute === "function") {
+                  window.risqueSetMirrorDeployRoute("setup");
+                }
+                if (typeof window.risquePersistHostGameState === "function") {
+                  window.risquePersistHostGameState(gameState);
+                }
+                if (typeof window.risqueFlushMirrorPush === "function") {
+                  window.__risqueArtemisForceDeployMirrorPush = true;
+                  try {
+                    window.risqueFlushMirrorPush();
+                  } catch (eDepMirNav) {
+                    /* ignore */
+                  } finally {
+                    window.__risqueArtemisForceDeployMirrorPush = false;
+                  }
+                }
+              } else if (typeof window.risquePersistHostGameState === "function") {
+                window.risquePersistHostGameState(gameState);
               }
             }
             navigateGameHtmlPreferSoft(nextByKind[selectKind]);

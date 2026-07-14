@@ -750,7 +750,7 @@
     if (!gs) return "";
     var cpU = gs.currentPlayer ? String(gs.currentPlayer).trim().toUpperCase() : "";
     var ctrl = Number(gs.artemisControlSlot) || 0;
-    if (ctrl >= 1 && ctrl <= 3 && Array.isArray(gs.players)) {
+    if (ctrl >= 1 && ctrl <= (window.risqueArtemisMaxSlots || 6) && Array.isArray(gs.players)) {
       var slotName = "";
       var roster = gs.artemisRoster;
       if (roster && Array.isArray(roster)) {

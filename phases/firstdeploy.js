@@ -130,7 +130,7 @@
   function deployResolvePlayerByControlSlot(gs) {
     if (!gs || !Array.isArray(gs.players)) return null;
     var ctrl = Number(gs.artemisControlSlot) || 0;
-    if (ctrl < 1 || ctrl > 3) return null;
+    if (ctrl < 1 || ctrl > (window.risqueArtemisMaxSlots || 6)) return null;
     var roster =
       gs.artemisRoster && Array.isArray(gs.artemisRoster) && gs.artemisRoster.length
         ? gs.artemisRoster
@@ -343,7 +343,7 @@
     if (!slot && typeof window.risqueArtemisActivePlayerSlot === "function") {
       slot = Number(window.risqueArtemisActivePlayerSlot(gs)) || 0;
     }
-    if (slot >= 1 && slot <= 3) {
+    if (slot >= 1 && slot <= (window.risqueArtemisMaxSlots || 6)) {
       gs.artemisControlSlot = slot;
     }
     return slot;

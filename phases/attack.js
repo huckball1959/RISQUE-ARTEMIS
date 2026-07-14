@@ -1505,6 +1505,8 @@ function syncAttackPhaseActionLocks() {
   }
   const pending = gs && String(gs.attackPhase || '') === 'pending_transfer';
   const hasPair = !!(attacker && defender);
+  /* Planning, committed, or running — block CONTINUE TO REINFORCEMENT so it isn't mistaken for Begin. */
+  const campaignBusy = campaignMode != null || !!isPauseCampaignRunning;
   const rollEl = document.getElementById('roll');
   const blitzEl = document.getElementById('blitz');
   const campaignEl = document.getElementById('campaign');
@@ -1515,8 +1517,8 @@ function syncAttackPhaseActionLocks() {
     !!document.querySelector('.ucp-slot-ctl--pulse-attention') ||
     !!document.querySelector('.risque-confirm-slot-flash') ||
     !!document.querySelector('.risque-confirm-slot-strip-flash');
-  if (rollEl) rollEl.disabled = !!pending || !hasPair;
-  if (blitzEl) blitzEl.disabled = !!pending || !hasPair;
+  if (rollEl) rollEl.disabled = !!pending || !hasPair || campaignBusy;
+  if (blitzEl) blitzEl.disabled = !!pending || !hasPair || campaignBusy;
   if (campaignEl) campaignEl.disabled = !!pending;
   const uses =
     window.gameUtils && typeof window.gameUtils.getAerialAttackUsesRemaining === 'function'
@@ -1530,9 +1532,9 @@ function syncAttackPhaseActionLocks() {
   const aerialUnlockedForUi = aerialUnlocked || uses >= 1;
   const aerialBaseGrey =
     !aerialUnlockedForUi || isSelectingAerialSource || isSelectingAerialTarget || isAwaitingAerialConfirm;
-  if (aerialEl) aerialEl.disabled = !!pending || aerialBaseGrey || uses < 1;
-  if (aerialEl2) aerialEl2.disabled = !!pending || aerialBaseGrey || uses < 2;
-  if (reinforceEl) reinforceEl.disabled = !!pending || guidedPromptActive;
+  if (aerialEl) aerialEl.disabled = !!pending || aerialBaseGrey || uses < 1 || campaignBusy;
+  if (aerialEl2) aerialEl2.disabled = !!pending || aerialBaseGrey || uses < 2 || campaignBusy;
+  if (reinforceEl) reinforceEl.disabled = !!pending || guidedPromptActive || campaignBusy;
 }
 
 /** Re-apply after {@link setAttackChromeInteractive}; HUD enablement must not override per-control locks. */
@@ -2861,11 +2863,7 @@ function launchQDevCampaignRun() {
   campaignPreferredGarrison = 1;
   performInstantCommitFromKeys();
   void runInstantCampaignExecution().catch(function (e) {
-    try {
-      console.error('[Attack] Q Camp run failed', e);
-    } catch (e2) {
-      /* ignore */
-    }
+    recoverFromCampaignRunFailure(e, 'Q Camp');
   });
 }
 
@@ -2897,7 +2895,7 @@ function finishQDevCampaignAfterRun() {
     window.gameState.risquePublicAttackTransferSummary = '';
   }
   showPrompt('Select territory to attack from.', [{ label: 'Cancel', onClick: cancelAttack }]);
-  syncAttackPhaseActionLocks();
+  restoreIdleAttackControlsAfterCampaign();
   if (window.gameUtils && window.gameState) {
     window.gameUtils.renderTerritories(null, window.gameState);
     window.gameUtils.renderStats(window.gameState);
@@ -3754,10 +3752,10 @@ function hintCampaignMapBlockedNoOp() {
   let msg = '';
   if (campaignMode === 'instant_committed') {
     msg =
-      'Campaign path is locked — use Begin (or Reset / Exit) in the green campaign strip below; map picks stay off until then.';
+      'Campaign path is locked — use Begin (or Reset) in the green campaign strip under control voice. Map picks stay off. Do not use CONTINUE TO REINFORCEMENT until the campaign ends.';
   } else if (campaignMode === 'cond_await_condition') {
     msg =
-      'Campaign is waiting on the condition flow — finish Confirmed / Begin attack in the prompts and strip; map picks are paused.';
+      'Campaign is waiting on the condition flow — finish Confirmed / Begin attack in the prompts; map picks are paused.';
   } else if (campaignMode === 'armed') {
     msg = 'Campaign path is armed — use BEGIN in the prompt (or Exit / Reset); map picks stay off until then.';
   }
@@ -3980,6 +3978,113 @@ window.risquePrepareAttackPhaseShellMount = function (gs) {
 };
 
 /**
+ * After any campaign end/fail: unlock map + chrome so regular attacks work again.
+ * Instant runs used to leave chrome locked / map routing stripped on ARTEMIS clients when a hop
+ * aborted with no visible dice, or when runInstant threw before idle restore.
+ */
+function restoreIdleAttackControlsAfterCampaign() {
+  try {
+    window.risqueArtemisDeployHandoffPending = 0;
+    window.risqueArtemisDeployPushLocked = false;
+    window.risqueArtemisDeployRelinquishedSeq = 0;
+  } catch (eDepFlags) {
+    /* ignore */
+  }
+  isAwaitingAerialConfirm = false;
+  isSelectingAerialSource = false;
+  isSelectingAerialTarget = false;
+  isAcquiring = false;
+  attacker = null;
+  defender = null;
+  if (window.gameState) {
+    try {
+      delete window.gameState.risqueHostAttackStepStripActive;
+      delete window.gameState.risquePublicCampaignStepPaused;
+      delete window.gameState.risquePublicPausableBlitzPaused;
+      delete window.gameState.risqueTransferPulse;
+    } catch (eCampFlags) {
+      /* ignore */
+    }
+    if (String(window.gameState.attackPhase || '') === 'pending_transfer') {
+      try {
+        teardownAttackTroopTransferWheel();
+      } catch (eWheel) {
+        /* ignore */
+      }
+      window.gameState.attackPhase = 'attack';
+      window.gameState.attackingTerritory = null;
+      window.gameState.acquiredTerritory = null;
+      window.gameState.minTroopsToTransfer = 0;
+      window.gameState.risqueInstantBlitzTransferUi = false;
+      try {
+        delete window.gameState.risquePublicTransferMirrorSeal;
+        delete window.gameState.risqueDeferConquerElimination;
+      } catch (eSeal) {
+        /* ignore */
+      }
+      risqueDeferredEliminationConquerPrompt = null;
+    }
+  }
+  if (
+    window.risqueRuntimeHud &&
+    typeof window.risqueRuntimeHud.setAttackChromeInteractive === 'function'
+  ) {
+    window.risqueRuntimeHud.setAttackChromeInteractive(true);
+  }
+  syncAttackPhaseActionLocks();
+  updateBattlePanelReadout();
+  if (typeof window.risqueAttackPhaseTerritoryClick === 'function') {
+    window.handleTerritoryClick = window.risqueAttackPhaseTerritoryClick;
+  }
+  if (typeof window.risqueArtemisEnsureAttackInteractive === 'function') {
+    try {
+      window.risqueArtemisEnsureAttackInteractive(window.gameState);
+    } catch (eEns) {
+      /* ignore */
+    }
+  }
+  if (typeof window.risqueArtemisScheduleAttackMapRouting === 'function') {
+    try {
+      window.risqueArtemisScheduleAttackMapRouting(window.gameState);
+    } catch (eSched) {
+      /* ignore */
+    }
+  } else if (typeof window.risqueArtemisEnsureAttackMapRouting === 'function') {
+    try {
+      window.risqueArtemisEnsureAttackMapRouting(window.gameState);
+    } catch (eMap) {
+      /* ignore */
+    }
+  }
+  campaignTrace('campaign:idle_restored', {
+    mode: campaignMode,
+    phase: window.gameState ? window.gameState.phase : null
+  });
+}
+
+function recoverFromCampaignRunFailure(err, label) {
+  const tag = label != null ? String(label) : 'campaign';
+  try {
+    console.error('[Attack] ' + tag + ' run failed', err);
+  } catch (eLog) {
+    /* ignore */
+  }
+  campaignTrace('campaign:run_exception', {
+    label: tag,
+    message: err && err.message != null ? String(err.message) : String(err || '')
+  });
+  const detail =
+    err && err.message != null && String(err.message).trim() !== ''
+      ? String(err.message).slice(0, 280)
+      : 'Campaign run failed — map picks are restored; try a normal attack.';
+  applyPostCampaignOutcomeAndIdlePrompt(
+    'Campaign unsuccessful.',
+    detail,
+    'ucp-voice-report--public-blitz-fail'
+  );
+}
+
+/**
  * Host control voice + mirror: same headlines as public TV, then idle attack prompt (Cancel).
  * Call after clearPublicCampaignEndMirror when the public one-shot fields are unused.
  */
@@ -4007,13 +4112,7 @@ function applyPostCampaignOutcomeAndIdlePrompt(primary, report, reportClass) {
       skipMirror: true
     });
   }
-  if (
-    window.risqueRuntimeHud &&
-    typeof window.risqueRuntimeHud.setAttackChromeInteractive === 'function'
-  ) {
-    window.risqueRuntimeHud.setAttackChromeInteractive(true);
-  }
-  updateBattlePanelReadout();
+  restoreIdleAttackControlsAfterCampaign();
   if (window.gameState) {
     try {
       delete window.gameState.risqueTransferPulse;
@@ -4449,11 +4548,7 @@ function instantCampaignTryRun() {
     runPauseCampaignExecution();
   } else {
     void runInstantCampaignExecution().catch(function (e) {
-      try {
-        console.error('[Attack] instant campaign run failed', e);
-      } catch (e2) {
-        /* ignore */
-      }
+      recoverFromCampaignRunFailure(e, 'instant campaign');
     });
   }
 }
@@ -4562,11 +4657,7 @@ function startInstantCondConditionFlow() {
                   }
                   publishPublicBattleBanner(`${cur} has started Campaign · Instant COND (condition set)`);
                   void runInstantCampaignExecution().catch(function (e) {
-                    try {
-                      console.error('[Attack] instant COND campaign run failed', e);
-                    } catch (e2) {
-                      /* ignore */
-                    }
+                    recoverFromCampaignRunFailure(e, 'instant COND');
                   });
                 }
               }
@@ -4739,6 +4830,14 @@ async function runInstantCampaignExecution() {
       mode: campaignMode,
       len: campaignCommittedPath ? campaignCommittedPath.length : 0
     });
+    /* Begin with a locked/invalid path used to leave map picks dead (instant_committed). */
+    if (campaignMode === 'instant_committed' || campaignMode === 'cond_await_condition') {
+      applyPostCampaignOutcomeAndIdlePrompt(
+        'Campaign unsuccessful.',
+        'Campaign path was incomplete or invalid — try again or attack normally.',
+        'ucp-voice-report--public-blitz-fail'
+      );
+    }
     return;
   }
   if (campaignQDevMode) {
@@ -4756,6 +4855,10 @@ async function runInstantCampaignExecution() {
   const condInstant = campaignType === 'cond' && !campaignCondFromPauseRow;
   const condT = condInstant && campaignCondThreshold != null ? campaignCondThreshold : null;
   campaignTrace('instant:run_start', { path: cp.slice(), leaveBehind, condThreshold: condT });
+  /* Match Campaign Step: lock chrome so CONTINUE TO REINFORCEMENT cannot interrupt the run. */
+  if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.setAttackChromeInteractive === 'function') {
+    window.risqueRuntimeHud.setAttackChromeInteractive(false);
+  }
   if (window.gameState) {
     try {
       delete window.gameState.risqueCampaignInterruptedByElimination;
@@ -5487,6 +5590,13 @@ function runPauseCampaignExecution() {
       mode: campaignMode,
       len: campaignCommittedPath ? campaignCommittedPath.length : 0
     });
+    if (campaignMode === 'instant_committed' || campaignMode === 'cond_await_condition') {
+      applyPostCampaignOutcomeAndIdlePrompt(
+        'Campaign unsuccessful.',
+        'Campaign path was incomplete or invalid — try again or attack normally.',
+        'ucp-voice-report--public-blitz-fail'
+      );
+    }
     return;
   }
   syncInstantCampaignGarrisonFromUi();
@@ -5595,6 +5705,7 @@ function startInstantCampaignPlanning(opts) {
   ) {
     window.risqueRuntimeHud.setAttackChromeInteractive(true);
   }
+  syncAttackPhaseActionLocks();
 }
 
 function startInstantCondCampaignPlanning() {
@@ -5636,6 +5747,7 @@ function startInstantCondCampaignPlanning() {
   ) {
     window.risqueRuntimeHud.setAttackChromeInteractive(true);
   }
+  syncAttackPhaseActionLocks();
 }
 
 function startPauseCampaignPlanning() {
@@ -5675,6 +5787,7 @@ function startPauseCampaignPlanning() {
   ) {
     window.risqueRuntimeHud.setAttackChromeInteractive(true);
   }
+  syncAttackPhaseActionLocks();
 }
 
 function handleInstantCampaignTerritoryClick(label) {

@@ -1740,6 +1740,40 @@
   /** Brief pause before each recap step paints (shorter for voice-only = snappier wildcard flash). */
   var BOOK_PUBLIC_RECAP_VOICE_READ_MS = 280;
 
+  /**
+   * Kitchen-table ARTEMIS: same recap choreography as TV, but much shorter dwells.
+   * Hot-seat / public TV keep the full living-room timings above.
+   */
+  function bookPublicArtemisPaceMs(tvMs) {
+    var n = Number(tvMs) || 0;
+    if (!window.risqueArtemisMode || n <= 0) return n;
+    return Math.max(120, Math.round(n * 0.4));
+  }
+
+  function bookPublicSummaryMs(isRecap) {
+    return bookPublicArtemisPaceMs(isRecap ? BOOK_PUBLIC_RECAP_SUMMARY_MS : BOOK_PUBLIC_SUMMARY_MS);
+  }
+
+  function bookPublicRecapReadMs() {
+    return bookPublicArtemisPaceMs(BOOK_PUBLIC_RECAP_READ_MS);
+  }
+
+  function bookPublicRecapVoiceReadMs() {
+    return bookPublicArtemisPaceMs(BOOK_PUBLIC_RECAP_VOICE_READ_MS);
+  }
+
+  function bookPublicCountMs() {
+    return bookPublicArtemisPaceMs(BOOK_PUBLIC_COUNT_MS);
+  }
+
+  function bookPublicMapSwellMs() {
+    return bookPublicArtemisPaceMs(BOOK_PUBLIC_MAP_SWELL_MS);
+  }
+
+  function bookPublicAerialGapMs() {
+    return bookPublicArtemisPaceMs(BOOK_PUBLIC_RECAP_AERIAL_GAP_MS);
+  }
+
   /** JSON / storage can coerce booleans; treat any truthy recap flag as recap mode for TV timing + copy. */
   function risquePublicProcRecapAnimation(proc) {
     return !!(
@@ -1769,18 +1803,18 @@
   }
 
   function risquePublicBookStepHoldMs(step) {
-    if (!step) return BOOK_PUBLIC_HOLD_MS;
+    if (!step) return bookPublicArtemisPaceMs(BOOK_PUBLIC_HOLD_MS);
     var proc0 = _pubBook.proc;
     if (step.effect === "aerial_attack" && risquePublicProcRecapAnimation(proc0)) {
-      return BOOK_PUBLIC_RECAP_AERIAL_HOLD_MS;
+      return bookPublicArtemisPaceMs(BOOK_PUBLIC_RECAP_AERIAL_HOLD_MS);
     }
     if (!step.mapTerritory && !step.animateTroops) {
       if (risquePublicProcRecapAnimation(proc0)) {
-        return BOOK_PUBLIC_RECAP_VOICE_ONLY_HOLD_MS;
+        return bookPublicArtemisPaceMs(BOOK_PUBLIC_RECAP_VOICE_ONLY_HOLD_MS);
       }
-      return BOOK_PUBLIC_VOICE_ONLY_HOLD_MS;
+      return bookPublicArtemisPaceMs(BOOK_PUBLIC_VOICE_ONLY_HOLD_MS);
     }
-    return BOOK_PUBLIC_HOLD_MS;
+    return bookPublicArtemisPaceMs(BOOK_PUBLIC_HOLD_MS);
   }
   var _pubBook = {
     seq: null,
@@ -2609,10 +2643,13 @@
       }
       var out = gs;
       var snap = gs.risqueCardplayPublicMirrorSnapshot;
+      /* Kitchen-table ARTEMIS: never publish the pre-play frozen board — spectators briefly see
+       * acquires during recap then snap back to Guido when the freeze wins. Hot-seat TV still freezes. */
       if (
         (String(gs.phase || "") === "cardplay" || String(gs.phase || "") === "con-cardplay") &&
         gs.risqueCardplayUseFrozenPublicMirror === true &&
         !gs.risqueReplayPlaybackActive &&
+        !window.risqueArtemisMode &&
         snap &&
         snap.players &&
         Array.isArray(snap.players)
@@ -2771,7 +2808,10 @@
         (Number(window.__risquePublicMirrorSeqCounter) || 0) + 1;
       window.__risquePublicMirrorSeqCounter = mirrorPayload.risquePublicMirrorSeq;
       if (mirrorPayload && typeof mirrorPayload === "object") {
-        delete mirrorPayload.risquePlayedCardsGallery;
+        /* ARTEMIS laptops need the cards-played gallery; TV-only omit still avoids huge payloads. */
+        if (!window.risqueArtemisMode) {
+          delete mirrorPayload.risquePlayedCardsGallery;
+        }
         delete mirrorPayload.risqueLuckyLedger;
         /* TV needs this flag to bypass cardplay book map during host battle replay. */
         delete mirrorPayload.phaseReplayIndex;
@@ -3940,6 +3980,26 @@
     }
   }
 
+  /** Prefer the longer cards-played gallery (never shrink on stale mirrors). */
+  function risqueMergePlayedCardsGalleryMonotonic(targetGs, sourceGs) {
+    if (!targetGs) return;
+    var src = sourceGs && Array.isArray(sourceGs.risquePlayedCardsGallery)
+      ? sourceGs.risquePlayedCardsGallery
+      : null;
+    var dst = Array.isArray(targetGs.risquePlayedCardsGallery)
+      ? targetGs.risquePlayedCardsGallery
+      : [];
+    if (src && src.length > dst.length) {
+      try {
+        targetGs.risquePlayedCardsGallery = JSON.parse(JSON.stringify(src));
+      } catch (eGal) {
+        targetGs.risquePlayedCardsGallery = src.slice();
+      }
+    } else if (!Array.isArray(targetGs.risquePlayedCardsGallery)) {
+      targetGs.risquePlayedCardsGallery = dst;
+    }
+  }
+
   function risqueRenderHostCardsPlayedPanel(gs) {
     var el = document.getElementById("risque-host-cards-played-panel");
     if (!el) return;
@@ -4037,6 +4097,7 @@
   }
 
   window.risqueAppendCommittedCardplayToGallery = risqueAppendCommittedCardplayToGallery;
+  window.risqueMergePlayedCardsGalleryMonotonic = risqueMergePlayedCardsGalleryMonotonic;
   window.risqueRenderHostCardsPlayedPanel = risqueRenderHostCardsPlayedPanel;
   window.risqueRenderHostCardsInHandPanel = risqueRenderHostCardsInHandPanel;
 
@@ -4822,6 +4883,76 @@
     return out;
   }
 
+  /**
+   * ARTEMIS safety: after book/recap map animation, commit the final troop map into live gameState
+   * so Ukraine (etc.) cannot snap back to the pre-acquire owner when displayTroopMap is cleared.
+   */
+  function risqueArtemisCommitBookTroopMapIntoGameState(gs, troopMap) {
+    if (!window.risqueArtemisMode || !gs || !troopMap || !Array.isArray(gs.players)) return false;
+    var keys = Object.keys(troopMap);
+    if (!keys.length) return false;
+    gs.players.forEach(function (p) {
+      if (p) p.territories = [];
+    });
+    keys.forEach(function (label) {
+      var info = troopMap[label];
+      if (!info || info.owner == null || info.owner === "") return;
+      var want = String(info.owner);
+      var pl = gs.players.find(function (x) {
+        return (
+          x &&
+          String(x.name || "")
+            .trim()
+            .toUpperCase() === want.trim().toUpperCase()
+        );
+      });
+      if (!pl) return;
+      pl.territories.push({ name: label, troops: Number(info.troops) || 0 });
+    });
+    gs.players.forEach(function (p) {
+      if (!p) return;
+      var sum = 0;
+      (p.territories || []).forEach(function (t) {
+        sum += Number(t && t.troops) || 0;
+      });
+      p.troopsTotal = sum;
+    });
+    return true;
+  }
+
+  /**
+   * Final post-play board for a recap proc: baseline (pre-play) + every step applied forward.
+   * Prefer this over raw live gs — live can lag/stale on host/spectators while the proc is authoritative.
+   */
+  function risquePublicFinalTroopMapFromProc(proc, gs) {
+    if (!proc) return risqueTroopSnapshotForPublicBook(gs);
+    var map = risquePublicCloneTroopMap(
+      proc.territoryBaseline && Object.keys(proc.territoryBaseline).length
+        ? proc.territoryBaseline
+        : risqueTroopSnapshotForPublicBook(gs)
+    );
+    var acting = String((proc.playerName || (gs && gs.currentPlayer) || "") + "");
+    var steps = Array.isArray(proc.steps) ? proc.steps : [];
+    var si;
+    for (si = 0; si < steps.length; si++) {
+      risquePublicApplyStepForwardToTroopMap(map, steps[si], acting);
+    }
+    return map;
+  }
+
+  function risqueArtemisSeedLiveBoardFromBookProc(gs, proc) {
+    if (!window.risqueArtemisMode || !gs || !proc) return null;
+    var finalMap = risquePublicFinalTroopMapFromProc(proc, gs);
+    if (!finalMap || !Object.keys(finalMap).length) return null;
+    try {
+      risqueArtemisCommitBookTroopMapIntoGameState(gs, finalMap);
+    } catch (eSeed) {
+      /* ignore */
+    }
+    return finalMap;
+  }
+  window.risqueArtemisSeedLiveBoardFromBookProc = risqueArtemisSeedLiveBoardFromBookProc;
+
   function risquePublicApplyStepForwardToTroopMap(map, step, actingPlayerName) {
     if (!map || !step) return;
     var mapT = step.mapTerritory;
@@ -5467,7 +5598,9 @@
       urlPhaseForVoice = "";
     }
     var suppressPlayerSelectFlashVoice = false;
-    if (window.risqueArtemisNetClient && !window.risqueArtemisHost) {
+    if (psFlash && (psFlash.final === true || psFlash.final === "true" || psFlash.final === 1)) {
+      suppressPlayerSelectFlashVoice = false;
+    } else if (window.risqueArtemisNetClient && !window.risqueArtemisHost) {
       var psSelectKind = String(gs.risquePublicUiSelectKind || gs.selectionPhase || "").trim();
       if (psSelectKind.toLowerCase() === "cardplay") psSelectKind = "cardPlay";
       var cardPlayOrderRouletteLive =
@@ -5501,12 +5634,35 @@
     }
     var playerSelectFlashActive =
       !suppressPlayerSelectFlashVoice &&
-      (window.risqueDisplayIsPublic || artemisClientSetupMirror) &&
+      (window.risqueDisplayIsPublic ||
+        artemisClientSetupMirror ||
+        (psFlash &&
+          (psFlash.final === true || psFlash.final === "true" || psFlash.final === 1))) &&
       gs &&
-      String(gs.phase || "") === "playerSelect" &&
       psFlash &&
       String(psFlash.name || "").trim() !== "" &&
-      !(Number(window.risqueArtemisDeployRelinquishedSeq) > 0);
+      !(Number(window.risqueArtemisDeployRelinquishedSeq) > 0) &&
+      (String(gs.phase || "") === "playerSelect" ||
+        psFlash.final === true ||
+        psFlash.final === "true" ||
+        psFlash.final === 1);
+    if (!playerSelectFlashActive) {
+      if (typeof window.risqueSetRouletteRevealVoiceExpanded === "function") {
+        window.risqueSetRouletteRevealVoiceExpanded(false);
+      } else {
+        try {
+          var cvCollapse = document.getElementById("control-voice");
+          if (cvCollapse && cvCollapse.classList) {
+            cvCollapse.classList.remove("ucp-control-voice--roulette-reveal");
+          }
+          if (document.body && document.body.classList) {
+            document.body.classList.remove("risque-roulette-reveal-cv");
+          }
+        } catch (eCvCollapse) {
+          /* ignore */
+        }
+      }
+    }
 
     var basePrimary = "";
     var reportText = "";
@@ -5975,14 +6131,39 @@
         /* no-op */
       } else if (renderPlayerSelectFlash) {
         vt.innerHTML = "";
+        if (typeof window.risqueSetRouletteRevealVoiceExpanded === "function") {
+          window.risqueSetRouletteRevealVoiceExpanded(true);
+        } else {
+          try {
+            var cvReveal = document.getElementById("control-voice");
+            if (cvReveal && cvReveal.classList) {
+              cvReveal.classList.add("ucp-control-voice--roulette-reveal");
+            }
+          } catch (eCvReveal) {
+            /* ignore */
+          }
+        }
+        var fl = gs.risquePublicPlayerSelectFlash;
+        var skPub = fl && fl.selectKind != null ? String(fl.selectKind) : "";
         var insPub = document.createElement("div");
         insPub.className = "player-select-voice-instruction";
-        insPub.textContent = String(basePrimary || "")
-          .replace(/\n/g, " ")
-          .trim();
+        var insText =
+          fl && fl.instruction
+            ? String(fl.instruction)
+            : skPub === "firstCard"
+              ? "FIRST CARD"
+              : skPub === "deployOrder"
+                ? "FIRST TO DEPLOY"
+                : skPub === "cardPlay"
+                  ? "PLAYER ONE"
+                  : String(basePrimary || "");
+        insPub.textContent = insText.replace(/\n/g, " ").trim();
         var cycPub = document.createElement("div");
         cycPub.className = "player-select-cycle-name player-select-cycle-name--hud-primary";
-        var fl = gs.risquePublicPlayerSelectFlash;
+        if (fl && (fl.final === true || fl.final === "true" || fl.final === 1)) {
+          cycPub.className += " player-select-cycle-name--winner";
+          cycPub.style.animation = "none";
+        }
         cycPub.textContent = String(fl && fl.name ? fl.name : "").toUpperCase();
         var colPub = fl && fl.color != null ? String(fl.color) : "";
         cycPub.style.color =
@@ -5991,6 +6172,39 @@
             : "#ffffff";
         vt.appendChild(insPub);
         vt.appendChild(cycPub);
+        var orderList = fl && Array.isArray(fl.turnOrder) ? fl.turnOrder : [];
+        if (orderList.length > 1) {
+          var orderWrapPub = document.createElement("div");
+          orderWrapPub.className = "player-select-turn-order player-select-turn-order--row";
+          var orderTitlePub = document.createElement("div");
+          orderTitlePub.className = "player-select-turn-order-title";
+          orderTitlePub.textContent = "THEN";
+          orderWrapPub.appendChild(orderTitlePub);
+          var trackPub = document.createElement("div");
+          trackPub.className = "player-select-turn-order-track";
+          var colsPub = Array.isArray(fl.turnOrderColors) ? fl.turnOrderColors : [];
+          orderList.forEach(function (nm, idx) {
+            if (idx === 0) return;
+            var chipPub = document.createElement("span");
+            chipPub.className = "player-select-turn-order-chip";
+            var ordPub = document.createElement("span");
+            ordPub.className = "player-select-turn-order-chip-ord";
+            ordPub.textContent = String(idx + 1);
+            var namePub = document.createElement("span");
+            namePub.className = "player-select-turn-order-chip-name";
+            namePub.textContent = String(nm || "").toUpperCase();
+            var cName = colsPub[idx] != null ? String(colsPub[idx]) : "";
+            chipPub.style.color =
+              window.gameUtils && window.gameUtils.colorMap && window.gameUtils.colorMap[cName]
+                ? window.gameUtils.colorMap[cName]
+                : "#e2e8f0";
+            chipPub.appendChild(ordPub);
+            chipPub.appendChild(namePub);
+            trackPub.appendChild(chipPub);
+          });
+          orderWrapPub.appendChild(trackPub);
+          vt.appendChild(orderWrapPub);
+        }
       } else if (
         elBan !== "" &&
         String(gs.phase || "") === "attack" &&
@@ -6831,14 +7045,29 @@
         _pubBook.phase = "summary";
         _pubBook.stepIndex = 0;
         _pubBook.focusLabel = null;
-        _pubBook.displayTroopMap = risquePublicCloneTroopMap(
-          proc.territoryBaseline && Object.keys(proc.territoryBaseline).length
-            ? proc.territoryBaseline
-            : risqueTroopSnapshotForPublicBook(gs)
-        );
-        var summaryMs = risquePublicProcRecapAnimation(_pubBook.proc)
-          ? BOOK_PUBLIC_RECAP_SUMMARY_MS
-          : BOOK_PUBLIC_SUMMARY_MS;
+        /*
+         * ARTEMIS: seed display + live board from baseline+steps (authoritative post-play map).
+         * Using raw live gs flashed correct then snapped back when a stale mirror won after anim.
+         * Using territoryBaseline alone rewound acquires (yellow flash) on Confirm.
+         */
+        if (window.risqueArtemisMode) {
+          var seeded = risqueArtemisSeedLiveBoardFromBookProc(gs, proc);
+          _pubBook.displayTroopMap = risquePublicCloneTroopMap(
+            seeded || risquePublicFinalTroopMapFromProc(proc, gs)
+          );
+          try {
+            localStorage.setItem("gameState", JSON.stringify(gs));
+          } catch (eSeedLs) {
+            /* ignore */
+          }
+        } else {
+          _pubBook.displayTroopMap = risquePublicCloneTroopMap(
+            proc.territoryBaseline && Object.keys(proc.territoryBaseline).length
+              ? proc.territoryBaseline
+              : risqueTroopSnapshotForPublicBook(gs)
+          );
+        }
+        var summaryMs = bookPublicSummaryMs(risquePublicProcRecapAnimation(_pubBook.proc));
         _pubBook.summaryDeadlineMs = Date.now() + summaryMs;
         _pubBook.summaryTimer = setTimeout(function () {
           _pubBook.summaryTimer = null;
@@ -7273,6 +7502,19 @@
   var SHELF_CROSSFADE_MS = 500;
   var SHELF_UPPER_CLEAR_MS = 400;
 
+  function shelfCrossfadeMs() {
+    return bookPublicArtemisPaceMs(SHELF_CROSSFADE_MS);
+  }
+
+  function shelfUpperClearMs() {
+    return bookPublicArtemisPaceMs(SHELF_UPPER_CLEAR_MS);
+  }
+
+  function risquePublicShelfRecapLeadMs(stepIdx) {
+    if (!risquePublicShelfOverlayHasShelfPanel()) return 0;
+    return stepIdx > 0 ? shelfUpperClearMs() + shelfCrossfadeMs() : shelfCrossfadeMs();
+  }
+
   function risquePublicShelfOverlayHasShelfPanel() {
     var o = document.getElementById("risque-public-cardplay-recap-overlay");
     return !!(o && o.querySelector(".risque-public-cardplay-recap-panel--shelf"));
@@ -7284,11 +7526,8 @@
     return !!(o && o.querySelector(".risque-public-cp-shelf-lower .risque-public-cp-shelf-card-slot"));
   }
 
-  /** Milliseconds after runStep starts before map highlight (recap + shelf): crossfade(s) + read beat. */
-  function risquePublicShelfRecapLeadMs(stepIdx) {
-    if (!risquePublicShelfOverlayHasShelfPanel()) return 0;
-    return stepIdx > 0 ? SHELF_UPPER_CLEAR_MS + SHELF_CROSSFADE_MS : SHELF_CROSSFADE_MS;
-  }
+  /** Milliseconds after runStep starts before map highlight (recap + shelf): crossfade(s) + read beat.
+   * (Primary definition is shelfCrossfadeMs / risquePublicShelfRecapLeadMs above.) */
 
   function risqueHostShelfClearAerialUiPoll() {
     if (_pubBook.hostShelfAerialUiPoll) {
@@ -7573,7 +7812,7 @@
 
     function fillUpperProcessingUi() {
       risqueHostShelfClearAerialUiPoll();
-      upperInner.style.transition = "opacity " + SHELF_CROSSFADE_MS + "ms ease";
+      upperInner.style.transition = "opacity " + shelfCrossfadeMs() + "ms ease";
       upperInner.innerHTML = "";
       var wrap = document.createElement("div");
       wrap.className =
@@ -7648,7 +7887,7 @@
         var sl = liveSlots[si];
         var img = sl.querySelector("img");
         if (!img) continue;
-        img.style.transition = "opacity " + SHELF_CROSSFADE_MS + "ms ease";
+        img.style.transition = "opacity " + shelfCrossfadeMs() + "ms ease";
         sl.classList.remove("risque-public-cp-shelf-card-slot--done");
         if (si < vidx) {
           sl.classList.add("risque-public-cp-shelf-card-slot--done");
@@ -7662,13 +7901,13 @@
     }
 
     if (stepIdx > 0) {
-      upperInner.style.transition = "opacity " + SHELF_UPPER_CLEAR_MS + "ms ease";
+      upperInner.style.transition = "opacity " + shelfUpperClearMs() + "ms ease";
       upperInner.style.opacity = "0";
       setTimeout(function () {
         upperInner.innerHTML = "";
         updateLowerSlotsForStep();
         fillUpperProcessingUi();
-      }, SHELF_UPPER_CLEAR_MS);
+      }, shelfUpperClearMs());
     } else {
       updateLowerSlotsForStep();
       fillUpperProcessingUi();
@@ -7688,14 +7927,14 @@
       if (typeof done === "function") done();
       return;
     }
-    upperInner.style.transition = "opacity " + SHELF_CROSSFADE_MS + "ms ease";
+    upperInner.style.transition = "opacity " + shelfCrossfadeMs() + "ms ease";
     upperInner.style.opacity = "0";
     var si;
     for (si = 0; si < slots.length; si++) {
       var sl = slots[si];
       var img = sl && sl.querySelector("img");
       if (!img) continue;
-      img.style.transition = "opacity " + SHELF_CROSSFADE_MS + "ms ease";
+      img.style.transition = "opacity " + shelfCrossfadeMs() + "ms ease";
       sl.classList.add("risque-public-cp-shelf-card-slot--done");
       img.style.opacity = "0.35";
     }
@@ -7703,7 +7942,7 @@
       upperInner.innerHTML = "";
       upperInner.style.opacity = "1";
       if (typeof done === "function") done();
-    }, SHELF_CROSSFADE_MS);
+    }, shelfCrossfadeMs());
   }
 
   function risquePublicBookAnimateTroops(label, from, to, ms, done) {
@@ -7757,6 +7996,49 @@
               sessionStorage.setItem(RISQUE_SESSION_RECAP_SEQ_KEY, String(_pubBook.seq));
             }
           } catch (eSeq) {
+            /* ignore */
+          }
+        }
+        if (_pubBook.displayTroopMap && gs) {
+          try {
+            if (risqueArtemisCommitBookTroopMapIntoGameState(gs, _pubBook.displayTroopMap)) {
+              try {
+                localStorage.setItem("gameState", JSON.stringify(gs));
+              } catch (eLsMap) {
+                /* ignore */
+              }
+              if (
+                window.risqueArtemisHost &&
+                !window.risqueArtemisNetClient &&
+                typeof window.risqueMirrorPushGameState === "function"
+              ) {
+                try {
+                  window.risqueMirrorPushGameState();
+                } catch (eMirMap) {
+                  /* ignore */
+                }
+              }
+              if (typeof window.risqueRenderHostCardsPlayedPanel === "function") {
+                try {
+                  window.risqueRenderHostCardsPlayedPanel(gs);
+                } catch (eGalRen) {
+                  /* ignore */
+                }
+              }
+            }
+          } catch (eCommitMap) {
+            /* ignore */
+          }
+        } else if (window.risqueArtemisMode && gs && proc) {
+          /* displayTroopMap already cleared elsewhere — still force post-play board from proc. */
+          try {
+            risqueArtemisSeedLiveBoardFromBookProc(gs, proc);
+            try {
+              localStorage.setItem("gameState", JSON.stringify(gs));
+            } catch (eSeedEnd) {
+              /* ignore */
+            }
+          } catch (eSeedEnd2) {
             /* ignore */
           }
         }
@@ -7958,9 +8240,9 @@
       delete gs.risquePublicCardplayHighlightLabels;
       delete gs.risquePublicCardplayHighlightMode;
       risquePublicRenderMapForBook(gs);
-      var readMs = BOOK_PUBLIC_RECAP_READ_MS;
+      var readMs = bookPublicRecapReadMs();
       if (step && !step.mapTerritory && !step.animateTroops) {
-        readMs = BOOK_PUBLIC_RECAP_VOICE_READ_MS;
+        readMs = bookPublicRecapVoiceReadMs();
       }
       var shelfLead = useShelfRecap ? risquePublicShelfRecapLeadMs(idx) : 0;
       _pubBook.stepTimer = setTimeout(function () {
@@ -7982,7 +8264,7 @@
       vr.textContent = "";
       vr.style.display = "none";
     }
-    setTimeout(done, BOOK_PUBLIC_RECAP_AERIAL_GAP_MS);
+    setTimeout(done, bookPublicAerialGapMs());
   }
 
   function risquePublicBookScheduleAdvanceFromStep(idx, step, stepHold) {
@@ -8049,7 +8331,7 @@
         }
         requestAnimationFrame(function () {
           requestAnimationFrame(function () {
-            risquePublicBookAnimateTroops(mapT, step.troopsFrom, step.troopsTo, BOOK_PUBLIC_COUNT_MS, clearFocusThenScheduleNext);
+            risquePublicBookAnimateTroops(mapT, step.troopsFrom, step.troopsTo, bookPublicCountMs(), clearFocusThenScheduleNext);
           });
         });
       } else {
@@ -8081,7 +8363,7 @@
         delete gs.risquePublicCardplayHighlightMode;
         risquePublicRenderMapForBook(gs);
         runTroopOrHoldAfterHighlight();
-      }, BOOK_PUBLIC_MAP_SWELL_MS);
+      }, bookPublicMapSwellMs());
       return;
     }
 
@@ -8703,7 +8985,7 @@
       });
     }
     risquePublicClearStaticRecapAckTimer();
-    var staticReadMs = Math.max(BOOK_PUBLIC_SUMMARY_MS, 900 + recapPopIdx * 55);
+    var staticReadMs = Math.max(bookPublicSummaryMs(false), 900 + recapPopIdx * 55);
     if (gs.risquePublicCardplayRecapAckRequiredSeq != null && String(gs.phase || "") === "cardplay") {
       var ackSeqStatic = Number(gs.risquePublicCardplayRecapAckRequiredSeq);
       window.__risqueStaticRecapAckT = setTimeout(function () {
@@ -9333,7 +9615,14 @@
       }
     }
     if (String(gs.phase || "") !== "playerSelect") {
-      if (typeof window.risqueArtemisClearSetupPlayerSelectArtifacts === "function") {
+      var keepFinalFlash =
+        gs.risquePublicPlayerSelectFlash &&
+        (gs.risquePublicPlayerSelectFlash.final === true ||
+          gs.risquePublicPlayerSelectFlash.final === "true" ||
+          gs.risquePublicPlayerSelectFlash.final === 1);
+      if (keepFinalFlash) {
+        /* Final roulette order still on screen — do not wipe for deal/deploy handoff. */
+      } else if (typeof window.risqueArtemisClearSetupPlayerSelectArtifacts === "function") {
         window.risqueArtemisClearSetupPlayerSelectArtifacts(gs);
       } else if (gs.risquePublicPlayerSelectFlash != null) {
         delete gs.risquePublicPlayerSelectFlash;
@@ -11984,8 +12273,15 @@
     if (window.risqueArtemisNetClient) {
       return;
     }
-    /* ARTEMIS host fast-boot uses artemis-login.js + fixed GUIDO/MICTOR/NOOCH — not legacy HUD login. */
-    if (window.risqueArtemisHost && window.risqueArtemisFastBoot !== false) {
+    /*
+     * Host-driven kitchen-table login (m347+): mount hot-seat HUD + presets on the host.
+     * Legacy fast-boot skipped this and relied on fixed GUIDO/MICTOR/NOOCH overlays.
+     */
+    if (
+      window.risqueArtemisHost &&
+      window.risqueArtemisFastBoot !== false &&
+      window.risqueArtemisHostDrivenLogin === false
+    ) {
       return;
     }
     if (
@@ -16612,7 +16908,9 @@
     startBtn.setAttribute("aria-disabled", ready ? "false" : "true");
     startBtn.title = ready
       ? "Start welcome → deal → setup (fresh game)"
-      : "Waiting for Mictor and Nooch to sign in";
+      : window.risqueArtemisHostDrivenLogin !== false
+        ? "Fill names/colors on the login form (try Preset 1), with all laptops connected"
+        : "Waiting for all players to sign in";
   }
 
   window.risqueSyncBoardCornerArtemisStart = syncBoardCornerArtemisStartVisibility;

@@ -1,0 +1,125 @@
+  var RIG_PICKER_LEAD_AFTER_START =
+    "Pick who wins first-card, deploy-order, and cardplay roulettes. The game continues after you choose.";
+  var RIG_PICKER_OPTIONS = [
+    { ui: 1, random: true, label: "True random", hint: "Fair roulette - no swap after spin" },
+    { ui: 2, slot: 1, label: "Rigged - Guido", hint: "Player 1 wins setup roulettes" },
+    { ui: 3, slot: 2, label: "Rigged - Mictor", hint: "Player 2 wins setup roulettes" },
+    { ui: 4, slot: 3, label: "Rigged - Nooch", hint: "Player 3 wins setup roulettes" }
+  ];
+
+
+  var rigPickerOverlay = null;
+  var rigPickContinueFn = null;
+
+  function ensureRigPickerOverlay() {
+    if (rigPickerOverlay) return rigPickerOverlay;
+    if (!document.body) return null;
+    rigPickerOverlay = document.createElement("div");
+    rigPickerOverlay.id = "risque-artemis-rig-picker";
+    rigPickerOverlay.className = "risque-artemis-rig-picker";
+    rigPickerOverlay.hidden = true;
+    rigPickerOverlay.innerHTML =
+      '<div class="risque-artemis-rig-picker-card" role="dialog" aria-labelledby="risque-artemis-rig-picker-title">' +
+      '<h2 class="risque-artemis-rig-picker-title" id="risque-artemis-rig-picker-title">Setup roulette rig</h2>' +
+      '<p class="risque-artemis-rig-picker-lead" id="risque-artemis-rig-picker-lead">Pick who wins first-card, deploy-order, and cardplay roulettes. The game continues after you choose.</p>' +
+      '<div class="risque-artemis-rig-picker-options" id="risque-artemis-rig-picker-options"></div>' +
+      "</div>";
+    document.body.appendChild(rigPickerOverlay);
+
+    var optionsEl = document.getElementById("risque-artemis-rig-picker-options");
+    if (optionsEl) {
+      RIG_PICKER_OPTIONS.forEach(function (opt) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "risque-artemis-rig-picker-btn";
+        btn.setAttribute("data-rig-ui", String(opt.ui));
+        btn.innerHTML =
+          '<span class="risque-artemis-rig-picker-btn-num">' +
+          opt.ui +
+          "</span>" +
+          '<span class="risque-artemis-rig-picker-btn-text">' +
+          '<span class="risque-artemis-rig-picker-btn-label">' +
+          opt.label +
+          "</span>" +
+          '<span class="risque-artemis-rig-picker-btn-hint">' +
+          opt.hint +
+          "</span></span>";
+        btn.addEventListener("click", function () {
+          pickRigOption(opt);
+        });
+        optionsEl.appendChild(btn);
+      });
+    }
+    return rigPickerOverlay;
+  }
+
+  function pickRigOption(opt) {
+    if (!opt || typeof window.risqueArtemisApplyRigSetup !== "function") return;
+    var cont = rigPickContinueFn;
+    rigPickContinueFn = null;
+    var label = "";
+    if (opt.random) {
+      label = window.risqueArtemisApplyRigSetup({ random: true });
+    } else {
+      label = window.risqueArtemisApplyRigSetup({ slot: opt.slot });
+    }
+    if (window.gameState && typeof window.risqueArtemisCaptureRigIntoGameState === "function") {
+      window.risqueArtemisCaptureRigIntoGameState(window.gameState);
+      try {
+        localStorage.setItem("gameState", JSON.stringify(window.gameState));
+      } catch (eGs) {
+        /* ignore */
+      }
+      if (typeof window.risqueMirrorPushGameState === "function") {
+        try {
+          window.risqueMirrorPushGameState();
+        } catch (eMir) {
+          /* ignore */
+        }
+      }
+    }
+    if (rigPickerOverlay) rigPickerOverlay.hidden = true;
+    document.documentElement.classList.remove("risque-artemis-rig-picker-active");
+    if (typeof window.risqueSetBoardCornerMsg === "function" && label) {
+      window.risqueSetBoardCornerMsg("Setup rig: " + label);
+    }
+    if (typeof cont === "function") {
+      setTimeout(function () {
+        try {
+          cont();
+        } catch (eCont) {
+          try {
+            console.error("[ARTEMIS rig] continue after pick failed:", eCont);
+          } catch (eLog) {
+            /* ignore */
+          }
+        }
+      }, 0);
+    }
+  }
+
+  function hideRigPicker() {
+    if (rigPickerOverlay) rigPickerOverlay.hidden = true;
+    document.documentElement.classList.remove("risque-artemis-rig-picker-active");
+    rigPickContinueFn = null;
+  }
+
+  /** After START - welcome blank is visible; pause until host picks rig (fresh games only). */
+  window.risqueArtemisShowRigPickerAfterStart = function (continueFn) {
+    if (!isHost || !window.risqueArtemisFastBoot) {
+      if (typeof continueFn === "function") continueFn();
+      return;
+    }
+    rigPickContinueFn = continueFn;
+    if (!ensureRigPickerOverlay()) {
+      rigPickContinueFn = null;
+      if (typeof continueFn === "function") continueFn();
+      return;
+    }
+    var lead = document.getElementById("risque-artemis-rig-picker-lead");
+    if (lead) lead.textContent = RIG_PICKER_LEAD_AFTER_START;
+    rigPickerOverlay.hidden = false;
+    document.documentElement.classList.add("risque-artemis-rig-picker-active");
+  };
+
+  window.risqueArtemisHideRigPicker = hideRigPicker;

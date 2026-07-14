@@ -51,9 +51,24 @@
   }
 
   function showWelcomeChrome(gs) {
+    try {
+      document.documentElement.classList.add("risque-artemis-setup-started");
+      document.documentElement.classList.remove("risque-artemis-login-active");
+    } catch (eCls) {
+      /* ignore */
+    }
     document.body.classList.add("risque-setup-fullstage");
     var appEl = document.getElementById("app");
     if (appEl) appEl.innerHTML = "";
+    try {
+      var loginRoot = document.getElementById("risque-login-hud-root");
+      if (loginRoot) {
+        loginRoot.hidden = true;
+        loginRoot.innerHTML = "";
+      }
+    } catch (eLoginClr) {
+      /* ignore */
+    }
     if (typeof window.risqueRefreshSetupStageChrome === "function") {
       window.risqueRefreshSetupStageChrome("WELCOME", function () {
         if (window.risqueRuntimeHud && typeof window.risqueRuntimeHud.setControlVoiceText === "function") {
@@ -171,16 +186,24 @@
       }
     }
 
+    /* Fair random setup (m349): no post-login rig picker. Optional ?rigSetup= still works. */
     if (
-      typeof window.risqueArtemisIsRigSetupLocked === "function" &&
-      window.risqueArtemisIsRigSetupLocked()
+      typeof window.risqueArtemisApplyRigSetup === "function" &&
+      !(
+        typeof window.risqueArtemisIsRigSetupLocked === "function" &&
+        window.risqueArtemisIsRigSetupLocked()
+      )
     ) {
-      runWelcomeBeatThenFirstCard();
-    } else if (typeof window.risqueArtemisShowRigPickerAfterStart === "function") {
-      window.risqueArtemisShowRigPickerAfterStart(runWelcomeBeatThenFirstCard);
-    } else {
-      runWelcomeBeatThenFirstCard();
+      try {
+        window.risqueArtemisApplyRigSetup({ random: true });
+        if (window.gameState && typeof window.risqueArtemisCaptureRigIntoGameState === "function") {
+          window.risqueArtemisCaptureRigIntoGameState(window.gameState);
+        }
+      } catch (eFair) {
+        /* ignore */
+      }
     }
+    runWelcomeBeatThenFirstCard();
 
     return true;
   };

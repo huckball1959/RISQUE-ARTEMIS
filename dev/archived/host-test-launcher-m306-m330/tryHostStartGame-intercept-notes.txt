@@ -1,0 +1,4 @@
+﻿// --- tryHostStartGame launcher intercept (removed m346) ---
+// From tryHostStartGame: hostLauncherIsOpen guard, HideHostTestLauncher in runHostStartGame,
+// onLoginSuccess risqueArtemisHostLaunchMode branch, ShowHostTestLauncher(launchWithChoices)
+// See README.md for restore instructions.
